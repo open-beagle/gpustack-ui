@@ -9,6 +9,12 @@
 /.umi-production
 /.umi-test
 /dist
+/css
+/js
+/static
+/index.html
+/favicon.ico
+/favicon.png
 /.mfsu
 .swc
 .DS_Store
