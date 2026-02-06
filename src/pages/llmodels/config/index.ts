@@ -543,7 +543,7 @@ export const getBackendParamsTips = (backend: string) => {
     return {
       backend: 'Ascend MindIE',
       releases: '',
-      link: 'http://docs.gpustack.ai/latest/user-guide/inference-backends/#parameters-reference_2',
+      link: 'http://www.bc-cloud.com/latest/user-guide/inference-backends/#parameters-reference_2',
       version: '1.0.0'
     };
   }

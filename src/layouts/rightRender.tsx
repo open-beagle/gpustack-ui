@@ -186,7 +186,8 @@ export const getRightRenderContent = (opts: {
               opts.runtimeConfig.showShortcuts();
             }
           }
-        }))
+        })),
+        style: { display: 'none' }
       }
     ]
   };
@@ -219,7 +220,8 @@ export const getRightRenderContent = (opts: {
           onClick: () => {
             setLocale(key, false);
           }
-        }))
+        })),
+        style: { display: 'none' }
       }
     ]
   };
