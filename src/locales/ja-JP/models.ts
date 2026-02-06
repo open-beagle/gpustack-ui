@@ -71,6 +71,9 @@ export default {
   'models.form.backend_parameters.llamabox.placeholder': '例: --ctx-size=8192',
   'models.form.backend_parameters.vllm.placeholder': '例: --max-model-len=8192',
   'models.form.backend_parameters.vllm.tips': '詳細な{backend}パラメータ情報',
+  'models.form.backend_parameters.vllmomni.placeholder':
+    '例: --num-inference-steps=9',
+  'models.form.backend_parameters.vllmomni.tips': '詳細な{backend}パラメータ情報',
   'models.logs.pagination.prev': '前の{lines}行',
   'models.logs.pagination.next': '次の{lines}行',
   'models.logs.pagination.last': '最終ページ',
@@ -84,6 +87,8 @@ export default {
   'models.form.backend.llamabox':
     'GGUF形式のモデル用（Linux、macOS、Windowsをサポート）。',
   'models.form.backend.vllm': '非GGUF形式のモデル用。Linux のみ対応。',
+  'models.form.backend.vllmomni':
+    'オムニモーダルモデル（画像/音声生成）用。Linuxのみ対応。',
   'models.form.backend.voxbox':
     '非GGUF形式の音声モデル用。NVIDIA GPUおよびCPUのみ対応。',
   'models.form.backend.mindie':

@@ -63,6 +63,10 @@ const backendOptions = [
     value: backendOptionsMap.vllm
   },
   {
+    label: 'vLLM-Omni',
+    value: backendOptionsMap.vllmOmni
+  },
+  {
     label: 'Ascend Mindie',
     value: backendOptionsMap.ascendMindie
   },

@@ -92,6 +92,10 @@ export const backendTipsList = [
     tips: 'models.form.backend.vllm'
   },
   {
+    title: 'vLLM-Omni',
+    tips: 'models.form.backend.vllmomni'
+  },
+  {
     title: 'Ascend MindIE',
     tips: 'models.form.backend.mindie'
   },
@@ -128,6 +132,7 @@ export const localPathTipsList = [
 export const backendOptionsMap = {
   llamaBox: 'llama-box',
   vllm: 'vllm',
+  vllmOmni: 'vllm-omni',
   voxBox: 'vox-box',
   ascendMindie: 'ascend-mindie'
 };
@@ -135,6 +140,7 @@ export const backendOptionsMap = {
 export const backendLabelMap = {
   [backendOptionsMap.llamaBox]: 'llama-box',
   [backendOptionsMap.vllm]: 'vLLM',
+  [backendOptionsMap.vllmOmni]: 'vLLM-Omni',
   [backendOptionsMap.voxBox]: 'vox-box',
   [backendOptionsMap.ascendMindie]: 'Ascend MindIE'
 };
@@ -147,6 +153,10 @@ export const backendParamsHolderTips = {
   [backendOptionsMap.vllm]: {
     holder: 'models.form.backend_parameters.vllm.placeholder',
     tooltip: 'models.form.backend_parameters.vllm.tips'
+  },
+  [backendOptionsMap.vllmOmni]: {
+    holder: 'models.form.backend_parameters.vllmomni.placeholder',
+    tooltip: 'models.form.backend_parameters.vllmomni.tips'
   },
   [backendOptionsMap.voxBox]: null
 };
@@ -518,6 +528,14 @@ export const getBackendParamsTips = (backend: string) => {
       backend: 'vLLM',
       releases: 'https://github.com/vllm-project/vllm/releases',
       link: 'https://docs.vllm.ai/en/stable/cli/serve.html',
+      version: 'v0.8.5'
+    };
+  }
+  if (backend === backendOptionsMap.vllmOmni) {
+    return {
+      backend: 'vLLM-Omni',
+      releases: 'https://github.com/vllm-project/vllm/releases',
+      link: 'https://github.com/vllm-project/vllm',
       version: 'v0.8.5'
     };
   }

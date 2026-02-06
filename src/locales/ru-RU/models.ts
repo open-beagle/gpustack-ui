@@ -72,6 +72,10 @@ export default {
     'например: --max-model-len=8192',
   'models.form.backend_parameters.vllm.tips':
     'Подробнее о параметрах {backend}',
+  'models.form.backend_parameters.vllmomni.placeholder':
+    'например: --num-inference-steps=9',
+  'models.form.backend_parameters.vllmomni.tips':
+    'Подробнее о параметрах {backend}',
   'models.logs.pagination.prev': 'Предыдущие {lines} строк',
   'models.logs.pagination.next': 'Следующие {lines} строк',
   'models.logs.pagination.last': 'Последняя страница',
@@ -86,6 +90,8 @@ export default {
     'Для моделей формата GGUF. Поддержка Linux, macOS и Windows.',
   'models.form.backend.vllm':
     'Для моделей не-GGUF формата, поддерживается только в Linux.',
+  'models.form.backend.vllmomni':
+    'Для омни-модальных моделей (генерация изображений/аудио), поддерживается только в Linux.',
   'models.form.backend.voxbox':
     'Для аудиомоделей не-GGUF формата, поддерживается только на GPU NVIDIA и CPU.',
   'models.form.backend.mindie':

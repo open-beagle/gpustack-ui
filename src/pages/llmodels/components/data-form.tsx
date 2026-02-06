@@ -279,6 +279,14 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
                     : isGGUF
               },
               {
+                label: backendLabelMap[backendOptionsMap.vllmOmni],
+                value: backendOptionsMap.vllmOmni,
+                disabled:
+                  props.source === modelSourceMap.local_path_value
+                    ? false
+                    : isGGUF
+              },
+              {
                 label: backendLabelMap[backendOptionsMap.ascendMindie],
                 value: backendOptionsMap.ascendMindie,
                 disabled:

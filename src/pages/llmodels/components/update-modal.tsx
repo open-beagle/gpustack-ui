@@ -424,6 +424,15 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
                         : isGGUF
                   },
                   {
+                    label: backendLabelMap[backendOptionsMap.vllmOmni],
+                    value: backendOptionsMap.vllmOmni,
+                    disabled:
+                      formData?.source === modelSourceMap.local_path_value ||
+                      isVllmOrAscend
+                        ? false
+                        : isGGUF
+                  },
+                  {
                     label: backendLabelMap[backendOptionsMap.ascendMindie],
                     value: backendOptionsMap.ascendMindie,
                     disabled:

@@ -114,6 +114,9 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
     if (backend === backendOptionsMap.vllm) {
       return vllmConfig;
     }
+    if (backend === backendOptionsMap.vllmOmni) {
+      return vllmConfig;
+    }
     if (backend === backendOptionsMap.ascendMindie) {
       return mindieConfig;
     }
@@ -449,6 +452,7 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
           [
             backendOptionsMap.llamaBox,
             backendOptionsMap.vllm,
+            backendOptionsMap.vllmOmni,
             backendOptionsMap.ascendMindie
           ].includes(backend) && (
             <div style={{ paddingBottom: 22, paddingLeft: 10 }}>
