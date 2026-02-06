@@ -114,7 +114,7 @@ jobs:
       - name: Upload to S3
         run: |
           mc alias set s3 --api=S3v4 https://cache.ali.wodcloud.com ${{ secrets.S3_ACCESS_KEY_ALIYUN }} ${{ secrets.S3_SECRET_KEY_ALIYUN }}
-          mc cp dist/${{ steps.version.outputs.version }}.tar.gz s3/gpustack-ui/releases/${{ steps.version.outputs.version }}.tar.gz
+          mc cp dist/${{ steps.version.outputs.version }}.tar.gz s3/vscode/gpustack/gpustack-ui-${{ steps.version.outputs.version }}.tar.gz
         env:
           S3_ACCESS_KEY_ALIYUN: ${{ secrets.S3_ACCESS_KEY_ALIYUN }}
           S3_SECRET_KEY_ALIYUN: ${{ secrets.S3_SECRET_KEY_ALIYUN }}
