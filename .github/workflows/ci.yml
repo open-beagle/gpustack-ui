@@ -106,14 +106,15 @@ jobs:
         run: scripts/package
         env:
           VERSION: '${{ steps.version.outputs.version }}'
-      - name: Release
-        uses: TencentCloud/cos-action@b0aa648235fb35a1bdd6a77f529eb0ac4c2f1c25
-        with:
-          secret_id: ${{ secrets.CI_TECENTCOS_SECRET_ID }}
-          secret_key: ${{ secrets.CI_TECENTCOS_SECRET_KEY }}
-          cos_bucket: ${{ secrets.COS_BUCKET }}
-          cos_region: ${{ secrets.COS_REGION }}
-          local_path: dist/${{ steps.version.outputs.version }}.tar.gz
-          remote_path: releases/${{ steps.version.outputs.version }}.tar.gz
-          accelerate: true
-          clean: false
+      - name: Setup MinIO Client
+        run: |
+          wget https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          sudo mv mc /usr/local/bin/
+      - name: Upload to S3
+        run: |
+          mc alias set s3 --api=S3v4 https://cache.ali.wodcloud.com ${{ secrets.S3_ACCESS_KEY_ALIYUN }} ${{ secrets.S3_SECRET_KEY_ALIYUN }}
+          mc cp dist/${{ steps.version.outputs.version }}.tar.gz s3/gpustack-ui/releases/${{ steps.version.outputs.version }}.tar.gz
+        env:
+          S3_ACCESS_KEY_ALIYUN: ${{ secrets.S3_ACCESS_KEY_ALIYUN }}
+          S3_SECRET_KEY_ALIYUN: ${{ secrets.S3_SECRET_KEY_ALIYUN }}
