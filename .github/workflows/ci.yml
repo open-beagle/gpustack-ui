@@ -9,8 +9,8 @@ on:
       - 'main'
 
 env:
-  NODE_VERSION: '21'
-  BUILD_VERSION: 'v0.7.1'
+  NODE_VERSION: '22'
+  BUILD_VERSION: 'v0.7.2'
 
 jobs:
   deps:
@@ -25,7 +25,7 @@ jobs:
       - name: Setup Pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.3.0
+          version: 10.31.0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
