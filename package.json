@@ -48,7 +48,7 @@
     "jotai": "^2.8.4",
     "jszip": "^3.10.1",
     "katex": "^0.16.21",
-    "lamejs": "https://github.com/zhuker/lamejs.git",
+    "lamejs": "git+https://github.com/zhuker/lamejs.git",
     "localforage": "^1.10.0",
     "lodash": "^4.17.21",
     "mammoth": "^1.8.0",
