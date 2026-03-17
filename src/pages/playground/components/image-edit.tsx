@@ -82,7 +82,8 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
     paramsConfig,
     initialValues,
     parameters,
-    isOpenaiCompatible
+    isOpenaiCompatible,
+    isVllmOmni
   } = useInitImageMeta(props, {
     type: 'edit'
   });
@@ -99,7 +100,8 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
     scroller,
     paramsRef,
     chunkFields: ['stream_options_chunk_result'],
-    API: EDIT_IMAGE_API
+    API: EDIT_IMAGE_API,
+    isVllmOmni
   });
 
   useImperativeHandle(ref, () => {
@@ -134,7 +136,7 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
   }, [parameters]);
 
   const viewCodeContent = useMemo(() => {
-    if (isOpenaiCompatible) {
+    if (isOpenaiCompatible || isVllmOmni) {
       return generateOpenaiImageCode({
         api: EDIT_IMAGE_API,
         edit: true,
@@ -154,7 +156,7 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
         prompt: currentPrompt
       }
     });
-  }, [finalParameters, currentPrompt, isOpenaiCompatible]);
+  }, [finalParameters, currentPrompt, isOpenaiCompatible, isVllmOmni]);
 
   const handleClear = () => {
     setCurrentPrompt('');
@@ -538,26 +540,28 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
                   <span>
                     {intl.formatMessage({ id: 'playground.parameters' })}
                   </span>
-                  <Tooltip
-                    title={intl.formatMessage({
-                      id: 'playground.image.params.custom.tips'
-                    })}
-                  >
-                    <Button
-                      size="small"
-                      type="text"
-                      icon={<SwapOutlined />}
-                      onClick={handleToggleParamsStyle}
+                  {!isVllmOmni && (
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'playground.image.params.custom.tips'
+                      })}
                     >
-                      {isOpenaiCompatible
-                        ? intl.formatMessage({
-                            id: 'playground.image.params.custom'
-                          })
-                        : intl.formatMessage({
-                            id: 'playground.image.params.openai'
-                          })}
-                    </Button>
-                  </Tooltip>
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<SwapOutlined />}
+                        onClick={handleToggleParamsStyle}
+                      >
+                        {isOpenaiCompatible
+                          ? intl.formatMessage({
+                              id: 'playground.image.params.custom'
+                            })
+                          : intl.formatMessage({
+                              id: 'playground.image.params.openai'
+                            })}
+                      </Button>
+                    </Tooltip>
+                  )}
                 </div>
               }
               onValuesChange={handleOnValuesChange}

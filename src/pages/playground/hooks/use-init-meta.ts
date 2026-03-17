@@ -5,6 +5,7 @@ import {
   ImageSizeConfig,
   ImageSizeItem,
   ImageconstExtraConfig,
+  VllmOmniImageParamsConfig,
   ImageAdvancedParamsConfig as ImgAdvancedParamsConfig,
   imageSizeOptions as imageSizeList
 } from '@/pages/playground/config/params-config';
@@ -24,6 +25,7 @@ import {
   advancedFieldsDefaultValus,
   imgInitialValues,
   openaiCompatibleFieldsDefaultValus,
+  vllmOmniFieldsDefaultValues,
   precisionTwoKeys
 } from './config';
 
@@ -219,6 +221,7 @@ export const useInitImageMeta = (
   const [searchParams] = useSearchParams();
   const [modelMeta, setModelMeta] = useState<any>({});
   const [isOpenaiCompatible, setIsOpenaiCompatible] = useState<boolean>(false);
+  const [isVllmOmni, setIsVllmOmni] = useState<boolean>(false);
   const [imageSizeOptions, setImageSizeOptions] = React.useState<
     ImageSizeItem[]
   >([]);
@@ -337,22 +340,24 @@ export const useInitImageMeta = (
   const updateParamsConfig = (values: {
     size: string;
     isOpenaiCompatible: boolean;
+    isVllmOmni?: boolean;
   }) => {
+    const getExtraConfig = () => {
+      if (values.isVllmOmni) return VllmOmniImageParamsConfig;
+      if (values.isOpenaiCompatible) return ImageconstExtraConfig;
+      return ImageAdvancedParamsConfig;
+    };
     // update config
     if (values.size === 'custom') {
       return [
         ...basicParamsConfig,
         ...ImageCustomSizeConfig,
-        ...(values.isOpenaiCompatible
-          ? ImageconstExtraConfig
-          : ImageAdvancedParamsConfig)
+        ...getExtraConfig()
       ];
     }
     return [
       ...basicParamsConfig,
-      ...(values.isOpenaiCompatible
-        ? ImageconstExtraConfig
-        : ImageAdvancedParamsConfig)
+      ...getExtraConfig()
     ];
   };
 
@@ -410,26 +415,60 @@ export const useInitImageMeta = (
     (val: string) => {
       if (!val) return;
       const model = modelList.find((item) => item.value === val);
-      const { form: initialData, sizeOptions } = extractIMGMeta(model?.meta);
-      const newParamsConfig = generateImageParamsConfig(model, sizeOptions);
+      const modelBackend = model?.meta?.backend;
+      const isVllmOmniBackend = modelBackend === 'vllm-omni';
+      setIsVllmOmni(isVllmOmniBackend);
 
-      if (!isOpenaiCompatible) {
-        setParamsConfig([...newParamsConfig, ...ImageAdvancedParamsConfig]);
+      if (isVllmOmniBackend) {
+        // vllm-omni: use standard OpenAI params only
+        const sizeOptions = getNewImageSizeOptions(model?.meta);
+        const newParamsConfig = generateImageParamsConfig(model, sizeOptions);
+        const vllmInitialValues = {
+          ...imgInitialValues,
+          ...vllmOmniFieldsDefaultValues,
+          size: sizeOptions.length
+            ? `${model?.meta?.default_width || 1024}x${model?.meta?.default_height || 1024}`
+            : '1024x1024',
+          width: model?.meta?.default_width || 1024,
+          height: model?.meta?.default_height || 1024
+        };
+        setParamsConfig([...newParamsConfig, ...VllmOmniImageParamsConfig]);
+        setBasicParamsConfig(newParamsConfig);
+        setImageSizeOptions(sizeOptions);
+        setModelMeta(model?.meta || {});
+        setIsOpenaiCompatible(true);
+        setInitialValues({
+          ...vllmInitialValues,
+          model: val
+        });
+        setParams({
+          ...vllmInitialValues,
+          model: val
+        });
+        updateCacheFormData(vllmInitialValues);
       } else {
-        setParamsConfig(newParamsConfig);
+        // llama-box or other: keep existing logic
+        const { form: initialData, sizeOptions } = extractIMGMeta(model?.meta);
+        const newParamsConfig = generateImageParamsConfig(model, sizeOptions);
+
+        if (!isOpenaiCompatible) {
+          setParamsConfig([...newParamsConfig, ...ImageAdvancedParamsConfig]);
+        } else {
+          setParamsConfig(newParamsConfig);
+        }
+        setBasicParamsConfig(newParamsConfig);
+        setImageSizeOptions(sizeOptions);
+        setModelMeta(model?.meta || {});
+        setInitialValues({
+          ...initialData,
+          model: val
+        });
+        setParams({
+          ...initialData,
+          model: val
+        });
+        updateCacheFormData(initialData);
       }
-      setBasicParamsConfig(newParamsConfig);
-      setImageSizeOptions(sizeOptions);
-      setModelMeta(model?.meta || {});
-      setInitialValues({
-        ...initialData,
-        model: val
-      });
-      setParams({
-        ...initialData,
-        model: val
-      });
-      updateCacheFormData(initialData);
     },
     [modelList, isOpenaiCompatible]
   );
@@ -442,13 +481,17 @@ export const useInitImageMeta = (
         return;
       }
 
+      const getExtraConfig = () => {
+        if (isVllmOmni) return VllmOmniImageParamsConfig;
+        if (isOpenaiCompatible) return ImageconstExtraConfig;
+        return ImageAdvancedParamsConfig;
+      };
+
       if (changeValues.size && changeValues.size === 'custom') {
         setParamsConfig([
           ...basicParamsConfig,
           ...ImageCustomSizeConfig,
-          ...(!isOpenaiCompatible
-            ? ImageAdvancedParamsConfig
-            : ImageconstExtraConfig)
+          ...getExtraConfig()
         ]);
         setParams({
           ...allValues,
@@ -463,9 +506,7 @@ export const useInitImageMeta = (
       } else if (changeValues.size && parameters.size === 'custom') {
         setParamsConfig([
           ...basicParamsConfig,
-          ...(!isOpenaiCompatible
-            ? ImageAdvancedParamsConfig
-            : ImageconstExtraConfig)
+          ...getExtraConfig()
         ]);
         setParams(allValues);
         updateCacheFormData(changeValues);
@@ -478,7 +519,8 @@ export const useInitImageMeta = (
       handleOnModelChange,
       parameters.size,
       basicParamsConfig,
-      isOpenaiCompatible
+      isOpenaiCompatible,
+      isVllmOmni
     ]
   );
 
@@ -508,6 +550,7 @@ export const useInitImageMeta = (
     initialValues,
     parameters,
     isOpenaiCompatible,
+    isVllmOmni,
     cacheFormData,
     basicParamsConfig,
     imageSizeOptions,
@@ -518,6 +561,7 @@ export const useInitImageMeta = (
     ImageCountConfig,
     ImageSizeConfig,
     ImageCustomSizeConfig,
-    ImageconstExtraConfig
+    ImageconstExtraConfig,
+    VllmOmniImageParamsConfig
   };
 };

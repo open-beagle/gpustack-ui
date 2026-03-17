@@ -54,7 +54,8 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
     paramsConfig,
     initialValues,
     parameters,
-    isOpenaiCompatible
+    isOpenaiCompatible,
+    isVllmOmni
   } = useInitImageMeta(props, {
     type: 'create'
   });
@@ -72,7 +73,8 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
     scroller,
     paramsRef,
     chunkFields: ['stream_options', 'chunk_results'],
-    API: CREAT_IMAGE_API
+    API: CREAT_IMAGE_API,
+    isVllmOmni
   });
 
   useImperativeHandle(ref, () => {
@@ -117,7 +119,7 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
   }, [parameters]);
 
   const viewCodeContent = useMemo(() => {
-    if (isOpenaiCompatible) {
+    if (isOpenaiCompatible || isVllmOmni) {
       return generateOpenaiImageCode({
         api: CREAT_IMAGE_API,
         parameters: {
@@ -133,14 +135,29 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
         prompt: currentPrompt
       }
     });
-  }, [finalParameters, isOpenaiCompatible, currentPrompt]);
+  }, [finalParameters, isOpenaiCompatible, isVllmOmni, currentPrompt]);
 
   const handleInputChange = (e: any) => {
     setCurrentPrompt(e.target.value);
   };
 
   const generateParams = () => {
-    // preview
+    if (isVllmOmni) {
+      // vllm-omni: standard OpenAI params, no streaming
+      const params = {
+        ..._.omitBy(finalParameters, (value: string) => !value),
+        prompt: currentPrompt,
+        response_format: 'b64_json'
+      };
+      // remove llama-box specific fields
+      return _.omit(params, [
+        'sample_method', 'schedule_method', 'sampling_steps',
+        'cfg_scale', 'guidance', 'negative_prompt', 'seed',
+        'stream', 'stream_options', 'preview'
+      ]);
+    }
+
+    // llama-box: streaming with advanced params
     let stream_options: Record<string, any> = {
       chunk_size: 16 * 1024,
       chunk_results: true
@@ -169,12 +186,15 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
       await form.current?.form?.validateFields();
       if (!parameters.model) return;
       const params = generateParams();
-      setParams({
-        ...parameters,
-        seed: params.seed
-      });
 
-      form.current?.form?.setFieldValue('seed', params.seed);
+      if (!isVllmOmni) {
+        setParams({
+          ...parameters,
+          seed: params.seed
+        });
+        form.current?.form?.setFieldValue('seed', params.seed);
+      }
+
       console.log('params:', params, parameters);
       setRouteCache(routeCachekey['/playground/text-to-image'], true);
       await submitMessage(params);
@@ -294,26 +314,28 @@ const GroundImages: React.FC<MessageProps> = forwardRef((props, ref) => {
                 <span>
                   {intl.formatMessage({ id: 'playground.parameters' })}
                 </span>
-                <Tooltip
-                  title={intl.formatMessage({
-                    id: 'playground.image.params.custom.tips'
-                  })}
-                >
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<SwapOutlined />}
-                    onClick={handleToggleParamsStyle}
+                {!isVllmOmni && (
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: 'playground.image.params.custom.tips'
+                    })}
                   >
-                    {isOpenaiCompatible
-                      ? intl.formatMessage({
-                          id: 'playground.image.params.custom'
-                        })
-                      : intl.formatMessage({
-                          id: 'playground.image.params.openai'
-                        })}
-                  </Button>
-                </Tooltip>
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<SwapOutlined />}
+                      onClick={handleToggleParamsStyle}
+                    >
+                      {isOpenaiCompatible
+                        ? intl.formatMessage({
+                            id: 'playground.image.params.custom'
+                          })
+                        : intl.formatMessage({
+                            id: 'playground.image.params.openai'
+                          })}
+                    </Button>
+                  </Tooltip>
+                )}
               </div>
             }
             onValuesChange={handleOnValuesChange}

@@ -14,7 +14,7 @@ const ODD_STRING = 'AAAABJRU5ErkJgg===';
 
 export default function useTextImage(props: any) {
   const intl = useIntl();
-  const { scroller, paramsRef, chunkFields, API } = props;
+  const { scroller, paramsRef, chunkFields, API, isVllmOmni } = props;
   const [loading, setLoading] = useState(false);
   const [tokenResult, setTokenResult] = useState<any>(null);
   const [imageList, setImageList] = useState<
@@ -29,6 +29,7 @@ export default function useTextImage(props: any) {
       loading?: boolean;
       progress?: number;
       preview?: boolean;
+      progressType?: string;
     }[]
   >([]);
   const [currentPrompt, setCurrentPrompt] = useState('');
@@ -118,13 +119,86 @@ export default function useTextImage(props: any) {
             height: imgSize[1],
             width: imgSize[0],
             loading: true,
-            progressType: 'dashboard',
+            progressType: isVllmOmni ? 'spin' : 'dashboard',
             preview: false,
             uid: setMessageId()
           };
         });
       setImageList(newImageList);
 
+      // vllm-omni: standard OpenAI non-streaming request
+      if (isVllmOmni) {
+        try {
+          const res = await fetch(`${API}?t=${Date.now()}`, {
+            method: 'POST',
+            body: JSON.stringify(parameters),
+            signal: requestToken.current.signal,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            setTokenResult({
+              error: true,
+              errorMessage: extractErrorMessage({ error: true, data: errorData })
+            });
+            setImageList([]);
+            return;
+          }
+
+          const jsonResult = await res.json();
+          const dataList = jsonResult?.data || [];
+          newImageList = newImageList.map((imgItem, index) => {
+            const item = dataList[index];
+            if (item?.b64_json) {
+              return {
+                ...imgItem,
+                dataUrl: `data:image/png;base64,${item.b64_json}`,
+                loading: false,
+                progress: 100,
+                preview: API === CREAT_IMAGE_API
+              };
+            }
+            if (item?.url) {
+              return {
+                ...imgItem,
+                dataUrl: item.url,
+                loading: false,
+                progress: 100,
+                preview: API === CREAT_IMAGE_API
+              };
+            }
+            return {
+              ...imgItem,
+              loading: false,
+              progress: 0
+            };
+          });
+          setImageList([...newImageList]);
+
+          if (newImageList.every((item) => item.progress === 0)) {
+            setTokenResult({
+              error: true,
+              errorMessage: intl.formatMessage({
+                id: 'playground.image.generate.error'
+              })
+            });
+          }
+        } catch (error: any) {
+          if (error?.name !== 'AbortError') {
+            setTokenResult({
+              error: true,
+              errorMessage: error?.message || 'Request failed'
+            });
+            setImageList([]);
+          }
+        }
+        return;
+      }
+
+      // llama-box: streaming chunked request
       let result: any = {};
       if (API === CREAT_IMAGE_API) {
         result = await fetchChunkedData({

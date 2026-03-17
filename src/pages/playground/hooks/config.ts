@@ -56,6 +56,11 @@ export const openaiCompatibleFieldsDefaultValus = {
   style: null
 };
 
+export const vllmOmniFieldsDefaultValues = {
+  quality: 'standard',
+  style: null
+};
+
 export const imgInitialValues = {
   n: 1,
   size: '512x512',
