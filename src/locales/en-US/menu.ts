@@ -1,5 +1,6 @@
 export default {
   'menu.dashboard': 'Dashboard',
+  'menu.modelUsage': 'Model Usage',
   'menu.playground': 'Playground',
   'menu.playground.rerank': 'Rerank',
   'menu.playground.embedding': 'Embedding',

@@ -13,6 +13,17 @@ export default [
     routes: []
   },
   {
+    name: 'modelUsage',
+    path: '/model-usage',
+    key: 'modelUsage',
+    icon: 'icon-dashboard',
+    selectedIcon: 'icon-dashboard-filled',
+    defaultIcon: 'icon-dashboard',
+    access: 'canSeeAdmin',
+    component: './model-usage',
+    routes: []
+  },
+  {
     name: 'playground',
     icon: 'icon-experiment',
     selectedIcon: 'icon-experiment-filled',

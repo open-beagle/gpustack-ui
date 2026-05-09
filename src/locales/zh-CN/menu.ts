@@ -1,5 +1,6 @@
 export default {
   'menu.dashboard': '概览',
+  'menu.modelUsage': '模型用量',
   'menu.playground': '试验场',
   'menu.playground.rerank': '重排',
   'menu.playground.embedding': '嵌入',
