@@ -8,10 +8,18 @@ import { formatNumber } from '../utils';
 interface UsageTrendsProps {
   dailyLogs: DailyLogRow[];
   hourlyLogs: HourlyLogRow[];
+  selectedDate: string;
   loading?: boolean;
+  onDateSelect: (date: string) => void;
 }
 
-const UsageTrends: React.FC<UsageTrendsProps> = ({ dailyLogs, hourlyLogs, loading }) => {
+const UsageTrends: React.FC<UsageTrendsProps> = ({
+  dailyLogs,
+  hourlyLogs,
+  selectedDate,
+  loading,
+  onDateSelect
+}) => {
   const intl = useIntl();
   const dailyColumns: ColumnsType<DailyLogRow> = [
     {
@@ -175,6 +183,11 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({ dailyLogs, hourlyLogs, loadin
                 columns={dailyColumns}
                 dataSource={dailyLogs}
                 pagination={false}
+                rowClassName={(row) => (row.date === selectedDate ? 'ant-table-row-selected' : '')}
+                onRow={(row) => ({
+                  onClick: () => onDateSelect(row.date),
+                  style: { cursor: 'pointer' }
+                })}
                 scroll={{ x: 1000 }}
               />
             )

@@ -16,7 +16,7 @@ import {
   rebuildModelUsageStats
 } from './apis';
 import CallsTable from './components/calls-table';
-import FilterBar from './components/filter-bar';
+import FilterBar, { FilterOption } from './components/filter-bar';
 import OverviewCards from './components/overview-cards';
 import RankingTables from './components/ranking-tables';
 import ServerSummaryTable from './components/server-summary-table';
@@ -39,6 +39,31 @@ import {
   todayForCalls
 } from './utils';
 
+const toApiKeyOptions = (rows: ApiKeyUsageRow[]): FilterOption[] =>
+  rows
+    .map((row) => {
+      const value = row.api_key_id ? String(row.api_key_id) : row.api_key_access_key;
+      if (!value) {
+        return null;
+      }
+      const label = row.api_key_name || row.api_key_access_key || value;
+      return {
+        label: row.api_key_access_key ? `${label} (${row.api_key_access_key})` : label,
+        value
+      };
+    })
+    .filter(Boolean) as FilterOption[];
+
+const toModelOptions = (rows: ModelUsageRow[]): FilterOption[] =>
+  rows
+    .filter((row) => row.model_name)
+    .map((row) => ({ label: row.model_name as string, value: row.model_name as string }));
+
+const toSourceIpOptions = (rows: SourceIpUsageRow[]): FilterOption[] =>
+  rows
+    .filter((row) => row.source_ip)
+    .map((row) => ({ label: row.source_ip as string, value: row.source_ip as string }));
+
 const ModelUsagePage: React.FC = () => {
   const intl = useIntl();
   const [query, setQuery] = useState<ModelUsageQuery>(defaultModelUsageQuery());
@@ -47,6 +72,9 @@ const ModelUsagePage: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeyUsageRow[]>([]);
   const [models, setModels] = useState<ModelUsageRow[]>([]);
   const [sourceIps, setSourceIps] = useState<SourceIpUsageRow[]>([]);
+  const [apiKeyOptions, setApiKeyOptions] = useState<FilterOption[]>([]);
+  const [modelOptions, setModelOptions] = useState<FilterOption[]>([]);
+  const [sourceIpOptions, setSourceIpOptions] = useState<FilterOption[]>([]);
   const [serverSummary, setServerSummary] = useState<ServerSummaryRow[]>([]);
   const [dailyLogs, setDailyLogs] = useState<DailyLogRow[]>([]);
   const [hourlyLogs, setHourlyLogs] = useState<HourlyLogRow[]>([]);
@@ -63,6 +91,14 @@ const ModelUsagePage: React.FC = () => {
         page: nextQuery.page || 1,
         page_size: nextQuery.page_size || DEFAULT_PAGE_SIZE
       });
+      const optionParams = compactQuery({
+        ...nextQuery,
+        api_key: undefined,
+        model: undefined,
+        source_ip: undefined,
+        page: 1,
+        page_size: 100
+      });
       setLoading(true);
       try {
         const [
@@ -73,7 +109,10 @@ const ModelUsagePage: React.FC = () => {
           sourceIpRes,
           dailyLogsRes,
           hourlyLogsRes,
-          callsRes
+          callsRes,
+          apiKeyOptionsRes,
+          modelOptionsRes,
+          sourceIpOptionsRes
         ] = await Promise.allSettled([
           queryModelUsageOverview(params),
           queryModelUsageServerSummary(params),
@@ -82,7 +121,10 @@ const ModelUsagePage: React.FC = () => {
           querySourceIpUsageRanking(params),
           queryModelUsageDailyLogs(params),
           queryModelUsageHourlyLogs(nextCallDate, compactQuery(nextQuery)),
-          queryModelUsageCalls(nextCallDate, callsParams)
+          queryModelUsageCalls(nextCallDate, callsParams),
+          queryApiKeyUsageRanking(optionParams),
+          queryModelUsageRanking(optionParams),
+          querySourceIpUsageRanking(optionParams)
         ]);
         setOverview(overviewRes.status === 'fulfilled' ? overviewRes.value : undefined);
         setServerSummary(
@@ -95,12 +137,48 @@ const ModelUsagePage: React.FC = () => {
         setHourlyLogs(hourlyLogsRes.status === 'fulfilled' ? hourlyLogsRes.value.items || [] : []);
         setCalls(callsRes.status === 'fulfilled' ? callsRes.value.items || [] : []);
         setCallsTotal(callsRes.status === 'fulfilled' ? callsRes.value.total || 0 : 0);
+        setApiKeyOptions(
+          apiKeyOptionsRes.status === 'fulfilled'
+            ? toApiKeyOptions(apiKeyOptionsRes.value.items || [])
+            : []
+        );
+        setModelOptions(
+          modelOptionsRes.status === 'fulfilled'
+            ? toModelOptions(modelOptionsRes.value.items || [])
+            : []
+        );
+        setSourceIpOptions(
+          sourceIpOptionsRes.status === 'fulfilled'
+            ? toSourceIpOptions(sourceIpOptionsRes.value.items || [])
+            : []
+        );
+        if (
+          callsRes.status === 'fulfilled' &&
+          !callsRes.value.items?.length &&
+          dailyLogsRes.status === 'fulfilled'
+        ) {
+          const latestDate = dailyLogsRes.value.items?.[0]?.date;
+          if (latestDate && latestDate !== nextCallDate) {
+            setCallDate(latestDate);
+            const latestCallsRes = await queryModelUsageCalls(latestDate, callsParams);
+            const latestHourlyRes = await queryModelUsageHourlyLogs(
+              latestDate,
+              compactQuery(nextQuery)
+            );
+            setCalls(latestCallsRes.items || []);
+            setCallsTotal(latestCallsRes.total || 0);
+            setHourlyLogs(latestHourlyRes.items || []);
+          }
+        }
       } catch (error) {
         setOverview(undefined);
         setServerSummary([]);
         setApiKeys([]);
         setModels([]);
         setSourceIps([]);
+        setApiKeyOptions([]);
+        setModelOptions([]);
+        setSourceIpOptions([]);
         setDailyLogs([]);
         setHourlyLogs([]);
         setCalls([]);
@@ -170,6 +248,9 @@ const ModelUsagePage: React.FC = () => {
           <FilterBar
             query={query}
             callDate={callDate}
+            apiKeyOptions={apiKeyOptions}
+            modelOptions={modelOptions}
+            sourceIpOptions={sourceIpOptions}
             loading={loading}
             onQueryChange={handleQueryChange}
             onCallDateChange={handleCallDateChange}
@@ -186,7 +267,13 @@ const ModelUsagePage: React.FC = () => {
         </Space>
         <OverviewCards data={overview} />
         <ServerSummaryTable data={serverSummary} loading={loading} />
-        <UsageTrends dailyLogs={dailyLogs} hourlyLogs={hourlyLogs} loading={loading} />
+        <UsageTrends
+          dailyLogs={dailyLogs}
+          hourlyLogs={hourlyLogs}
+          selectedDate={callDate}
+          loading={loading}
+          onDateSelect={handleCallDateChange}
+        />
         <Card bordered={false} title={intl.formatMessage({ id: 'modelUsage.ranking' })}>
           <RankingTables
             apiKeys={apiKeys}

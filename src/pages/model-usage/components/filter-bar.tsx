@@ -1,13 +1,21 @@
 import { SyncOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
-import { Button, DatePicker, Input, Select, Space } from 'antd';
+import { Button, DatePicker, Select, Space } from 'antd';
 import dayjs from 'dayjs';
 import { ModelUsageOperation, ModelUsageQuery } from '../config/types';
 import { operationOptions } from '../utils';
 
+export interface FilterOption {
+  label: string;
+  value: string;
+}
+
 interface FilterBarProps {
   query: ModelUsageQuery;
   callDate: string;
+  apiKeyOptions: FilterOption[];
+  modelOptions: FilterOption[];
+  sourceIpOptions: FilterOption[];
   loading?: boolean;
   onQueryChange: (query: ModelUsageQuery) => void;
   onCallDateChange: (date: string) => void;
@@ -17,6 +25,9 @@ interface FilterBarProps {
 const FilterBar: React.FC<FilterBarProps> = ({
   query,
   callDate,
+  apiKeyOptions,
+  modelOptions,
+  sourceIpOptions,
   loading,
   onQueryChange,
   onCallDateChange,
@@ -46,26 +57,35 @@ const FilterBar: React.FC<FilterBarProps> = ({
           });
         }}
       />
-      <Input
+      <Select
         allowClear
+        showSearch
         style={{ width: 180 }}
         placeholder={intl.formatMessage({ id: 'modelUsage.filters.apiKey' })}
+        optionFilterProp="label"
+        options={apiKeyOptions}
         value={query.api_key}
-        onChange={(event) => updateQuery({ api_key: event.target.value })}
+        onChange={(value?: string) => updateQuery({ api_key: value })}
       />
-      <Input
+      <Select
         allowClear
+        showSearch
         style={{ width: 180 }}
         placeholder={intl.formatMessage({ id: 'modelUsage.filters.model' })}
+        optionFilterProp="label"
+        options={modelOptions}
         value={query.model}
-        onChange={(event) => updateQuery({ model: event.target.value })}
+        onChange={(value?: string) => updateQuery({ model: value })}
       />
-      <Input
+      <Select
         allowClear
+        showSearch
         style={{ width: 160 }}
         placeholder={intl.formatMessage({ id: 'modelUsage.filters.sourceIp' })}
+        optionFilterProp="label"
+        options={sourceIpOptions}
         value={query.source_ip}
-        onChange={(event) => updateQuery({ source_ip: event.target.value })}
+        onChange={(value?: string) => updateQuery({ source_ip: value })}
       />
       <Select
         allowClear
