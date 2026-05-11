@@ -2,6 +2,7 @@ import { request } from '@umijs/max';
 import qs from 'query-string';
 import {
   ApiKeyUsageRow,
+  CleanupUsageRequest,
   DailyLogRow,
   HourlyLogRow,
   ModelUsageCallRow,
@@ -88,6 +89,13 @@ export async function rebuildModelUsageStats(data: RebuildStatsRequest) {
   return request(`${MODEL_USAGE_API}/rebuild-stats`, {
     method: 'POST',
     data
+  });
+}
+
+export async function cleanupModelUsageData(data: CleanupUsageRequest) {
+  return request(`${MODEL_USAGE_API}/cleanup`, {
+    method: 'POST',
+    params: data
   });
 }
 

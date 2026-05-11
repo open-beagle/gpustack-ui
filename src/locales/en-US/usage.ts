@@ -58,5 +58,10 @@ export default {
   'modelUsage.hour': 'Hour',
   'modelUsage.rebuildStats': 'Rebuild Stats',
   'modelUsage.rebuildStatsConfirm': 'Rebuild usage statistics for current filters?',
-  'modelUsage.rebuildStatsSubmitted': 'Rebuild task submitted'
+  'modelUsage.rebuildStatsSubmitted': 'Rebuild task submitted',
+  'modelUsage.cleanup': 'Clean Up',
+  'modelUsage.cleanupConfirm': 'Delete model usage data older than {months} months?',
+  'modelUsage.cleanupSubmitted': 'Cleanup completed',
+  'modelUsage.retention3Months': '3 months',
+  'modelUsage.retention6Months': '6 months'
 };

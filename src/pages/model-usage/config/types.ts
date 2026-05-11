@@ -27,6 +27,10 @@ export interface RebuildStatsRequest {
   end_date?: string;
 }
 
+export interface CleanupUsageRequest {
+  retention_months: 3 | 6;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

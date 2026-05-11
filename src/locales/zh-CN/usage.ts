@@ -58,5 +58,10 @@ export default {
   'modelUsage.hour': '小时',
   'modelUsage.rebuildStats': '重算统计',
   'modelUsage.rebuildStatsConfirm': '确认按当前筛选条件重算用量统计？',
-  'modelUsage.rebuildStatsSubmitted': '重算任务已提交'
+  'modelUsage.rebuildStatsSubmitted': '重算任务已提交',
+  'modelUsage.cleanup': '清理数据',
+  'modelUsage.cleanupConfirm': '确认删除 {months} 个月之前的模型用量数据？',
+  'modelUsage.cleanupSubmitted': '清理完成',
+  'modelUsage.retention3Months': '3 个月',
+  'modelUsage.retention6Months': '6 个月'
 };

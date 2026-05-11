@@ -1,9 +1,10 @@
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl } from '@umijs/max';
-import { Button, Card, Divider, Popconfirm, Space, Spin, message } from 'antd';
+import { Button, Card, Divider, Popconfirm, Select, Space, Spin, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  cleanupModelUsageData,
   modelUsageCallsExportUrl,
   queryApiKeyUsageRanking,
   queryModelUsageDailyLogs,
@@ -82,6 +83,8 @@ const ModelUsagePage: React.FC = () => {
   const [callsTotal, setCallsTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
+  const [cleanupRetentionMonths, setCleanupRetentionMonths] = useState<3 | 6>(3);
+  const [cleaning, setCleaning] = useState(false);
 
   const fetchData = useCallback(
     async (nextQuery: ModelUsageQuery = query, nextCallDate: string = callDate) => {
@@ -233,6 +236,17 @@ const ModelUsagePage: React.FC = () => {
     }
   };
 
+  const handleCleanupUsageData = async () => {
+    setCleaning(true);
+    try {
+      await cleanupModelUsageData({ retention_months: cleanupRetentionMonths });
+      message.success(intl.formatMessage({ id: 'modelUsage.cleanupSubmitted' }));
+      fetchData();
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   return (
     <PageContainer
       ghost
@@ -264,6 +278,34 @@ const ModelUsagePage: React.FC = () => {
               {intl.formatMessage({ id: 'modelUsage.rebuildStats' })}
             </Button>
           </Popconfirm>
+          <Space>
+            <Select
+              style={{ width: 120 }}
+              value={cleanupRetentionMonths}
+              options={[
+                {
+                  label: intl.formatMessage({ id: 'modelUsage.retention3Months' }),
+                  value: 3
+                },
+                {
+                  label: intl.formatMessage({ id: 'modelUsage.retention6Months' }),
+                  value: 6
+                }
+              ]}
+              onChange={(value) => setCleanupRetentionMonths(value)}
+            />
+            <Popconfirm
+              title={intl.formatMessage(
+                { id: 'modelUsage.cleanupConfirm' },
+                { months: cleanupRetentionMonths }
+              )}
+              onConfirm={handleCleanupUsageData}
+            >
+              <Button loading={cleaning} danger>
+                {intl.formatMessage({ id: 'modelUsage.cleanup' })}
+              </Button>
+            </Popconfirm>
+          </Space>
         </Space>
         <OverviewCards data={overview} />
         <ServerSummaryTable data={serverSummary} loading={loading} />
