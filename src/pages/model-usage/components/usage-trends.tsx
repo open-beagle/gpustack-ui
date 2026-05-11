@@ -2,6 +2,7 @@ import LineChart from '@/components/echarts/line-chart';
 import { useIntl } from '@umijs/max';
 import { Card, Col, Row, Table, Tabs } from 'antd';
 import { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 import { DailyLogRow, HourlyLogRow } from '../config/types';
 import { formatNumber } from '../utils';
 
@@ -21,6 +22,9 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
   onDateSelect
 }) => {
   const intl = useIntl();
+  const formatLocalHour = (hour: number) => {
+    return dayjs(`${selectedDate}T${String(hour).padStart(2, '0')}:00:00Z`).format('HH:mm');
+  };
   const dailyColumns: ColumnsType<DailyLogRow> = [
     {
       title: intl.formatMessage({ id: 'modelUsage.date' }),
@@ -74,7 +78,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
     {
       title: intl.formatMessage({ id: 'modelUsage.hour' }),
       dataIndex: 'hour',
-      render: (value) => `${String(value).padStart(2, '0')}:00`
+      render: (value) => formatLocalHour(value)
     },
     {
       title: intl.formatMessage({ id: 'modelUsage.requestCount' }),
@@ -114,7 +118,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
       total_tokens: 0
     }
   );
-  const xAxisData = hourlySeries.map((item) => `${String(item.hour).padStart(2, '0')}:00`);
+  const xAxisData = hourlySeries.map((item) => formatLocalHour(item.hour));
   const requestSeries = hourlySeries.map((item) => item.request_count || 0);
   const tokenSeries = hourlySeries.map((item) => item.total_tokens || 0);
 
