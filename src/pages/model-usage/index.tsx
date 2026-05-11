@@ -74,26 +74,27 @@ const ModelUsagePage: React.FC = () => {
           dailyLogsRes,
           hourlyLogsRes,
           callsRes
-        ] =
-          await Promise.all([
-            queryModelUsageOverview(params),
-            queryModelUsageServerSummary(params),
-            queryApiKeyUsageRanking(params),
-            queryModelUsageRanking(params),
-            querySourceIpUsageRanking(params),
-            queryModelUsageDailyLogs(params),
-            queryModelUsageHourlyLogs(nextCallDate, compactQuery(nextQuery)),
-            queryModelUsageCalls(nextCallDate, callsParams)
-          ]);
-        setOverview(overviewRes);
-        setServerSummary(serverSummaryRes.items || []);
-        setApiKeys(apiKeyRes.items || []);
-        setModels(modelRes.items || []);
-        setSourceIps(sourceIpRes.items || []);
-        setDailyLogs(dailyLogsRes.items || []);
-        setHourlyLogs(hourlyLogsRes.items || []);
-        setCalls(callsRes.items || []);
-        setCallsTotal(callsRes.total || 0);
+        ] = await Promise.allSettled([
+          queryModelUsageOverview(params),
+          queryModelUsageServerSummary(params),
+          queryApiKeyUsageRanking(params),
+          queryModelUsageRanking(params),
+          querySourceIpUsageRanking(params),
+          queryModelUsageDailyLogs(params),
+          queryModelUsageHourlyLogs(nextCallDate, compactQuery(nextQuery)),
+          queryModelUsageCalls(nextCallDate, callsParams)
+        ]);
+        setOverview(overviewRes.status === 'fulfilled' ? overviewRes.value : undefined);
+        setServerSummary(
+          serverSummaryRes.status === 'fulfilled' ? serverSummaryRes.value.items || [] : []
+        );
+        setApiKeys(apiKeyRes.status === 'fulfilled' ? apiKeyRes.value.items || [] : []);
+        setModels(modelRes.status === 'fulfilled' ? modelRes.value.items || [] : []);
+        setSourceIps(sourceIpRes.status === 'fulfilled' ? sourceIpRes.value.items || [] : []);
+        setDailyLogs(dailyLogsRes.status === 'fulfilled' ? dailyLogsRes.value.items || [] : []);
+        setHourlyLogs(hourlyLogsRes.status === 'fulfilled' ? hourlyLogsRes.value.items || [] : []);
+        setCalls(callsRes.status === 'fulfilled' ? callsRes.value.items || [] : []);
+        setCallsTotal(callsRes.status === 'fulfilled' ? callsRes.value.total || 0 : 0);
       } catch (error) {
         setOverview(undefined);
         setServerSummary([]);
