@@ -13,6 +13,7 @@ export interface ChartProps {
   smooth?: boolean;
   color?: string;
   yAxisName?: string;
+  secondaryYAxisName?: string;
 }
 
 export interface AreaChartItemProps {

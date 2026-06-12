@@ -16,7 +16,8 @@ const LineChart: React.FC<ChartProps> = (props) => {
     tooltipValueFormatter = null,
     legendData = [],
     smooth,
-    title
+    title,
+    secondaryYAxisName
   } = props;
   const {
     grid,
@@ -38,6 +39,23 @@ const LineChart: React.FC<ChartProps> = (props) => {
     return value;
   };
 
+  const hasSecondaryYAxis = seriesData.some(
+    (item: any) => item.yAxisIndex === 1
+  );
+  const chartYAxis = hasSecondaryYAxis
+    ? [
+        yAxis,
+        {
+          ...yAxis,
+          name: secondaryYAxisName,
+          splitLine: {
+            ...yAxis.splitLine,
+            show: false
+          }
+        }
+      ]
+    : yAxis;
+
   const options = {
     title: {
       text: ''
@@ -58,7 +76,7 @@ const LineChart: React.FC<ChartProps> = (props) => {
         formatter: axisLabelFormatter
       }
     },
-    yAxis,
+    yAxis: chartYAxis,
     legend: {
       ...legend,
       data: legendData.map((item: any) => {
@@ -95,13 +113,45 @@ const LineChart: React.FC<ChartProps> = (props) => {
         ...titleConfig,
         text: title
       },
-      yAxis: {
-        ...options.yAxis,
-        name: yAxisName,
-        nameTextStyle: {
-          fontSize: 12,
-          align: 'right'
-        }
+      yAxis: hasSecondaryYAxis
+        ? [
+            {
+              ...(options.yAxis as any[])[0],
+              name: yAxisName,
+              nameTextStyle: {
+                fontSize: 12,
+                align: 'right'
+              }
+            },
+            {
+              ...(options.yAxis as any[])[1],
+              nameTextStyle: {
+                fontSize: 12,
+                align: 'left'
+              }
+            }
+          ]
+        : {
+            ...options.yAxis,
+            name: yAxisName,
+            nameTextStyle: {
+              fontSize: 12,
+              align: 'right'
+            }
+          },
+      grid: {
+        ...options.grid,
+        right: hasSecondaryYAxis ? 16 : options.grid.right
+      },
+      legend: {
+        ...options.legend,
+        data: legendData.map((item: any) => {
+          return {
+            name: item,
+            icon: 'circle'
+          };
+        }),
+        top: title ? 28 : 0
       },
       xAxis: {
         ...options.xAxis,
@@ -109,7 +159,17 @@ const LineChart: React.FC<ChartProps> = (props) => {
       },
       series: data
     };
-  }, [seriesData, xAxisData, yAxisName, title, smooth, legendData, options]);
+  }, [
+    seriesData,
+    xAxisData,
+    yAxisName,
+    secondaryYAxisName,
+    title,
+    smooth,
+    legendData,
+    options,
+    hasSecondaryYAxis
+  ]);
 
   return (
     <>
