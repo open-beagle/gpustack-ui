@@ -4938,7 +4938,7 @@ packages:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
   lamejs@https://github.com/zhuker/lamejs/archive/refs/tags/1.2.1a.tar.gz:
-    resolution: {integrity: sha512-Pc9PSoDDsZn5GcLB/UrEcha4xg7PGZK6iQBbLojsh9yTTyJ0IT2J+QBoErfwSihAjntqH2rgHNSNr3HDIshCZw==}
+    resolution: {integrity: sha512-Pc9PSoDDsZn5GcLB/UrEcha4xg7PGZK6iQBbLojsh9yTTyJ0IT2J+QBoErfwSihAjntqH2rgHNSNr3HDIshCZw==, tarball: https://github.com/zhuker/lamejs/archive/refs/tags/1.2.1a.tar.gz}
     version: 1.2.1
 
   less-loader@11.1.0:
@@ -8383,7 +8383,7 @@ packages:
         optional: true
 
   xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz:
-    resolution: {integrity: sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==}
+    resolution: {integrity: sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==, tarball: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz}
     version: 0.20.3
     engines: {node: '>=0.8'}
     hasBin: true
