@@ -54,9 +54,9 @@ export default function useChatCompletion(
 
     reasonContentRef.current =
       reasonContentRef.current +
-      _.get(chunk, 'choices.0.delta.reasoning_content', '');
+      (_.get(chunk, 'choices.0.delta.reasoning_content') || '');
     contentRef.current =
-      contentRef.current + _.get(chunk, 'choices.0.delta.content', '');
+      contentRef.current + (_.get(chunk, 'choices.0.delta.content') || '');
 
     const content = formatContent({
       content: contentRef.current,

@@ -10,7 +10,7 @@ on:
 
 env:
   NODE_VERSION: '22'
-  BUILD_VERSION: 'v0.7.3'
+  BUILD_VERSION: 'v0.7.4'
 
 jobs:
   deps:
