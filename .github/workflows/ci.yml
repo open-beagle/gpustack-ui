@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - 'main'
+      - 'dev'
   pull_request:
     branches:
       - 'main'
 
 env:
   NODE_VERSION: '22'
-  BUILD_VERSION: 'v0.7.4'
+  BUILD_VERSION: 'v0.7.5'
 
 jobs:
   deps:
@@ -66,7 +67,7 @@ jobs:
   build-publish:
     needs:
       - deps
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     steps:
