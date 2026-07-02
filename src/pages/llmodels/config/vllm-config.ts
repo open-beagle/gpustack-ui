@@ -774,17 +774,78 @@ const options = [
   }
 ];
 
-const resultList = options.map((option) => {
-  return {
-    label: option.label,
-    value: option.value,
-    opts: option.options.map((opt) => {
-      return {
-        label: opt,
-        value: opt
-      };
-    })
-  };
+const formatOptions = (items: typeof options) => {
+  return items.map((option) => {
+    return {
+      label: option.label,
+      value: option.value,
+      opts: option.options.map((opt) => {
+        return {
+          label: opt,
+          value: opt
+        };
+      })
+    };
+  });
+};
+
+const vllmOmniExcludedParams = new Set([
+  '--lora-modules',
+  '--prompt-adapters',
+  '--chat-template',
+  '--response-role',
+  '--return-tokens-as-token-ids',
+  '--enable-auto-tool-choice',
+  '--tool-call-parser',
+  '--tool-parser-plugin',
+  '--skip-tokenizer-init',
+  '--tokenizer-mode',
+  '--chat-template-content-format',
+  '--enable-reasoning',
+  '--reasoning-parser',
+  '--kv-cache-dtype',
+  '--guided-decoding-backend',
+  '--logits-processor-pattern',
+  '--disable-cascade-attn',
+  '--block-size',
+  '--enable-prefix-caching',
+  '--prefix-caching-hash-algo',
+  '--disable-sliding-window',
+  '--use-v2-block-manager',
+  '--num-lookahead-slots',
+  '--gpu-memory-utilization',
+  '--num-gpu-blocks-override',
+  '--max-num-batched-tokens',
+  '--max-num-partial-prefills',
+  '--max-long-partial-prefills',
+  '--long-prefill-token-threshold',
+  '--max-num-seqs',
+  '--max-logprobs',
+  '--disable-log-stats',
+  '--enable-lora-bias',
+  '--enable-lora',
+  '--max-loras',
+  '--max-lora-rank',
+  '--lora-extra-vocab-size',
+  '--lora-dtype',
+  '--long-lora-scaling-factors',
+  '--max-cpu-loras',
+  '--fully-sharded-loras',
+  '--max-prompt-adapter-token',
+  '--speculative-config',
+  '--num-scheduler-steps',
+  '--scheduler-delay-factor',
+  '--scheduler-cls',
+  '--qlora-adapter-name-or-path',
+  '--enable-prompt-tokens-details'
+]);
+
+const vllmOmniOptions = options.filter((option) => {
+  return !vllmOmniExcludedParams.has(option.value);
 });
+
+const resultList = formatOptions(options);
+
+export const vllmOmniConfig = formatOptions(vllmOmniOptions);
 
 export default resultList;

@@ -32,7 +32,7 @@ import { useFormContext } from '../config/form-context';
 import llamaConfig from '../config/llama-config';
 import mindieConfig from '../config/mindie-config';
 import { FormData } from '../config/types';
-import vllmConfig from '../config/vllm-config';
+import vllmConfig, { vllmOmniConfig } from '../config/vllm-config';
 import dataformStyles from '../style/data-form.less';
 import GPUCard from './gpu-card';
 
@@ -115,7 +115,7 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
       return vllmConfig;
     }
     if (backend === backendOptionsMap.vllmOmni) {
-      return vllmConfig;
+      return vllmOmniConfig;
     }
     if (backend === backendOptionsMap.ascendMindie) {
       return mindieConfig;

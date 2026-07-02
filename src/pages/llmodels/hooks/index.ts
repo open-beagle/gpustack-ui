@@ -14,6 +14,7 @@ import { evaluationsModelSpec, queryGPUList } from '../apis';
 import {
   backendOptionsMap,
   getSourceRepoConfigValue,
+  modelCategoriesMap,
   modelSourceMap,
   modelTaskMap,
   setSourceRepoConfigValue
@@ -247,11 +248,12 @@ export const checkOnlyAscendNPU = (gpuOptions: any[]) => {
 
 export const checkCurrentbackend = (data: {
   isAudio: boolean;
+  isVllmOmni?: boolean;
   isGGUF: boolean;
   gpuOptions: any[];
   defaultBackend?: string;
 }) => {
-  const { isAudio, isGGUF, gpuOptions, defaultBackend } = data;
+  const { isAudio, isVllmOmni, isGGUF, gpuOptions, defaultBackend } = data;
   if (isAudio) {
     return backendOptionsMap.voxBox;
   }
@@ -260,10 +262,88 @@ export const checkCurrentbackend = (data: {
     return backendOptionsMap.llamaBox;
   }
 
+  if (isVllmOmni) {
+    return backendOptionsMap.vllmOmni;
+  }
+
   if (checkOnlyAscendNPU(gpuOptions)) {
     return backendOptionsMap.ascendMindie;
   }
   return defaultBackend;
+};
+
+export const isImageModelCandidate = (model: any) => {
+  const categories = model?.categories || [];
+  const categoryList = Array.isArray(categories) ? categories : [categories];
+  const task = _.toLower(model?.task || '');
+  const name = _.toLower(model?.name || '');
+
+  return (
+    categoryList.includes(modelCategoriesMap.image) ||
+    task === modelTaskMap.textToImage ||
+    task === modelTaskMap.image ||
+    name.includes('qwen-image') ||
+    name.includes('z-image') ||
+    name.includes('stable-diffusion') ||
+    name.includes('flux')
+  );
+};
+
+export const isVideoModelCandidate = (model: any) => {
+  const categories = model?.categories || [];
+  const categoryList = Array.isArray(categories) ? categories : [categories];
+  const task = _.toLower(model?.task || '');
+  const name = _.toLower(model?.name || model?.repo_id || '');
+
+  return (
+    categoryList.includes('video') ||
+    ['text-to-video', 'image-to-video', 'video-generation'].includes(task) ||
+    name.includes('wan') ||
+    name.includes('cogvideo') ||
+    name.includes('hunyuan-video') ||
+    name.includes('ltx-video')
+  );
+};
+
+export const isGGUFModelCandidate = (model: any) => {
+  if (model?.isGGUF) {
+    return true;
+  }
+
+  const values = [
+    model?.name,
+    model?.repo_id,
+    model?.file_name,
+    model?.huggingface_filename,
+    model?.model_scope_file_path,
+    model?.local_path
+  ];
+
+  return values.some((value) => _.toLower(value || '').endsWith('.gguf'));
+};
+
+export const isVllmOmniModelCandidate = (model: any) => {
+  if (isGGUFModelCandidate(model)) {
+    return false;
+  }
+
+  const name = _.toLower(
+    [
+      model?.name,
+      model?.repo_id,
+      model?.huggingface_repo_id,
+      model?.model_scope_model_id,
+      model?.local_path
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  return (
+    isImageModelCandidate(model) ||
+    isVideoModelCandidate(model) ||
+    name.includes('omni')
+  );
 };
 
 export const useCheckCompatibility = () => {
@@ -635,6 +715,7 @@ export const useSelectModel = (data: { gpuOptions: any[] }) => {
     const backend = checkCurrentbackend({
       defaultBackend: backendOptionsMap.vllm,
       isAudio: modelTaskData.type === modelTaskMap.audio,
+      isVllmOmni: isVllmOmniModelCandidate(selectModel),
       isGGUF: selectModel.isGGUF,
       gpuOptions: gpuOptions
     });

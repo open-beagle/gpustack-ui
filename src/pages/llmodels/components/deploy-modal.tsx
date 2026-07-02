@@ -21,6 +21,7 @@ import {
   MessageStatus,
   WarningStausOptions,
   checkOnlyAscendNPU,
+  isVllmOmniModelCandidate,
   useCheckCompatibility,
   useSelectModel
 } from '../hooks';
@@ -200,6 +201,29 @@ const AddModal: FC<AddModalProps> = (props) => {
     return categories || null;
   };
 
+  const getDefaultBackend = (params: {
+    category: string | null;
+    fallbackBackend: string;
+    modelInfo?: any;
+    selectedModel?: any;
+  }) => {
+    const { category, fallbackBackend, modelInfo, selectedModel } = params;
+    if (fallbackBackend === backendOptionsMap.llamaBox) {
+      return fallbackBackend;
+    }
+
+    if (
+      isVllmOmniModelCandidate({
+        ...selectedModel,
+        ...modelInfo,
+        categories: category ? [category] : []
+      })
+    ) {
+      return backendOptionsMap.vllmOmni;
+    }
+    return fallbackBackend;
+  };
+
   const { run: onSelectFile } = useDeferredRequest(
     async (item: any, modelInfo: any, manual?: boolean) => {
       unlockWarningStatus();
@@ -225,9 +249,16 @@ const AddModal: FC<AddModalProps> = (props) => {
        */
       const formValues = form.current?.getFieldsValue?.(pickFieldsFromSpec);
 
+      const category = getCategory(item);
       form.current?.setFieldsValue?.({
         ..._.omit(modelInfo, ['name']),
         file_name: item.fakeName,
+        backend: getDefaultBackend({
+          category,
+          fallbackBackend: modelInfo.backend,
+          modelInfo,
+          selectedModel
+        }),
         backend_parameters:
           formValues.backend_parameters?.length > 0
             ? formValues.backend_parameters
@@ -235,7 +266,7 @@ const AddModal: FC<AddModalProps> = (props) => {
         backend_version:
           formValues.backend_version || defaultSpec.backend_version,
         env: formValues.env || defaultSpec.env,
-        categories: getCategory(item)
+        categories: category
       });
     },
     100
@@ -253,10 +284,17 @@ const AddModal: FC<AddModalProps> = (props) => {
 
     const modelInfo = onSelectModel(selectedModel, props.source);
 
+    const category = getCategory(item);
     form.current?.setFieldsValue?.({
       ..._.omit(modelInfo, ['name']),
       file_name: item.fakeName,
-      categories: getCategory(item)
+      backend: getDefaultBackend({
+        category,
+        fallbackBackend: modelInfo.backend,
+        modelInfo,
+        selectedModel
+      }),
+      categories: category
     });
 
     // evaluate the form data when select a model file
