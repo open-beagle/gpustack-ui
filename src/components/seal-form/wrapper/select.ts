@@ -99,7 +99,7 @@ const SelectWrapper = styled.div`
 
       .ant-select-selection-search {
         top: 20px !important;
-        inset-inline-start: ${INPUT_INNER_PADDING}px;
+        inset-inline-start: 0;
       }
       &.ant-select-multiple.ant-cascader .ant-select-selection-search {
         top: 0 !important;
