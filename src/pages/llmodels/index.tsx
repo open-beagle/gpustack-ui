@@ -155,13 +155,12 @@ const Models: React.FC = () => {
         });
       } catch (error) {
         if (!isPageHidden.current) {
-          setDataSource({
-            dataList: [],
+          setDataSource((pre) => ({
+            ...pre,
             loading: false,
             loadend: true,
-            total: dataSource.total,
             deletedIds: []
-          });
+          }));
         }
       }
     },
@@ -267,6 +266,11 @@ const Models: React.FC = () => {
     },
     [fetchData]
   );
+
+  const refreshModelInstances = useCallback(async () => {
+    await getAllModelInstances();
+    await createModelsInstanceChunkRequest();
+  }, [getAllModelInstances, createModelsInstanceChunkRequest]);
 
   const debounceUpdateFilter = _.debounce((e: any) => {
     setQueryParams({
@@ -468,6 +472,7 @@ const Models: React.FC = () => {
         handlePageChange={handlePageChange}
         handleDeleteSuccess={fetchData}
         handleOnToggleExpandAll={createModelsInstanceChunkRequest}
+        onRefreshInstances={refreshModelInstances}
         onViewLogs={handleOnViewLogs}
         onCancelViewLogs={handleOnCancelViewLogs}
         onStop={handleSearchBySilent}

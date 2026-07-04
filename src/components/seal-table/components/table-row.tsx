@@ -2,7 +2,7 @@ import useSetChunkRequest, {
   createAxiosToken
 } from '@/hooks/use-chunk-request';
 import useUpdateChunkedList from '@/hooks/use-update-chunk-list';
-import { Col, Row, Spin } from 'antd';
+import { Col, Empty, Row, Spin } from 'antd';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {
@@ -87,17 +87,19 @@ const TableRow: React.FC<
 
   const renderChildrenData = () => {
     if (childrenData.length === 0) {
-      // return (
-      //   <Empty
-      //     image={loading ? null : Empty.PRESENTED_IMAGE_SIMPLE}
-      //     description={loading ? null : undefined}
-      //     style={{
-      //       marginBlock: 0,
-      //       height: 54
-      //     }}
-      //   ></Empty>
-      // );
-      return null;
+      if (loading) {
+        return null;
+      }
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={null}
+          style={{
+            marginBlock: 0,
+            height: 54
+          }}
+        ></Empty>
+      );
     }
     return renderChildren?.(childrenData, {
       parent: record,
@@ -231,7 +233,7 @@ const TableRow: React.FC<
   }, []);
 
   useEffect(() => {
-    if (updateChild) {
+    if (updateChild && expanded) {
       // for update watch data
       filterUpdateChildrenHandler();
     }
@@ -239,7 +241,7 @@ const TableRow: React.FC<
       chunkRequestRef.current?.current?.cancel?.();
       cacheDataListRef.current = [];
     };
-  }, [updateChild, tableContext.allChildren]);
+  }, [updateChild, expanded, tableContext.allChildren]);
 
   return (
     <RowContext.Provider value={{ row: { ...record, rowIndex }, onCell }}>

@@ -93,6 +93,7 @@ interface ModelsProps {
   onViewLogs: () => void;
   onCancelViewLogs: () => void;
   handleOnToggleExpandAll: () => void;
+  onRefreshInstances?: () => Promise<void> | void;
   onStop?: (ids: number[]) => void;
   onStart?: () => void;
   queryParams: {
@@ -134,6 +135,7 @@ const Models: React.FC<ModelsProps> = ({
   onCancelViewLogs,
   handleCategoryChange,
   handleOnToggleExpandAll,
+  onRefreshInstances,
   onStop,
   onStart,
   modelFileOptions,
@@ -335,8 +337,7 @@ const Models: React.FC<ModelsProps> = ({
         await deleteModel(row.id);
         removeExpandedRowKey([row.id]);
         rowSelection.removeSelectedKey(row.id);
-        handleDeleteSuccess();
-        handleSearch();
+        await handleDeleteSuccess();
       }
     });
   };
@@ -356,8 +357,7 @@ const Models: React.FC<ModelsProps> = ({
           }
         );
         rowSelection.removeSelectedKeys(successIds);
-        handleDeleteSuccess();
-        handleSearch();
+        await handleDeleteSuccess();
         return res;
       }
     });
@@ -413,10 +413,15 @@ const Models: React.FC<ModelsProps> = ({
         name: row.name,
         async onOk() {
           await deleteModelInstance(row.id);
+          await onRefreshInstances?.();
+          await handleSearch({
+            loadingVal: false
+          });
+          message.success(intl.formatMessage({ id: 'common.message.success' }));
         }
       });
     },
-    [deleteModelInstance]
+    [handleSearch, intl, onRefreshInstances]
   );
 
   const getModelInstances = useCallback(async (row: any, options?: any) => {
