@@ -58,8 +58,7 @@ export default {
   'models.table.layers': 'Layers',
   'models.form.backend': 'Backend',
   'models.form.backend_parameters': 'Backend Parameters',
-  'models.search.gguf.tips':
-    'GGUF models use llama-box(supports Linux, macOS and Windows).',
+  'models.search.gguf.tips': 'GGUF models can use llama-box or llama.cpp.',
   'models.search.vllm.tips':
     'Non-GGUF models use vox-box for audio and vLLM(x86 Linux only) for others.',
   'models.search.voxbox.tips':
@@ -67,6 +66,8 @@ export default {
   'models.form.ollamalink':
     'Find More in  <a href="https://www.ollama.com/library" target="_blank">Ollama Library</a>.',
   'models.form.backend_parameters.llamabox.placeholder':
+    'e.g., --ctx-size=8192',
+  'models.form.backend_parameters.llamacpp.placeholder':
     'e.g., --ctx-size=8192',
   'models.form.backend_parameters.vllm.placeholder':
     'e.g., --max-model-len=8192',
@@ -88,6 +89,8 @@ export default {
   'models.form.gpuselector': 'GPU Selector',
   'models.form.backend.llamabox':
     'For GGUF format models, supports Linux, macOS, and Windows.',
+  'models.form.backend.llamacpp':
+    'For GGUF format models, starts the native llama.cpp llama-server. Distributed inference across workers is not supported.',
   'models.form.backend.vllm':
     'For non-GGUF format models, supported only on Linux.',
   'models.form.backend.vllmomni':
@@ -121,11 +124,11 @@ export default {
   'models.form.moreparameters': 'Parameter Description',
   'models.table.vram.allocated': 'Allocated VRAM',
   'models.form.backend.warning':
-    'The backend for GGUF format models uses llama-box.',
+    'GGUF format models should use llama-box or llama.cpp.',
   'models.form.ollama.warning':
-    'Deploy the Ollama model backend using llama-box.',
+    'Deploy the Ollama model backend using llama-box or llama.cpp.',
   'models.form.backend.warning.llamabox':
-    'To use the llama-box backend, specify the full path to the model file (e.g.,<span style="font-weight: 700">/data/models/model.gguf</span>). For sharded models, provide the path to the first shard (e.g.,<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>).',
+    'To use a GGUF backend, specify the full path to the model file (e.g.,<span style="font-weight: 700">/data/models/model.gguf</span>). For sharded models, provide the path to the first shard (e.g.,<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>).',
   'models.form.keyvalue.paste':
     'Paste multiple lines of text, with each line containing a key-value pair. The key and value are separated by an = sign, and different key-value pairs are separated by newline characters.',
   'models.form.files': 'files',

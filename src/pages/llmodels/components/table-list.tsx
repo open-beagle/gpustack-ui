@@ -450,7 +450,9 @@ const Models: React.FC<ModelsProps> = ({
       gpuOptions: gpuDeviceList.current,
       modelFileOptions: modelFileOptions,
       data: initialValues,
-      isGGUF: row.backend === backendOptionsMap.llamaBox
+      isGGUF: [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
+        row.backend
+      )
     });
     setCurrentData(row);
     setOpenAddModal(true);

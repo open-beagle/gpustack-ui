@@ -108,7 +108,10 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
   const { onValuesChange } = useFormContext();
 
   const paramsConfig = useMemo(() => {
-    if (backend === backendOptionsMap.llamaBox) {
+    if (
+      backend === backendOptionsMap.llamaBox ||
+      backend === backendOptionsMap.llamaCpp
+    ) {
       return llamaConfig;
     }
     if (backend === backendOptionsMap.vllm) {
@@ -429,7 +432,9 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
           ></LabelSelector>
         </Form.Item>
 
-        {backend === backendOptionsMap.llamaBox && (
+        {[backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
+          backend
+        ) && (
           <div style={{ paddingBottom: 22, paddingLeft: 10 }}>
             <Form.Item<FormData>
               name="cpu_offloading"

@@ -168,7 +168,10 @@ const RenderWorkerDownloading = (props: {
   if (
     instanceData.state !== InstanceStatusMap.Downloading ||
     !severList.length ||
-    backend === backendOptionsMap.llamaBox
+    (backend &&
+      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
+        backend
+      ))
   ) {
     return null;
   }

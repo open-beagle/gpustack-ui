@@ -147,6 +147,11 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
         distributed_inference_across_workers: true,
         cpu_offloading: true
       });
+    } else if (backend === backendOptionsMap.llamaCpp) {
+      Object.assign(updates, {
+        distributed_inference_across_workers: false,
+        cpu_offloading: true
+      });
     }
     form.setFieldsValue({ ...updates, backend_parameters: [], env: null });
     handleSetGPUIds(backend);
@@ -160,7 +165,8 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
       handleOnValuesChange?.({
         changedValues: {},
         allValues:
-          backend === backendOptionsMap.llamaBox
+          backend === backendOptionsMap.llamaBox ||
+          backend === backendOptionsMap.llamaCpp
             ? data
             : _.omit(data, [
                 'cpu_offloading',
@@ -191,6 +197,7 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
 
     let submitData = {} as FormData;
     const isVoxBox = [backendOptionsMap.voxBox].includes(formdata.backend);
+    const isLlamaCpp = formdata.backend === backendOptionsMap.llamaCpp;
 
     submitData = {
       ..._.omit(formdata, ['scheduleType']),
@@ -201,6 +208,12 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
         ? {
             distributed_inference_across_workers: false,
             cpu_offloading: false
+          }
+        : {}),
+      ...(isLlamaCpp
+        ? {
+            distributed_inference_across_workers: false,
+            cpu_offloading: true
           }
         : {}),
       ...generateGPUIds(formdata)
@@ -415,6 +428,14 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
                         : !isGGUF
                   },
                   {
+                    label: backendLabelMap[backendOptionsMap.llamaCpp],
+                    value: backendOptionsMap.llamaCpp,
+                    disabled:
+                      formData?.source === modelSourceMap.local_path_value
+                        ? false
+                        : !isGGUF
+                  },
+                  {
                     label: backendLabelMap[backendOptionsMap.vllm],
                     value: backendOptionsMap.vllm,
                     disabled:
@@ -452,7 +473,8 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
                 disabled={
                   action === PageAction.EDIT &&
                   formData?.source !== modelSourceMap.local_path_value &&
-                  !isVllmOrAscend
+                  !isVllmOrAscend &&
+                  !isGGUF
                 }
               ></SealSelect>
             </Form.Item>
@@ -494,7 +516,10 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
               gpuOptions={gpuOptions}
               action={PageAction.EDIT}
               source={formData?.source || ''}
-              isGGUF={formData?.backend === backendOptionsMap.llamaBox}
+              isGGUF={
+                formData?.backend === backendOptionsMap.llamaBox ||
+                formData?.backend === backendOptionsMap.llamaCpp
+              }
             ></AdvanceConfig>
           </Form>
         </FormContext.Provider>

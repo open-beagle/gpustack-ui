@@ -59,7 +59,7 @@ export default {
   'models.form.backend': 'Бэкенд',
   'models.form.backend_parameters': 'Параметры бэкенда',
   'models.search.gguf.tips':
-    'GGUF-модели используют llama-box (поддерживает Linux, macOS и Windows).',
+    'GGUF-модели могут использовать llama-box или llama.cpp.',
   'models.search.vllm.tips':
     'Не-GGUF модели используют vox-box для аудио и vLLM (только x86 Linux) для остальных.',
   'models.search.voxbox.tips':
@@ -67,6 +67,8 @@ export default {
   'models.form.ollamalink':
     'Больше моделей в библиотеке <a href="https://www.ollama.com/library" target="_blank">Ollama</a>',
   'models.form.backend_parameters.llamabox.placeholder':
+    'например: --ctx-size=8192',
+  'models.form.backend_parameters.llamacpp.placeholder':
     'например: --ctx-size=8192',
   'models.form.backend_parameters.vllm.placeholder':
     'например: --max-model-len=8192',
@@ -88,6 +90,8 @@ export default {
   'models.form.gpuselector': 'Селектор GPU',
   'models.form.backend.llamabox':
     'Для моделей формата GGUF. Поддержка Linux, macOS и Windows.',
+  'models.form.backend.llamacpp':
+    'Для моделей формата GGUF. Запускает нативный llama.cpp llama-server. Распределение между воркерами не поддерживается.',
   'models.form.backend.vllm':
     'Для моделей не-GGUF формата, поддерживается только в Linux.',
   'models.form.backend.vllmomni':
@@ -122,11 +126,11 @@ export default {
   'models.form.moreparameters': 'Описание параметров',
   'models.table.vram.allocated': 'Выделенная VRAM',
   'models.form.backend.warning':
-    'Бэкенд для моделей формата GGUF использует llama-box.',
+    'Для моделей формата GGUF используйте llama-box или llama.cpp.',
   'models.form.ollama.warning':
-    'Чтобы развернуть бэкенд для моделей Ollama с использованием llama-box , выполните следующие шаги.',
+    'Для моделей Ollama используйте llama-box или llama.cpp.',
   'models.form.backend.warning.llamabox':
-    'Чтобы использовать бэкенд llama-box , укажите полный путь к файлу модели (например,<span style="font-weight: 700">/data/models/model.gguf</span>). Для шардированных моделей укажите путь к первому шарду (например,<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>).',
+    'Чтобы использовать GGUF-бэкенд, укажите полный путь к файлу модели (например,<span style="font-weight: 700">/data/models/model.gguf</span>). Для шардированных моделей укажите путь к первому шарду (например,<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>).',
   'models.form.keyvalue.paste':
     'Вставьте несколько строк текста, где каждая строка содержит пару ключ-значение. Ключ и значение разделяются знаком равенства (=), а разные пары — символами новой строки.',
   'models.form.files': 'Файлы',

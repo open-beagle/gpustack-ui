@@ -59,14 +59,15 @@ export default {
   'models.table.layers': '层',
   'models.form.backend': '后端',
   'models.form.backend_parameters': '后端参数',
-  'models.search.gguf.tips':
-    'GGUF 模型用 llama-box（支持 Linux, macOS 和 Windows）。',
+  'models.search.gguf.tips': 'GGUF 模型可使用 llama-box 或 llama.cpp。',
   'models.search.vllm.tips':
     ' 非 GGUF 的语音模型用 vox-box，其它非 GGUF 的模型用 vLLM（仅支持 x86 Linux）。',
   'models.search.voxbox.tips': '若需部署语音模型取消勾选。',
   'models.form.ollamalink':
     '在 <a href="https://www.ollama.com/library" target="_blank">Ollama Library</a> 中查找',
   'models.form.backend_parameters.llamabox.placeholder':
+    '例如，--ctx-size=8192',
+  'models.form.backend_parameters.llamacpp.placeholder':
     '例如，--ctx-size=8192',
   'models.form.backend_parameters.vllm.placeholder':
     '例如，--max-model-len=8192',
@@ -86,6 +87,8 @@ export default {
   'models.form.gpuselector': 'GPU 选择器',
   'models.form.backend.llamabox':
     '用于 GGUF 格式模型，支持 Linux, macOS 和 Windows。',
+  'models.form.backend.llamacpp':
+    '用于 GGUF 格式模型，启动原生 llama.cpp llama-server，不支持跨 Worker 分布式。',
   'models.form.backend.vllm': '用于非 GGUF 格式模型，仅支持 Linux。',
   'models.form.backend.vllmomni':
     '用于全模态模型（图像/音频生成），仅支持 Linux。',
@@ -116,10 +119,12 @@ export default {
   'models.form.releases': '版本',
   'models.form.moreparameters': '参数说明',
   'models.table.vram.allocated': '分配显存',
-  'models.form.backend.warning': 'GGUF 格式模型后端用 llama-box。',
-  'models.form.ollama.warning': '部署 Ollama 模型后端使用 llama-box。',
+  'models.form.backend.warning':
+    'GGUF 格式模型后端请使用 llama-box 或 llama.cpp。',
+  'models.form.ollama.warning':
+    '部署 Ollama 模型后端请使用 llama-box 或 llama.cpp。',
   'models.form.backend.warning.llamabox':
-    '要使用 llama-box 后端，请指定模型文件的完整路径（例如：<span style="font-weight: 700">/data/models/model.gguf</span>）。对于分片模型，请提供第一个分片的路径（例如：<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>）。',
+    '要使用 GGUF 后端，请指定模型文件的完整路径（例如：<span style="font-weight: 700">/data/models/model.gguf</span>）。对于分片模型，请提供第一个分片的路径（例如：<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>）。',
   'models.form.keyvalue.paste':
     '粘贴多行文本，每行包含一个键值对，键和值之间用 = 号分隔，不同的键值对之间用换行符分隔。',
   'models.form.files': '个文件',

@@ -442,7 +442,10 @@ const AddModal: FC<AddModalProps> = (props) => {
   };
 
   const handleBackendChange = async (backend: string) => {
-    if (backend === backendOptionsMap.llamaBox) {
+    if (
+      backend === backendOptionsMap.llamaBox ||
+      backend === backendOptionsMap.llamaCpp
+    ) {
       setIsGGUF(true);
     } else {
       setIsGGUF(false);
@@ -457,7 +460,8 @@ const AddModal: FC<AddModalProps> = (props) => {
       handleOnValuesChange?.({
         changedValues: {},
         allValues:
-          backend === backendOptionsMap.llamaBox
+          backend === backendOptionsMap.llamaBox ||
+          backend === backendOptionsMap.llamaCpp
             ? data
             : _.omit(data, [
                 'cpu_offloading',

@@ -44,7 +44,7 @@ const LocalPathForm: React.FC = () => {
     } else if (
       !isEndwithGGUF &&
       !isBlobFile &&
-      backend === backendOptionsMap.llamaBox
+      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(backend)
     ) {
       backend = checkOnlyAscendNPU(gpuOptions || [])
         ? backendOptionsMap.ascendMindie

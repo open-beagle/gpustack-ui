@@ -88,6 +88,10 @@ export const backendTipsList = [
     tips: 'models.form.backend.llamabox'
   },
   {
+    title: 'llama.cpp',
+    tips: 'models.form.backend.llamacpp'
+  },
+  {
     title: 'vLLM',
     tips: 'models.form.backend.vllm'
   },
@@ -131,6 +135,7 @@ export const localPathTipsList = [
 
 export const backendOptionsMap = {
   llamaBox: 'llama-box',
+  llamaCpp: 'llama-cpp',
   vllm: 'vllm',
   vllmOmni: 'vllm-omni',
   voxBox: 'vox-box',
@@ -139,6 +144,7 @@ export const backendOptionsMap = {
 
 export const backendLabelMap = {
   [backendOptionsMap.llamaBox]: 'llama-box',
+  [backendOptionsMap.llamaCpp]: 'llama.cpp',
   [backendOptionsMap.vllm]: 'vLLM',
   [backendOptionsMap.vllmOmni]: 'vLLM-Omni',
   [backendOptionsMap.voxBox]: 'vox-box',
@@ -148,6 +154,10 @@ export const backendLabelMap = {
 export const backendParamsHolderTips = {
   [backendOptionsMap.llamaBox]: {
     holder: 'models.form.backend_parameters.llamabox.placeholder',
+    tooltip: 'models.form.backend_parameters.vllm.tips'
+  },
+  [backendOptionsMap.llamaCpp]: {
+    holder: 'models.form.backend_parameters.llamacpp.placeholder',
     tooltip: 'models.form.backend_parameters.vllm.tips'
   },
   [backendOptionsMap.vllm]: {
@@ -521,6 +531,14 @@ export const getBackendParamsTips = (backend: string) => {
       releases: 'https://github.com/gpustack/llama-box/releases',
       link: 'https://github.com/gpustack/llama-box?tab=readme-ov-file#usage',
       version: 'v0.0.140'
+    };
+  }
+  if (backend === backendOptionsMap.llamaCpp) {
+    return {
+      backend: 'llama.cpp',
+      releases: 'https://github.com/ggml-org/llama.cpp/releases',
+      link: 'https://github.com/ggml-org/llama.cpp/tree/master/tools/server',
+      version: 'b8322'
     };
   }
   if (backend === backendOptionsMap.vllm) {

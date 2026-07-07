@@ -254,11 +254,15 @@ export const checkCurrentbackend = (data: {
   defaultBackend?: string;
 }) => {
   const { isAudio, isVllmOmni, isGGUF, gpuOptions, defaultBackend } = data;
+  const ggufBackends = [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp];
   if (isAudio) {
     return backendOptionsMap.voxBox;
   }
 
   if (isGGUF) {
+    if (defaultBackend && ggufBackends.includes(defaultBackend)) {
+      return defaultBackend;
+    }
     return backendOptionsMap.llamaBox;
   }
 
@@ -520,19 +524,23 @@ export const useCheckCompatibility = () => {
     const isGGUFFile = localPath.endsWith('.gguf');
 
     const isOllamaModelFile = isBlobFile || isOllamaModel;
+    const isGGUFBackend = [
+      backendOptionsMap.llamaBox,
+      backendOptionsMap.llamaCpp
+    ].includes(backend);
 
     let warningMessage = '';
-    if (isOllamaModelFile && backend === backendOptionsMap.llamaBox) {
+    if (isOllamaModelFile && isGGUFBackend) {
       warningMessage = '';
-    } else if (isOllamaModelFile && backend !== backendOptionsMap.llamaBox) {
+    } else if (isOllamaModelFile && !isGGUFBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.ollama.warning'
       });
-    } else if (isGGUFFile && backend !== backendOptionsMap.llamaBox) {
+    } else if (isGGUFFile && !isGGUFBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.backend.warning'
       });
-    } else if (!isGGUFFile && backend === backendOptionsMap.llamaBox) {
+    } else if (!isGGUFFile && isGGUFBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.backend.warning.llamabox'
       });

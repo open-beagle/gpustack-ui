@@ -88,6 +88,11 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
         distributed_inference_across_workers: true,
         cpu_offloading: true
       });
+    } else if (val === backendOptionsMap.llamaCpp) {
+      Object.assign(updates, {
+        distributed_inference_across_workers: false,
+        cpu_offloading: true
+      });
     }
     form.setFieldsValue({
       ...updates,
@@ -137,7 +142,13 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
     const gpuSelector = generateGPUIds(data);
     const allValues = {
       ..._.omit(data, ['scheduleType']),
-      ...gpuSelector
+      ...gpuSelector,
+      ...(data.backend === backendOptionsMap.llamaCpp
+        ? {
+            distributed_inference_across_workers: false,
+            cpu_offloading: true
+          }
+        : {})
     };
 
     onOk(allValues);
@@ -156,31 +167,27 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
     onValuesChange?.(changedValues, allValues);
   };
 
-  useImperativeHandle(
-    ref,
-    () => {
-      return {
-        form: form,
-        submit: handleSumit,
-        resetFields: (fields: any[]) => {
-          form.resetFields(fields);
-        },
-        setFieldsValue: (values: FormData) => {
-          form.setFieldsValue(values);
-        },
-        setFieldValue: (name: string, value: any) => {
-          form.setFieldValue(name, value);
-        },
-        getFieldValue: (name: string) => {
-          return form.getFieldValue(name);
-        },
-        getFieldsValue: () => {
-          return form.getFieldsValue();
-        }
-      };
-    },
-    []
-  );
+  useImperativeHandle(ref, () => {
+    return {
+      form: form,
+      submit: handleSumit,
+      resetFields: (fields: any[]) => {
+        form.resetFields(fields);
+      },
+      setFieldsValue: (values: FormData) => {
+        form.setFieldsValue(values);
+      },
+      setFieldValue: (name: string, value: any) => {
+        form.setFieldValue(name, value);
+      },
+      getFieldValue: (name: string) => {
+        return form.getFieldValue(name);
+      },
+      getFieldsValue: () => {
+        return form.getFieldsValue();
+      }
+    };
+  }, []);
 
   return (
     <Form
@@ -265,6 +272,14 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
               {
                 label: backendLabelMap[backendOptionsMap.llamaBox],
                 value: backendOptionsMap.llamaBox,
+                disabled:
+                  props.source === modelSourceMap.local_path_value
+                    ? false
+                    : !isGGUF
+              },
+              {
+                label: backendLabelMap[backendOptionsMap.llamaCpp],
+                value: backendOptionsMap.llamaCpp,
                 disabled:
                   props.source === modelSourceMap.local_path_value
                     ? false

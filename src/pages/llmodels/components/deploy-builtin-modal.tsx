@@ -59,6 +59,10 @@ const backendOptions = [
     value: backendOptionsMap.llamaBox
   },
   {
+    label: 'llama.cpp',
+    value: backendOptionsMap.llamaCpp
+  },
+  {
     label: 'vLLM',
     value: backendOptionsMap.vllm
   },
@@ -146,7 +150,13 @@ const AddModal: React.FC<AddModalProps> = (props) => {
     const data = {
       ..._.omit(selectSpecRef.current, ['name']),
       ...formData,
-      ...gpuSelector
+      ...gpuSelector,
+      ...(formData.backend === backendOptionsMap.llamaCpp
+        ? {
+            distributed_inference_across_workers: false,
+            cpu_offloading: true
+          }
+        : {})
     };
 
     return data;
@@ -166,7 +176,9 @@ const AddModal: React.FC<AddModalProps> = (props) => {
     }
 
     if (
-      data.backend === backendOptionsMap.llamaBox &&
+      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
+        data.backend
+      ) &&
       checkOnlyAscendNPU(gpuOptions)
     ) {
       return hasF16Ref.current
@@ -333,7 +345,10 @@ const AddModal: React.FC<AddModalProps> = (props) => {
   };
 
   const handleBackendChange = (backend: string) => {
-    if (backend === backendOptionsMap.llamaBox) {
+    if (
+      backend === backendOptionsMap.llamaBox ||
+      backend === backendOptionsMap.llamaCpp
+    ) {
       setIsGGUF(true);
     } else {
       setIsGGUF(false);
@@ -416,7 +431,10 @@ const AddModal: React.FC<AddModalProps> = (props) => {
       const name = _.toLower(current.name).replace(/\s/g, '-') || '';
       form.current.setFieldValue('name', name);
 
-      if (defaultSpec.backend === backendOptionsMap.llamaBox) {
+      if (
+        defaultSpec.backend === backendOptionsMap.llamaBox ||
+        defaultSpec.backend === backendOptionsMap.llamaCpp
+      ) {
         setIsGGUF(true);
       } else {
         setIsGGUF(false);

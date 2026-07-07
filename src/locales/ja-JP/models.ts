@@ -61,7 +61,7 @@ export default {
   'models.form.backend': 'バックエンド',
   'models.form.backend_parameters': 'バックエンドパラメータ',
   'models.search.gguf.tips':
-    'GGUFモデルはllama-boxを使用します（Linux、macOS、Windowsをサポート）。',
+    'GGUFモデルはllama-boxまたはllama.cppを使用できます。',
   'models.search.vllm.tips':
     '非GGUFモデルは、音声にはvox-boxを、その他にはvLLM（x86 Linuxのみ）を使用します。',
   'models.search.voxbox.tips':
@@ -69,11 +69,13 @@ export default {
   'models.form.ollamalink':
     '<a href="https://www.ollama.com/library" target="_blank">Ollamaライブラリ</a>でさらに探す',
   'models.form.backend_parameters.llamabox.placeholder': '例: --ctx-size=8192',
+  'models.form.backend_parameters.llamacpp.placeholder': '例: --ctx-size=8192',
   'models.form.backend_parameters.vllm.placeholder': '例: --max-model-len=8192',
   'models.form.backend_parameters.vllm.tips': '詳細な{backend}パラメータ情報',
   'models.form.backend_parameters.vllmomni.placeholder':
     '例: --num-inference-steps=9',
-  'models.form.backend_parameters.vllmomni.tips': '詳細な{backend}パラメータ情報',
+  'models.form.backend_parameters.vllmomni.tips':
+    '詳細な{backend}パラメータ情報',
   'models.logs.pagination.prev': '前の{lines}行',
   'models.logs.pagination.next': '次の{lines}行',
   'models.logs.pagination.last': '最終ページ',
@@ -86,6 +88,8 @@ export default {
   'models.form.gpuselector': 'GPUセレクター',
   'models.form.backend.llamabox':
     'GGUF形式のモデル用（Linux、macOS、Windowsをサポート）。',
+  'models.form.backend.llamacpp':
+    'GGUF形式のモデル用。ネイティブのllama.cpp llama-serverを起動します。ワーカー間分散はサポートされません。',
   'models.form.backend.vllm': '非GGUF形式のモデル用。Linux のみ対応。',
   'models.form.backend.vllmomni':
     'オムニモーダルモデル（画像/音声生成）用。Linuxのみ対応。',
@@ -118,11 +122,11 @@ export default {
   'models.form.moreparameters': 'パラメータ説明',
   'models.table.vram.allocated': '割り当て済みVRAM',
   'models.form.backend.warning':
-    'GGUF形式のモデルのバックエンドはllama-boxを使用します。',
+    'GGUF形式のモデルはllama-boxまたはllama.cppを使用してください。',
   'models.form.ollama.warning':
-    'Ollamaモデルのバックエンドをllama-boxを使用してデプロイします。',
+    'Ollamaモデルのバックエンドはllama-boxまたはllama.cppを使用してください。',
   'models.form.backend.warning.llamabox':
-    'llama-boxバックエンドを使用するには、モデルファイルのフルパスを指定してください（例:<span style="font-weight: 700">/data/models/model.gguf</span>）。分割モデルの場合、最初のシャードのパスを指定してください（例:<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>）。',
+    'GGUFバックエンドを使用するには、モデルファイルのフルパスを指定してください（例:<span style="font-weight: 700">/data/models/model.gguf</span>）。分割モデルの場合、最初のシャードのパスを指定してください（例:<span style="font-weight: 700">/data/models/model-00001-of-00004.gguf</span>）。',
   'models.form.keyvalue.paste':
     '複数行のテキストを貼り付けます。各行にはキーと値のペアが含まれ、キーと値は=記号で区切られ、異なるキーと値のペアは改行文字で区切られます。',
   'models.form.files': 'ファイル',
