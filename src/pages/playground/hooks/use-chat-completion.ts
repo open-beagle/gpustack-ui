@@ -10,6 +10,12 @@ import {
 } from '../config';
 import { MessageItem } from '../config/types';
 
+const isUnsetCompletionParameter = (value: any) =>
+  value === undefined || value === null || value === '';
+
+const omitUnsetCompletionParameters = (parameters: any) =>
+  _.omitBy(parameters, isUnsetCompletionParameter);
+
 export default function useChatCompletion(
   scroller: React.RefObject<HTMLElement>
 ) {
@@ -142,14 +148,14 @@ export default function useChatCompletion(
 
       const messages = generateMessagesByListContent(messageParams);
 
-      const chatParams = {
+      const chatParams = omitUnsetCompletionParameters({
         messages: messages,
         ...parameters,
         stream: true,
         stream_options: {
           include_usage: true
         }
-      };
+      });
       const result: any = await fetchChunkedData({
         data: chatParams,
         url: CHAT_API,
