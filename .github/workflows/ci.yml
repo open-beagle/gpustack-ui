@@ -6,79 +6,34 @@ on:
       - 'main'
 
 env:
-  NODE_VERSION: '22'
   BUILD_VERSION: 'v0.7.6'
 
 jobs:
-  deps:
+  build:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
           persist-credentials: false
       - name: Setup Pnpm
-        uses: pnpm/action-setup@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: pnpm/action-setup@v6
         with:
-          node-version: '${{ env.NODE_VERSION }}'
+          version: 10.31.0
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
           cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
       - name: Deps
         run: scripts/deps
         env:
           LOCK: true
-      - name: Archive Modules
-        timeout-minutes: 5
-        uses: actions/cache/save@v4
-        with:
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          path: |
-            ${{ github.workspace }}/node_modules
-
-  build:
-    needs:
-      - deps
-    if: github.event_name == 'pull_request'
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Unarchive Node Modules
-        timeout-minutes: 5
-        uses: actions/cache/restore@v4
-        with:
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          path: |
-            ${{ github.workspace }}/node_modules
-      - name: Build
-        run: scripts/build
-
-  build-publish:
-    needs:
-      - deps
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Unarchive Node Modules
-        timeout-minutes: 5
-        uses: actions/cache/restore@v4
-        with:
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          path: |
-            ${{ github.workspace }}/node_modules
       - name: Build
         run: scripts/build
       - name: Package
