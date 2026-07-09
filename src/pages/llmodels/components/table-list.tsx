@@ -57,7 +57,7 @@ import {
 } from '../apis';
 import {
   InstanceRealtimeLogStatus,
-  backendOptionsMap,
+  isGGUFBackend,
   modelCategories,
   modelCategoriesMap,
   modelSourceMap
@@ -450,9 +450,7 @@ const Models: React.FC<ModelsProps> = ({
       gpuOptions: gpuDeviceList.current,
       modelFileOptions: modelFileOptions,
       data: initialValues,
-      isGGUF: [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
-        row.backend
-      )
+      isGGUF: isGGUFBackend(row.backend)
     });
     setCurrentData(row);
     setOpenAddModal(true);

@@ -7,6 +7,7 @@ import _ from 'lodash';
 import React, { useRef } from 'react';
 import {
   backendOptionsMap,
+  isGGUFBackend,
   localPathTipsList,
   modelSourceMap
 } from '../config';
@@ -41,11 +42,7 @@ const LocalPathForm: React.FC = () => {
 
     if (isEndwithGGUF || isBlobFile) {
       backend = backendOptionsMap.llamaBox;
-    } else if (
-      !isEndwithGGUF &&
-      !isBlobFile &&
-      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(backend)
-    ) {
+    } else if (!isEndwithGGUF && !isBlobFile && isGGUFBackend(backend)) {
       backend = checkOnlyAscendNPU(gpuOptions || [])
         ? backendOptionsMap.ascendMindie
         : backendOptionsMap.vllm;

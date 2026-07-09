@@ -25,6 +25,7 @@ import {
   backendOptionsMap,
   backendParamsHolderTips,
   getBackendParamsTips,
+  isGGUFBackend,
   modelCategories,
   placementStrategyOptions
 } from '../config';
@@ -108,10 +109,7 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
   const { onValuesChange } = useFormContext();
 
   const paramsConfig = useMemo(() => {
-    if (
-      backend === backendOptionsMap.llamaBox ||
-      backend === backendOptionsMap.llamaCpp
-    ) {
+    if (isGGUFBackend(backend)) {
       return llamaConfig;
     }
     if (backend === backendOptionsMap.vllm) {
@@ -432,9 +430,7 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
           ></LabelSelector>
         </Form.Item>
 
-        {[backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
-          backend
-        ) && (
+        {isGGUFBackend(backend) && (
           <div style={{ paddingBottom: 22, paddingLeft: 10 }}>
             <Form.Item<FormData>
               name="cpu_offloading"

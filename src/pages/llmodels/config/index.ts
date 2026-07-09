@@ -135,7 +135,7 @@ export const localPathTipsList = [
 
 export const backendOptionsMap = {
   llamaBox: 'llama-box',
-  llamaCpp: 'llama-cpp',
+  llamaCpp: 'llama.cpp',
   vllm: 'vllm',
   vllmOmni: 'vllm-omni',
   voxBox: 'vox-box',
@@ -149,6 +149,14 @@ export const backendLabelMap = {
   [backendOptionsMap.vllmOmni]: 'vLLM-Omni',
   [backendOptionsMap.voxBox]: 'vox-box',
   [backendOptionsMap.ascendMindie]: 'Ascend MindIE'
+};
+
+export const isLlamaCppBackend = (backend?: string) => {
+  return backend === backendOptionsMap.llamaCpp;
+};
+
+export const isGGUFBackend = (backend?: string) => {
+  return backend === backendOptionsMap.llamaBox || isLlamaCppBackend(backend);
 };
 
 export const backendParamsHolderTips = {
@@ -533,7 +541,7 @@ export const getBackendParamsTips = (backend: string) => {
       version: 'v0.0.140'
     };
   }
-  if (backend === backendOptionsMap.llamaCpp) {
+  if (isLlamaCppBackend(backend)) {
     return {
       backend: 'llama.cpp',
       releases: 'https://github.com/ggml-org/llama.cpp/releases',

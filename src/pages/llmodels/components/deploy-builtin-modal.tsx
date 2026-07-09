@@ -12,6 +12,8 @@ import { queryCatalogItemSpec } from '../apis';
 import {
   backendOptionsMap,
   defaultFormValues,
+  isGGUFBackend,
+  isLlamaCppBackend,
   modelCategoriesMap,
   sourceOptions
 } from '../config';
@@ -151,7 +153,7 @@ const AddModal: React.FC<AddModalProps> = (props) => {
       ..._.omit(selectSpecRef.current, ['name']),
       ...formData,
       ...gpuSelector,
-      ...(formData.backend === backendOptionsMap.llamaCpp
+      ...(isLlamaCppBackend(formData.backend)
         ? {
             distributed_inference_across_workers: false,
             cpu_offloading: true
@@ -175,12 +177,7 @@ const AddModal: React.FC<AddModalProps> = (props) => {
       return EmbeddingRerankFirstQuant.includes(_.toUpper(data.quantOption));
     }
 
-    if (
-      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
-        data.backend
-      ) &&
-      checkOnlyAscendNPU(gpuOptions)
-    ) {
+    if (isGGUFBackend(data.backend) && checkOnlyAscendNPU(gpuOptions)) {
       return hasF16Ref.current
         ? AscendNPUQuant_F16.includes(_.toUpper(data.quantOption))
         : AscendNPUQuant_Q8.includes(_.toUpper(data.quantOption));
@@ -345,14 +342,7 @@ const AddModal: React.FC<AddModalProps> = (props) => {
   };
 
   const handleBackendChange = (backend: string) => {
-    if (
-      backend === backendOptionsMap.llamaBox ||
-      backend === backendOptionsMap.llamaCpp
-    ) {
-      setIsGGUF(true);
-    } else {
-      setIsGGUF(false);
-    }
+    setIsGGUF(isGGUFBackend(backend));
     const sizeList = handleSetSizeOptions({
       backend: backend
     });
@@ -431,14 +421,7 @@ const AddModal: React.FC<AddModalProps> = (props) => {
       const name = _.toLower(current.name).replace(/\s/g, '-') || '';
       form.current.setFieldValue('name', name);
 
-      if (
-        defaultSpec.backend === backendOptionsMap.llamaBox ||
-        defaultSpec.backend === backendOptionsMap.llamaCpp
-      ) {
-        setIsGGUF(true);
-      } else {
-        setIsGGUF(false);
-      }
+      setIsGGUF(isGGUFBackend(defaultSpec.backend));
       const allValues = generateSubmitData({
         ...defaultSpec,
         categories: _.get(current, 'categories.0', null),

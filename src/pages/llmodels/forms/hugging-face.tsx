@@ -4,7 +4,7 @@ import useAppUtils from '@/hooks/use-app-utils';
 import { useIntl } from '@umijs/max';
 import { Form } from 'antd';
 import React from 'react';
-import { modelSourceMap } from '../config';
+import { isGGUFBackend, modelSourceMap } from '../config';
 import { useFormContext } from '../config/form-context';
 import { FormData } from '../config/types';
 
@@ -14,7 +14,11 @@ const HuggingFaceForm: React.FC = () => {
   const { getRuleMessage } = useAppUtils();
   const intl = useIntl();
   const { isGGUF, byBuiltIn, pageAction, onValuesChange } = formCtx;
-  const source = Form.useWatch('source');
+  const source =
+    Form.useWatch('source') ?? formInstance.getFieldValue('source');
+  const backend =
+    Form.useWatch('backend') ?? formInstance.getFieldValue('backend');
+  const showFileName = isGGUF || isGGUFBackend(backend);
 
   console.log('HuggingFaceForm', { source, isGGUF });
 
@@ -51,7 +55,7 @@ const HuggingFaceForm: React.FC = () => {
           onBlur={handleOnBlur}
         ></SealInput.Input>
       </Form.Item>
-      {isGGUF && (
+      {showFileName && (
         <Form.Item<FormData>
           name="file_name"
           key="file_name"

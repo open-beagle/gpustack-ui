@@ -13,6 +13,7 @@ import {
   backendOptionsMap,
   backendTipsList,
   excludeFields,
+  isLlamaCppBackend,
   modelSourceMap,
   sourceOptions
 } from '../config';
@@ -88,7 +89,7 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
         distributed_inference_across_workers: true,
         cpu_offloading: true
       });
-    } else if (val === backendOptionsMap.llamaCpp) {
+    } else if (isLlamaCppBackend(val)) {
       Object.assign(updates, {
         distributed_inference_across_workers: false,
         cpu_offloading: true
@@ -143,7 +144,7 @@ const DataForm: React.FC<DataFormProps> = forwardRef((props, ref) => {
     const allValues = {
       ..._.omit(data, ['scheduleType']),
       ...gpuSelector,
-      ...(data.backend === backendOptionsMap.llamaCpp
+      ...(isLlamaCppBackend(data.backend)
         ? {
             distributed_inference_across_workers: false,
             cpu_offloading: true

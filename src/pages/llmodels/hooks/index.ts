@@ -14,6 +14,7 @@ import { evaluationsModelSpec, queryGPUList } from '../apis';
 import {
   backendOptionsMap,
   getSourceRepoConfigValue,
+  isGGUFBackend,
   modelCategoriesMap,
   modelSourceMap,
   modelTaskMap,
@@ -254,13 +255,12 @@ export const checkCurrentbackend = (data: {
   defaultBackend?: string;
 }) => {
   const { isAudio, isVllmOmni, isGGUF, gpuOptions, defaultBackend } = data;
-  const ggufBackends = [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp];
   if (isAudio) {
     return backendOptionsMap.voxBox;
   }
 
   if (isGGUF) {
-    if (defaultBackend && ggufBackends.includes(defaultBackend)) {
+    if (defaultBackend && isGGUFBackend(defaultBackend)) {
       return defaultBackend;
     }
     return backendOptionsMap.llamaBox;
@@ -273,7 +273,7 @@ export const checkCurrentbackend = (data: {
   if (checkOnlyAscendNPU(gpuOptions)) {
     return backendOptionsMap.ascendMindie;
   }
-  return defaultBackend;
+  return defaultBackend || backendOptionsMap.vllm;
 };
 
 export const isImageModelCandidate = (model: any) => {
@@ -524,23 +524,20 @@ export const useCheckCompatibility = () => {
     const isGGUFFile = localPath.endsWith('.gguf');
 
     const isOllamaModelFile = isBlobFile || isOllamaModel;
-    const isGGUFBackend = [
-      backendOptionsMap.llamaBox,
-      backendOptionsMap.llamaCpp
-    ].includes(backend);
+    const isGGUFSelectedBackend = isGGUFBackend(backend);
 
     let warningMessage = '';
-    if (isOllamaModelFile && isGGUFBackend) {
+    if (isOllamaModelFile && isGGUFSelectedBackend) {
       warningMessage = '';
-    } else if (isOllamaModelFile && !isGGUFBackend) {
+    } else if (isOllamaModelFile && !isGGUFSelectedBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.ollama.warning'
       });
-    } else if (isGGUFFile && !isGGUFBackend) {
+    } else if (isGGUFFile && !isGGUFSelectedBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.backend.warning'
       });
-    } else if (!isGGUFFile && isGGUFBackend) {
+    } else if (!isGGUFFile && isGGUFSelectedBackend) {
       warningMessage = intl.formatMessage({
         id: 'models.form.backend.warning.llamabox'
       });

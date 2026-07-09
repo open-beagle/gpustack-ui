@@ -15,6 +15,8 @@ import {
   backendTipsList,
   updateExcludeFields as excludeFields,
   getSourceRepoConfigValue,
+  isGGUFBackend,
+  isLlamaCppBackend,
   modelSourceMap,
   sourceOptions,
   updateIgnoreFields
@@ -147,7 +149,7 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
         distributed_inference_across_workers: true,
         cpu_offloading: true
       });
-    } else if (backend === backendOptionsMap.llamaCpp) {
+    } else if (isLlamaCppBackend(backend)) {
       Object.assign(updates, {
         distributed_inference_across_workers: false,
         cpu_offloading: true
@@ -164,14 +166,12 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
     if (data.local_path || data.source !== modelSourceMap.local_path_value) {
       handleOnValuesChange?.({
         changedValues: {},
-        allValues:
-          backend === backendOptionsMap.llamaBox ||
-          backend === backendOptionsMap.llamaCpp
-            ? data
-            : _.omit(data, [
-                'cpu_offloading',
-                'distributed_inference_across_workers'
-              ]),
+        allValues: isGGUFBackend(backend)
+          ? data
+          : _.omit(data, [
+              'cpu_offloading',
+              'distributed_inference_across_workers'
+            ]),
         source: data.source
       });
     }
@@ -197,7 +197,7 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
 
     let submitData = {} as FormData;
     const isVoxBox = [backendOptionsMap.voxBox].includes(formdata.backend);
-    const isLlamaCpp = formdata.backend === backendOptionsMap.llamaCpp;
+    const isLlamaCpp = isLlamaCppBackend(formdata.backend);
 
     submitData = {
       ..._.omit(formdata, ['scheduleType']),
@@ -516,10 +516,7 @@ const UpdateModal: React.FC<AddModalProps> = (props) => {
               gpuOptions={gpuOptions}
               action={PageAction.EDIT}
               source={formData?.source || ''}
-              isGGUF={
-                formData?.backend === backendOptionsMap.llamaBox ||
-                formData?.backend === backendOptionsMap.llamaCpp
-              }
+              isGGUF={isGGUFBackend(formData?.backend)}
             ></AdvanceConfig>
           </Form>
         </FormContext.Provider>

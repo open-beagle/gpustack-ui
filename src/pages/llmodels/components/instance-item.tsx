@@ -28,7 +28,7 @@ import { MODEL_INSTANCE_API } from '../apis';
 import {
   InstanceStatusMap,
   InstanceStatusMapValue,
-  backendOptionsMap,
+  isGGUFBackend,
   status
 } from '../config';
 import {
@@ -168,10 +168,7 @@ const RenderWorkerDownloading = (props: {
   if (
     instanceData.state !== InstanceStatusMap.Downloading ||
     !severList.length ||
-    (backend &&
-      [backendOptionsMap.llamaBox, backendOptionsMap.llamaCpp].includes(
-        backend
-      ))
+    isGGUFBackend(backend)
   ) {
     return null;
   }

@@ -13,6 +13,7 @@ import {
   backendOptionsMap,
   defaultFormValues,
   getSourceRepoConfigValue,
+  isGGUFBackend,
   modelSourceMap
 } from '../config';
 import { FormContext } from '../config/form-context';
@@ -208,7 +209,7 @@ const AddModal: FC<AddModalProps> = (props) => {
     selectedModel?: any;
   }) => {
     const { category, fallbackBackend, modelInfo, selectedModel } = params;
-    if (fallbackBackend === backendOptionsMap.llamaBox) {
+    if (isGGUFBackend(fallbackBackend)) {
       return fallbackBackend;
     }
 
@@ -442,14 +443,7 @@ const AddModal: FC<AddModalProps> = (props) => {
   };
 
   const handleBackendChange = async (backend: string) => {
-    if (
-      backend === backendOptionsMap.llamaBox ||
-      backend === backendOptionsMap.llamaCpp
-    ) {
-      setIsGGUF(true);
-    } else {
-      setIsGGUF(false);
-    }
+    setIsGGUF(isGGUFBackend(backend));
 
     const data = form.current.form.getFieldsValue?.();
     const res = handleBackendChangeBefore(data);
@@ -459,14 +453,12 @@ const AddModal: FC<AddModalProps> = (props) => {
     if (data.local_path || props.source !== modelSourceMap.local_path_value) {
       handleOnValuesChange?.({
         changedValues: {},
-        allValues:
-          backend === backendOptionsMap.llamaBox ||
-          backend === backendOptionsMap.llamaCpp
-            ? data
-            : _.omit(data, [
-                'cpu_offloading',
-                'distributed_inference_across_workers'
-              ]),
+        allValues: isGGUFBackend(backend)
+          ? data
+          : _.omit(data, [
+              'cpu_offloading',
+              'distributed_inference_across_workers'
+            ]),
         source: props.source
       });
     }
