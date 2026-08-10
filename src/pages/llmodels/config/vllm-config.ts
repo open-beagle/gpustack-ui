@@ -774,7 +774,265 @@ const options = [
   }
 ];
 
-const formatOptions = (items: typeof options) => {
+type BackendParameterOption = (typeof options)[number];
+
+const vllmAdditionalFlags = `
+--aggregate-engine-logging
+--all2all-backend
+--allow-deprecated-quantization
+--allowed-media-domains
+--api-server-count
+--async-scheduling
+--attention-backend
+--attention-config
+--config
+--convert
+--cp-kv-cache-interleave-size
+--cpu-distributed-timeout-seconds
+--cpu-offload-params
+--cudagraph-capture-sizes
+--cudagraph-metrics
+--data-parallel-address
+--data-parallel-backend
+--data-parallel-external-lb
+--data-parallel-hybrid-lb
+--data-parallel-multi-port-external-lb
+--data-parallel-rank
+--data-parallel-rpc-port
+--data-parallel-size-local
+--data-parallel-start-rank
+--data-parallel-supervisor-port
+--dbo-decode-token-threshold
+--dbo-prefill-token-threshold
+--dcp-comm-backend
+--dcp-kv-cache-interleave-size
+--decode-context-parallel-size
+--default-chat-template-kwargs
+--default-mm-loras
+--device-ids
+--diffusion-config
+--disable-access-log-for-endpoints
+--disable-hybrid-kv-cache-manager
+--disable-nccl-for-dp-synchronization
+--distributed-timeout-seconds
+--dp-supervisor-probe-failure-threshold
+--dp-supervisor-probe-interval-s
+--dp-supervisor-probe-timeout-s
+--ec-transfer-config
+--enable-bf16x3-router-gemm
+--enable-cumem-allocator
+--enable-dbo
+--enable-elastic-ep
+--enable-ep-weight-filter
+--enable-eplb
+--enable-flash-late-interaction
+--enable-flashinfer-autotune
+--enable-force-include-usage
+--enable-layerwise-nvtx-tracing
+--enable-log-deltas
+--enable-log-outputs
+--enable-log-requests
+--enable-logging-iteration-details
+--enable-mamba-cache-stochastic-rounding
+--enable-mfu-metrics
+--enable-mixed-moe-lora-format
+--enable-mm-embeds
+--enable-mm-processor-stats
+--enable-moe-shared-loras
+--enable-offline-docs
+--enable-per-request-metrics
+--enable-prompt-embeds
+--enable-return-routed-experts
+--enable-tokenizer-info-endpoint
+--enable-tower-connector-lora
+--eplb-config
+--exclude-tools-when-tool-choice-none
+--expert-placement-strategy
+--fail-on-environ-validation
+--fingerprint-mode
+--fingerprint-value
+--gdn-prefill-backend
+--grpc
+--h11-max-header-count
+--h11-max-incomplete-event-size
+--headless
+--host
+--interleave-mm-strings
+--io-processor-plugin
+--ir-op-priority
+--jit-monitor-mode
+--jit-monitor-verbose
+--kernel-config
+--kv-cache-dtype-skip-layers
+--kv-cache-memory-bytes
+--kv-cache-metrics
+--kv-cache-metrics-sample
+--kv-events-config
+--kv-offloading-backend
+--kv-offloading-size
+--kv-sharing-fast-prefill
+--language-model-only
+--linear-backend
+--log-config-file
+--log-error-stack
+--logits-processors
+--logprobs-mode
+--lora-target-modules
+--mamba-backend
+--mamba-block-size
+--mamba-cache-dtype
+--mamba-cache-mode
+--mamba-cache-philox-rounds
+--mamba-config
+--mamba-ssm-cache-dtype
+--master-addr
+--master-port
+--max-cudagraph-capture-size
+--max-num-scheduled-tokens
+--media-io-kwargs
+--mm-encoder-attn-backend
+--mm-encoder-attn-dtype
+--mm-encoder-fp8-scale-path
+--mm-encoder-fp8-scale-save-margin
+--mm-encoder-fp8-scale-save-path
+--mm-encoder-only
+--mm-encoder-tp-mode
+--mm-ipc-gpu-memory-gb
+--mm-processor-cache-gb
+--mm-processor-cache-type
+--mm-shm-cache-max-object-size-mb
+--mm-tensor-ipc
+--model-class-overrides
+--model-weights
+--moe-backend
+--nnodes
+--no-aggregate-engine-logging
+--no-allow-credentials
+--no-allow-deprecated-quantization
+--no-async-scheduling
+--no-calculate-kv-scales
+--no-cudagraph-metrics
+--no-data-parallel-external-lb
+--no-data-parallel-hybrid-lb
+--no-data-parallel-multi-port-external-lb
+--no-disable-cascade-attn
+--no-disable-chunked-mm-input
+--no-disable-custom-all-reduce
+--no-disable-fastapi-docs
+--no-disable-hybrid-kv-cache-manager
+--no-disable-log-stats
+--no-disable-nccl-for-dp-synchronization
+--no-disable-sliding-window
+--no-disable-uvicorn-access-log
+--no-enable-auto-tool-choice
+--no-enable-bf16x3-router-gemm
+--no-enable-chunked-prefill
+--no-enable-cumem-allocator
+--no-enable-dbo
+--no-enable-elastic-ep
+--no-enable-ep-weight-filter
+--no-enable-eplb
+--no-enable-expert-parallel
+--no-enable-flash-late-interaction
+--no-enable-flashinfer-autotune
+--no-enable-force-include-usage
+--no-enable-layerwise-nvtx-tracing
+--no-enable-log-deltas
+--no-enable-log-outputs
+--no-enable-log-requests
+--no-enable-logging-iteration-details
+--no-enable-lora
+--no-enable-mamba-cache-stochastic-rounding
+--no-enable-mfu-metrics
+--no-enable-mixed-moe-lora-format
+--no-enable-mm-embeds
+--no-enable-mm-processor-stats
+--no-enable-moe-shared-loras
+--no-enable-offline-docs
+--no-enable-per-request-metrics
+--no-enable-prefix-caching
+--no-enable-prompt-embeds
+--no-enable-prompt-tokens-details
+--no-enable-request-id-headers
+--no-enable-return-routed-experts
+--no-enable-server-load-tracking
+--no-enable-sleep-mode
+--no-enable-ssl-refresh
+--no-enable-tokenizer-info-endpoint
+--no-enable-tower-connector-lora
+--no-enforce-eager
+--no-exclude-tools-when-tool-choice-none
+--no-fail-on-environ-validation
+--no-fully-sharded-loras
+--no-interleave-mm-strings
+--no-jit-monitor-verbose
+--no-kv-cache-metrics
+--no-kv-sharing-fast-prefill
+--no-language-model-only
+--no-log-error-stack
+--no-mm-encoder-only
+--no-numa-bind
+--no-ray-workers-use-nsight
+--no-return-tokens-as-token-ids
+--no-scheduler-reserve-full-isl
+--no-skip-mm-profiling
+--no-skip-tokenizer-init
+--no-specialize-active-lora
+--no-tokens-only
+--no-trust-remote-code
+--no-trust-request-chat-template
+--no-use-fp64-gumbel
+--no-use-tqdm-on-load
+--node-rank
+--numa-bind
+--numa-bind-cpus
+--numa-bind-nodes
+--offload-backend
+--offload-group-size
+--offload-num-in-group
+--offload-params
+--offload-prefetch-step
+--optimization-level
+--override-attention-dtype
+--performance-mode
+--pooler-config
+--port
+--prefill-context-parallel-size
+--prefill-schedule-interval
+--prefix-match-unit
+--profiler-config
+--pt-load-map-location
+--reasoning-config
+--reasoning-parser-plugin
+--quantization-config
+--renderer-num-workers
+--runner
+--safetensors-load-strategy
+--safetensors-prefetch-block-size
+--safetensors-prefetch-num-threads
+--scheduler-reserve-full-isl
+--shutdown-timeout
+--skip-mm-profiling
+--spec-method
+--spec-model
+--spec-tokens
+--specialize-active-lora
+--ssl-ciphers
+--stream-interval
+--structured-outputs-config
+--tokens-only
+--tool-server
+--trust-request-chat-template
+--ubatch-size
+--uds
+--use-fp64-gumbel
+--video-pruning-rate
+--watermark
+--weight-transfer-config
+--worker-extension-cls
+`;
+
+const formatOptions = (items: BackendParameterOption[]) => {
   return items.map((option) => {
     return {
       label: option.label,
@@ -789,62 +1047,617 @@ const formatOptions = (items: typeof options) => {
   });
 };
 
-const vllmOmniExcludedParams = new Set([
-  '--lora-modules',
-  '--prompt-adapters',
-  '--chat-template',
-  '--response-role',
-  '--return-tokens-as-token-ids',
-  '--enable-auto-tool-choice',
-  '--tool-call-parser',
-  '--tool-parser-plugin',
-  '--skip-tokenizer-init',
-  '--tokenizer-mode',
-  '--chat-template-content-format',
-  '--enable-reasoning',
-  '--reasoning-parser',
-  '--kv-cache-dtype',
-  '--guided-decoding-backend',
-  '--logits-processor-pattern',
-  '--disable-cascade-attn',
-  '--block-size',
-  '--enable-prefix-caching',
-  '--prefix-caching-hash-algo',
-  '--disable-sliding-window',
-  '--use-v2-block-manager',
-  '--num-lookahead-slots',
-  '--gpu-memory-utilization',
-  '--num-gpu-blocks-override',
-  '--max-num-batched-tokens',
-  '--max-num-partial-prefills',
-  '--max-long-partial-prefills',
-  '--long-prefill-token-threshold',
-  '--max-num-seqs',
-  '--max-logprobs',
-  '--disable-log-stats',
+const splitFlags = (flags: string) => {
+  return flags.trim().split(/\s+/).filter(Boolean);
+};
+
+const vllmUnsupportedParams = new Set([
+  '--async-chunk',
+  '--auxiliary-text-encoder',
+  '--boundary-ratio',
+  '--cache-backend',
+  '--cache-config',
+  '--cfg-parallel-size',
+  '--default-sampling-params',
+  '--deploy-config',
+  '--device',
+  '--diffusers-call-kwargs',
+  '--diffusers-load-kwargs',
+  '--diffusion-attention-backend',
+  '--diffusion-attention-config',
+  '--diffusion-kv-cache-dtype',
+  '--diffusion-kv-cache-skip-layers',
+  '--diffusion-kv-cache-skip-steps',
+  '--diffusion-load-format',
+  '--diffusion-quantization-config',
+  '--diffusion-streaming-output',
+  '--disable-async-output-proc',
+  '--disable-frontend-multiprocessing',
+  '--disable-log-requests',
+  '--disable-mm-preprocessor-cache',
+  '--disable-multithread-weight-load',
+  '--enable-ar-profiler',
+  '--enable-cache-dit-summary',
+  '--enable-cpu-offload',
+  '--enable-diffusion-pipeline-profiler',
+  '--enable-layerwise-offload',
   '--enable-lora-bias',
-  '--enable-lora',
-  '--max-loras',
-  '--max-lora-rank',
-  '--lora-extra-vocab-size',
-  '--lora-dtype',
+  '--enable-orch-monitor',
+  '--enable-prompt-adapter',
+  '--enable-reasoning',
+  '--flow-shift',
+  '--force-cutlass-fp8',
+  '--forced-aligner',
+  '--forced-aligner-config',
+  '--guidance-scale',
+  '--guidance-scale-2',
+  '--guided-decoding-backend',
+  '--hsdp-replicate-size',
+  '--hsdp-shard-size',
+  '--init-timeout',
+  '--log-file',
+  '--log-stats',
+  '--logits-processor-pattern',
   '--long-lora-scaling-factors',
-  '--max-cpu-loras',
-  '--fully-sharded-loras',
+  '--lora-extra-vocab-size',
+  '--max-context-len-to-capture',
+  '--max-generated-image-size',
   '--max-prompt-adapter-token',
-  '--speculative-config',
+  '--max-prompt-adapters',
+  '--max-seq-len-to-capture',
+  '--model-class-name',
+  '--multi-step-stream-outputs',
+  '--no-guardrails',
+  '--num-gpus',
+  '--num-inference-steps',
+  '--num-lookahead-slots',
   '--num-scheduler-steps',
-  '--scheduler-delay-factor',
-  '--scheduler-cls',
+  '--num-weight-load-threads',
+  '--omni-dp-size-local',
+  '--omni-heartbeat-timeout',
+  '--omni-lb-policy',
+  '--override-neuron-config',
+  '--override-pooler-config',
+  '--preemption-mode',
+  '--prompt-adapters',
   '--qlora-adapter-name-or-path',
-  '--enable-prompt-tokens-details'
+  '--quantization-param-path',
+  '--request-batch-max-wait-ms',
+  '--ring',
+  '--rope-scaling',
+  '--rope-theta',
+  '--scheduler-delay-factor',
+  '--stage-configs-path',
+  '--stage-id',
+  '--stage-init-timeout',
+  '--stage-overrides',
+  '--step-execution',
+  '--swap-space',
+  '--task',
+  '--task-type',
+  '--tokenizer-pool-extra-config',
+  '--tokenizer-pool-size',
+  '--tokenizer-pool-type',
+  '--tts-max-instructions-length',
+  '--ulysses-mode',
+  '--use-hsdp',
+  '--use-v2-block-manager',
+  '--usp',
+  '--vae-parallel-mode',
+  '--vae-patch-parallel-size',
+  '--vae-use-slicing',
+  '--vae-use-tiling',
+  '--worker-backend',
+  '--worker-use-ray'
 ]);
 
-const vllmOmniOptions = options.filter((option) => {
-  return !vllmOmniExcludedParams.has(option.value);
-});
+const formatFlagOptions = (flags: string[]): BackendParameterOption[] => {
+  return flags.map((flag) => {
+    return {
+      label: flag,
+      value: flag,
+      options: []
+    };
+  });
+};
 
-const resultList = formatOptions(options);
+const vllmOmniUnsupportedParams = new Set([
+  '--data-parallel-size',
+  '--data-parallel-size-local',
+  '--data-parallel-address',
+  '--data-parallel-rpc-port',
+  '--data-parallel-start-rank',
+  '--data-parallel-backend',
+  '--api-server-count',
+  '--enable-expert-parallel',
+  '--no-enable-expert-parallel',
+  '--device',
+  '--disable-async-output-proc',
+  '--disable-frontend-multiprocessing',
+  '--disable-log-requests',
+  '--disable-mm-preprocessor-cache',
+  '--enable-lora-bias',
+  '--enable-prompt-adapter',
+  '--enable-reasoning',
+  '--guidance-scale',
+  '--guidance-scale-2',
+  '--guided-decoding-backend',
+  '--logits-processor-pattern',
+  '--long-lora-scaling-factors',
+  '--lora-extra-vocab-size',
+  '--max-context-len-to-capture',
+  '--max-prompt-adapter-token',
+  '--max-prompt-adapters',
+  '--max-seq-len-to-capture',
+  '--multi-step-stream-outputs',
+  '--num-inference-steps',
+  '--num-lookahead-slots',
+  '--num-scheduler-steps',
+  '--override-neuron-config',
+  '--override-pooler-config',
+  '--preemption-mode',
+  '--prompt-adapters',
+  '--qlora-adapter-name-or-path',
+  '--quantization-param-path',
+  '--rope-scaling',
+  '--rope-theta',
+  '--scheduler-delay-factor',
+  '--swap-space',
+  '--task',
+  '--tokenizer-pool-extra-config',
+  '--tokenizer-pool-size',
+  '--tokenizer-pool-type',
+  '--use-v2-block-manager',
+  '--worker-use-ray'
+]);
+
+const omniSpecificOptions: BackendParameterOption[] = [
+  {
+    label: '--num-gpus',
+    value: '--num-gpus',
+    options: []
+  },
+  {
+    label: '--use-hsdp',
+    value: '--use-hsdp',
+    options: []
+  },
+  {
+    label: '--hsdp-shard-size',
+    value: '--hsdp-shard-size',
+    options: []
+  },
+  {
+    label: '--hsdp-replicate-size',
+    value: '--hsdp-replicate-size',
+    options: []
+  },
+  {
+    label: '--vae-use-slicing',
+    value: '--vae-use-slicing',
+    options: []
+  },
+  {
+    label: '--vae-use-tiling',
+    value: '--vae-use-tiling',
+    options: []
+  },
+  {
+    label: '--vae-patch-parallel-size',
+    value: '--vae-patch-parallel-size',
+    options: []
+  },
+  {
+    label: '--vae-parallel-mode',
+    value: '--vae-parallel-mode',
+    options: ['tile', 'spatial_shard_height', 'spatial_shard_width']
+  },
+  {
+    label: '--enable-cpu-offload',
+    value: '--enable-cpu-offload',
+    options: []
+  },
+  {
+    label: '--enable-layerwise-offload',
+    value: '--enable-layerwise-offload',
+    options: []
+  },
+  {
+    label: '--disable-multithread-weight-load',
+    value: '--disable-multithread-weight-load',
+    options: []
+  },
+  {
+    label: '--num-weight-load-threads',
+    value: '--num-weight-load-threads',
+    options: []
+  },
+  {
+    label: '--diffusion-load-format',
+    value: '--diffusion-load-format',
+    options: ['default', 'custom_pipeline', 'dummy', 'diffusers']
+  },
+  {
+    label: '--diffusers-load-kwargs',
+    value: '--diffusers-load-kwargs',
+    options: []
+  },
+  {
+    label: '--diffusers-call-kwargs',
+    value: '--diffusers-call-kwargs',
+    options: []
+  },
+  {
+    label: '--diffusion-quantization-config',
+    value: '--diffusion-quantization-config',
+    options: []
+  },
+  {
+    label: '--diffusion-attention-backend',
+    value: '--diffusion-attention-backend',
+    options: []
+  },
+  {
+    label: '--diffusion-attention-config',
+    value: '--diffusion-attention-config',
+    options: []
+  },
+  {
+    label: '--diffusion-kv-cache-dtype',
+    value: '--diffusion-kv-cache-dtype',
+    options: []
+  },
+  {
+    label: '--diffusion-kv-cache-skip-steps',
+    value: '--diffusion-kv-cache-skip-steps',
+    options: []
+  },
+  {
+    label: '--diffusion-kv-cache-skip-layers',
+    value: '--diffusion-kv-cache-skip-layers',
+    options: []
+  },
+  {
+    label: '--force-cutlass-fp8',
+    value: '--force-cutlass-fp8',
+    options: []
+  },
+  {
+    label: '--cache-backend',
+    value: '--cache-backend',
+    options: ['none', 'tea_cache', 'cache_dit', 'mag_cache', 'step_cache']
+  },
+  {
+    label: '--cache-config',
+    value: '--cache-config',
+    options: []
+  },
+  {
+    label: '--enable-cache-dit-summary',
+    value: '--enable-cache-dit-summary',
+    options: []
+  },
+  {
+    label: '--step-execution',
+    value: '--step-execution',
+    options: []
+  },
+  {
+    label: '--request-batch-max-wait-ms',
+    value: '--request-batch-max-wait-ms',
+    options: []
+  },
+  {
+    label: '--cfg-parallel-size',
+    value: '--cfg-parallel-size',
+    options: ['1', '2']
+  },
+  {
+    label: '--usp',
+    value: '--usp',
+    options: []
+  },
+  {
+    label: '--ulysses-mode',
+    value: '--ulysses-mode',
+    options: ['strict', 'advanced_uaa']
+  },
+  {
+    label: '--ring',
+    value: '--ring',
+    options: []
+  },
+  {
+    label: '--default-sampling-params',
+    value: '--default-sampling-params',
+    options: []
+  },
+  {
+    label: '--num-inference-steps',
+    value: '--num-inference-steps',
+    options: []
+  },
+  {
+    label: '--guidance-scale',
+    value: '--guidance-scale',
+    options: []
+  },
+  {
+    label: '--guidance-scale-2',
+    value: '--guidance-scale-2',
+    options: []
+  },
+  {
+    label: '--max-generated-image-size',
+    value: '--max-generated-image-size',
+    options: []
+  },
+  {
+    label: '--diffusion-streaming-output',
+    value: '--diffusion-streaming-output',
+    options: []
+  },
+  {
+    label: '--boundary-ratio',
+    value: '--boundary-ratio',
+    options: []
+  },
+  {
+    label: '--flow-shift',
+    value: '--flow-shift',
+    options: []
+  },
+  {
+    label: '--model-class-name',
+    value: '--model-class-name',
+    options: []
+  },
+  {
+    label: '--stage-configs-path',
+    value: '--stage-configs-path',
+    options: []
+  },
+  {
+    label: '--deploy-config',
+    value: '--deploy-config',
+    options: []
+  },
+  {
+    label: '--stage-overrides',
+    value: '--stage-overrides',
+    options: []
+  },
+  {
+    label: '--async-chunk',
+    value: '--async-chunk',
+    options: []
+  },
+  {
+    label: '--stage-id',
+    value: '--stage-id',
+    options: []
+  },
+  {
+    label: '--stage-init-timeout',
+    value: '--stage-init-timeout',
+    options: []
+  },
+  {
+    label: '--init-timeout',
+    value: '--init-timeout',
+    options: []
+  },
+  {
+    label: '--worker-backend',
+    value: '--worker-backend',
+    options: ['multi_process', 'ray']
+  },
+  {
+    label: '--omni-dp-size-local',
+    value: '--omni-dp-size-local',
+    options: []
+  },
+  {
+    label: '--omni-lb-policy',
+    value: '--omni-lb-policy',
+    options: ['random', 'round-robin', 'least-queue-length']
+  },
+  {
+    label: '--omni-heartbeat-timeout',
+    value: '--omni-heartbeat-timeout',
+    options: []
+  },
+  {
+    label: '--dtype',
+    value: '--dtype',
+    options: ['auto', 'bfloat16', 'float', 'float16', 'float32', 'half']
+  },
+  {
+    label: '--gpu-memory-utilization',
+    value: '--gpu-memory-utilization',
+    options: []
+  },
+  {
+    label: '--max-num-seqs',
+    value: '--max-num-seqs',
+    options: []
+  },
+  {
+    label: '--max-model-len',
+    value: '--max-model-len',
+    options: []
+  },
+  {
+    label: '--cpu-offload-gb',
+    value: '--cpu-offload-gb',
+    options: []
+  },
+  {
+    label: '--enforce-eager',
+    value: '--enforce-eager',
+    options: []
+  },
+  {
+    label: '--trust-remote-code',
+    value: '--trust-remote-code',
+    options: []
+  },
+  {
+    label: '--download-dir',
+    value: '--download-dir',
+    options: []
+  },
+  {
+    label: '--hf-token',
+    value: '--hf-token',
+    options: []
+  },
+  {
+    label: 'HF_TOKEN',
+    value: 'HF_TOKEN',
+    options: []
+  },
+  {
+    label: '--quantization',
+    value: '--quantization',
+    options: [
+      'aqlm',
+      'awq',
+      'bitsandbytes',
+      'compressed-tensors',
+      'fp8',
+      'gguf',
+      'gptq',
+      'gptq_marlin',
+      'modelopt',
+      'None'
+    ]
+  },
+  {
+    label: '--quantization-config',
+    value: '--quantization-config',
+    options: []
+  },
+  {
+    label: '--seed',
+    value: '--seed',
+    options: []
+  },
+  {
+    label: '--enable-sleep-mode',
+    value: '--enable-sleep-mode',
+    options: []
+  },
+  {
+    label: '--log-stats',
+    value: '--log-stats',
+    options: []
+  },
+  {
+    label: '--log-file',
+    value: '--log-file',
+    options: []
+  },
+  {
+    label: '--forced-aligner',
+    value: '--forced-aligner',
+    options: []
+  },
+  {
+    label: '--forced-aligner-config',
+    value: '--forced-aligner-config',
+    options: []
+  },
+  {
+    label: '--task-type',
+    value: '--task-type',
+    options: ['CustomVoice', 'VoiceDesign', 'Base']
+  },
+  {
+    label: '--tts-max-instructions-length',
+    value: '--tts-max-instructions-length',
+    options: []
+  },
+  {
+    label: '--no-guardrails',
+    value: '--no-guardrails',
+    options: []
+  },
+  {
+    label: '--enable-diffusion-pipeline-profiler',
+    value: '--enable-diffusion-pipeline-profiler',
+    options: []
+  },
+  {
+    label: '--enable-ar-profiler',
+    value: '--enable-ar-profiler',
+    options: []
+  },
+  {
+    label: '--enable-orch-monitor',
+    value: '--enable-orch-monitor',
+    options: []
+  },
+  {
+    label: '--auxiliary-text-encoder',
+    value: '--auxiliary-text-encoder',
+    options: []
+  }
+];
+
+const vllmOmniAdditionalFlags = `
+--allgather-degree
+--batch-timeout
+--diffusion-compile-dynamic
+--diffusion-compile-granularity
+--dlo-no-use-allgather
+--dlo-use-allgather
+--enable-distributed-layerwise-offload
+--no-async-chunk
+--no-diffusion-compile-dynamic
+--omni
+--omni-master-address
+--omni-master-port
+--omni-replica-address
+--ray-address
+--replica-id
+--ring-degree
+--shm-threshold-bytes
+--strategy-config
+--text-encoder-tp-size
+--ulysses-degree
+`;
+
+const mergeOptions = (items: BackendParameterOption[]) => {
+  const exists = new Set<string>();
+  return items.filter((item) => {
+    if (exists.has(item.value)) {
+      return false;
+    }
+    exists.add(item.value);
+    return true;
+  });
+};
+
+const vllmOptions = mergeOptions([
+  ...options.filter((option) => !vllmUnsupportedParams.has(option.value)),
+  ...formatFlagOptions(splitFlags(vllmAdditionalFlags))
+]);
+
+const vllmOmniOptions = mergeOptions([
+  ...vllmOptions.filter(
+    (option) => !vllmOmniUnsupportedParams.has(option.value)
+  ),
+  ...options.filter((option) => !vllmOmniUnsupportedParams.has(option.value)),
+  ...omniSpecificOptions.filter(
+    (option) => !vllmOmniUnsupportedParams.has(option.value)
+  ),
+  ...formatFlagOptions(splitFlags(vllmOmniAdditionalFlags)).filter(
+    (option) => !vllmOmniUnsupportedParams.has(option.value)
+  )
+]);
+
+const resultList = formatOptions(vllmOptions);
 
 export const vllmOmniConfig = formatOptions(vllmOmniOptions);
 

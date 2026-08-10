@@ -538,7 +538,7 @@ export const getBackendParamsTips = (backend: string) => {
       backend: 'llama-box',
       releases: 'https://github.com/gpustack/llama-box/releases',
       link: 'https://github.com/gpustack/llama-box?tab=readme-ov-file#usage',
-      version: 'v0.0.140'
+      version: 'v0.0.171'
     };
   }
   if (isLlamaCppBackend(backend)) {
@@ -546,7 +546,7 @@ export const getBackendParamsTips = (backend: string) => {
       backend: 'llama.cpp',
       releases: 'https://github.com/ggml-org/llama.cpp/releases',
       link: 'https://github.com/ggml-org/llama.cpp/tree/master/tools/server',
-      version: 'b8322'
+      version: 'b10331'
     };
   }
   if (backend === backendOptionsMap.vllm) {
@@ -554,7 +554,7 @@ export const getBackendParamsTips = (backend: string) => {
       backend: 'vLLM',
       releases: 'https://github.com/vllm-project/vllm/releases',
       link: 'https://docs.vllm.ai/en/stable/cli/serve.html',
-      version: 'v0.8.5'
+      version: 'v0.26.0'
     };
   }
   if (backend === backendOptionsMap.vllmOmni) {
@@ -562,7 +562,7 @@ export const getBackendParamsTips = (backend: string) => {
       backend: 'vLLM-Omni',
       releases: 'https://github.com/vllm-project/vllm/releases',
       link: 'https://github.com/vllm-project/vllm',
-      version: 'v0.8.5'
+      version: 'v0.26.0'
     };
   }
   if (backend === backendOptionsMap.ascendMindie) {
@@ -578,6 +578,6 @@ export const getBackendParamsTips = (backend: string) => {
     backend: 'vox-box',
     releases: 'https://github.com/gpustack/vox-box/releases',
     link: '',
-    version: 'v0.0.13'
+    version: 'v0.0.21'
   };
 };

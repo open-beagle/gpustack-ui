@@ -505,7 +505,7 @@ const options = [
     value: '--image-slg-skip-layer'
   },
   {
-    label: '--image-slg-start',
+    label: '--image-slg-end',
     value: '--image-slg-end'
   },
   {
@@ -611,17 +611,391 @@ const options = [
   }
 ];
 
-const resultList = options.map((option) => {
-  return {
-    label: option.label,
-    value: option.value,
-    opts: option.options?.map((opt) => {
-      return {
-        label: opt,
-        value: opt
-      };
-    })
-  };
-});
+type LlamaParameterOption = (typeof options)[number];
 
-export default resultList;
+const optionMap = new Map<string, LlamaParameterOption>(
+  options.map((option) => [option.value, option])
+);
+
+const commonUnsupportedFlags = new Set([
+  '--cache-list',
+  '--completion-bash',
+  '--help',
+  '--list-buffer-types',
+  '--list-devices',
+  '--system-info',
+  '--usage',
+  '--version'
+]);
+
+const llamaBoxUnsupportedFlags = new Set([
+  ...commonUnsupportedFlags,
+  '--no-cont-batching',
+  '--predict',
+  '--sampling-seq',
+  '--slot-prompt-similarity',
+  '--slots',
+  '--visual-max-image-cache'
+]);
+
+const llamaCppUnsupportedFlags = new Set([
+  ...commonUnsupportedFlags,
+  '--defrag-thold',
+  '--draft',
+  '--draft-max',
+  '--draft-min',
+  '--draft-n',
+  '--draft-n-min',
+  '--embeddings',
+  '--image-cfg-scale',
+  '--image-clip-g-model',
+  '--image-clip-l-model',
+  '--image-control-canny',
+  '--image-control-net-model',
+  '--image-control-strength',
+  '--image-free-compute-memory-immediately',
+  '--image-guidance',
+  '--image-max-batch',
+  '--image-max-height',
+  '--image-max-width',
+  '--image-no-control-net-model-offload',
+  '--image-no-text-encoder-model-offload',
+  '--image-no-vae-model-offload',
+  '--image-no-vae-tiling',
+  '--image-sample-method',
+  '--image-sampling-steps',
+  '--image-schedule-method',
+  '--image-slg-end',
+  '--image-slg-scale',
+  '--image-slg-skip-layer',
+  '--image-strength',
+  '--image-t5xxl-model',
+  '--image-taesd-model',
+  '--image-upscale-model',
+  '--image-upscale-repeats',
+  '--image-vae-model',
+  '--image-vae-tiling',
+  '--images',
+  '--max-projected-cache',
+  '--no-enable-reasoning',
+  '--no-warmup',
+  '--rpc',
+  '--spec-ngram-min-hits',
+  '--spec-ngram-size-m',
+  '--spec-ngram-size-n',
+  '--tokens-per-second',
+  '--visual-max-image-cache',
+  '--visual-max-image-size'
+]);
+
+const llamaBoxAdditionalFlags = `
+--alias
+--attention
+--chat-template-kwargs
+--control-vector
+--control-vector-layer-range
+--control-vector-scaled
+--cpu-moe
+--cpu-moe-draft
+--device-draft
+--draft
+--draft-max
+--draft-min
+--draft-n
+--draft-n-min
+--draft-p-min
+--embeddings
+--enable-reasoning
+--gpu-layers-draft
+--image-sample-steps
+--image-sampler
+--image-schedule
+--image-slg-start
+--kv-unified
+--log-colors
+--log-verbose
+--log-verbosity
+--lookup-ngram-min
+--model-draft
+--n-cpu-moe
+--n-cpu-moe-draft
+--n-gpu-layers
+--n-gpu-layers-draft
+--no-flash-attn
+--no-reasoning-in-content
+--no-repack
+--numa
+--override-tensor-draft
+--pooling
+--port
+--priority
+--reasoning-in-content
+--rerank
+--reverse-prompt
+--rpc
+--rpc-server-cache
+--rpc-server-cache-dir
+--rpc-server-host
+--rpc-server-main-gpu
+--rpc-server-port
+--rpc-server-reserve-memory
+--rpc-server-threads
+--special
+--top-nsigma
+--warmup
+`;
+
+const llamaCppAdditionalFlags = `
+--adaptive-decay
+--adaptive-target
+--agent
+--alias
+--api-key
+--api-key-file
+--api-prefix
+--backend-sampling
+--cache-idle-slots
+--cache-prompt
+--cache-ram
+--cache-type-k-draft
+--cache-type-v-draft
+--chat-template-kwargs
+--check-tensors
+--checkpoint-min-step
+--cont-batching
+--control-vector
+--control-vector-layer-range
+--control-vector-scaled
+--cpu-mask-batch-draft
+--cpu-mask-draft
+--cpu-moe
+--cpu-moe-draft
+--cpu-range-draft
+--cpu-strict-batch-draft
+--cpu-strict-draft
+--ctx-checkpoints
+--device-draft
+--direct-io
+--docker-repo
+--draft-p-min
+--draft-p-split
+--embd-gemma-default
+--embd-normalize
+--embedding
+--fim-qwen-1
+--fim-qwen-14b-spec
+--fim-qwen-30b-default
+--fim-qwen-3b-default
+--fim-qwen-7b-default
+--fim-qwen-7b-spec
+--fit
+--fit-ctx
+--fit-target
+--gpt-oss-120b-default
+--gpt-oss-20b-default
+--gpu-layers-draft
+--hf-file
+--hf-file-v
+--hf-repo
+--hf-repo-draft
+--hf-repo-v
+--hf-token
+--ignore-eos
+--image-max-tokens
+--image-min-tokens
+--json-schema-file
+--kv-offload
+--kv-unified
+--log-colors
+--log-disable
+--log-file
+--log-prefix
+--log-prompts-dir
+--log-timestamps
+--log-verbose
+--log-verbosity
+--lookup-cache-dynamic
+--lookup-cache-static
+--media-path
+--mmproj-auto
+--mmproj-offload
+--mmproj-url
+--model-draft
+--model-url
+--model-vocoder
+--models-autoload
+--models-dir
+--models-max
+--models-preset
+--mtmd-batch-max-tokens
+--n-cpu-moe
+--n-cpu-moe-draft
+--n-gpu-layers
+--n-gpu-layers-draft
+--n-predict
+--no-agent
+--no-cache-idle-slots
+--no-direct-io
+--no-host
+--no-jinja
+--no-kv-unified
+--no-log-prefix
+--no-log-timestamps
+--no-mmproj
+--no-mmproj-auto
+--no-mmproj-offload
+--no-models-autoload
+--no-op-offload
+--no-perf
+--no-prefill-assistant
+--no-reasoning-preserve
+--no-repack
+--no-skip-chat-parsing
+--no-slots
+--no-spec-draft-backend-sampling
+--no-ui
+--no-ui-mcp-proxy
+--no-webui
+--no-webui-mcp-proxy
+--numa
+--offline
+--op-offload
+--override-tensor-draft
+--path
+--perf
+--poll-batch-draft
+--poll-draft
+--pooling
+--port
+--prefill-assistant
+--prio-batch-draft
+--prio-draft
+--props
+--reasoning
+--reasoning-budget
+--reasoning-budget-message
+--reasoning-format
+--reasoning-preserve
+--repack
+--rerank
+--reranking
+--reuse-port
+--reverse-prompt
+--sampler-seq
+--skip-chat-parsing
+--sleep-idle-seconds
+--slot-prompt-similarity
+--slot-save-path
+--slots
+--spec-default
+--spec-draft-backend-sampling
+--spec-draft-cpu-mask
+--spec-draft-cpu-mask-batch
+--spec-draft-cpu-moe
+--spec-draft-cpu-range
+--spec-draft-cpu-strict
+--spec-draft-cpu-strict-batch
+--spec-draft-device
+--spec-draft-hf
+--spec-draft-model
+--spec-draft-n-cpu-moe
+--spec-draft-n-max
+--spec-draft-n-min
+--spec-draft-ncmoe
+--spec-draft-ngl
+--spec-draft-override-tensor
+--spec-draft-p-min
+--spec-draft-p-split
+--spec-draft-poll
+--spec-draft-poll-batch
+--spec-draft-prio
+--spec-draft-prio-batch
+--spec-draft-threads
+--spec-draft-threads-batch
+--spec-draft-type-k
+--spec-draft-type-v
+--spec-ngram-map-k-min-hits
+--spec-ngram-map-k-size-m
+--spec-ngram-map-k-size-n
+--spec-ngram-map-k4v-min-hits
+--spec-ngram-map-k4v-size-m
+--spec-ngram-map-k4v-size-n
+--spec-ngram-mod-n-match
+--spec-ngram-mod-n-max
+--spec-ngram-mod-n-min
+--spec-ngram-simple-min-hits
+--spec-ngram-simple-size-m
+--spec-ngram-simple-size-n
+--spec-type
+--special
+--spm-infill
+--sse-ping-interval
+--ssl-cert-file
+--ssl-key-file
+--swa-checkpoints
+--tags
+--temperature
+--threads-batch-draft
+--threads-draft
+--tools
+--top-n-sigma
+--top-nsigma
+--tts-use-guide-tokens
+--typical-p
+--ui
+--ui-config
+--ui-config-file
+--ui-mcp-proxy
+--vision-gemma-12b-default
+--vision-gemma-4b-default
+--warmup
+--webui
+--webui-config
+--webui-config-file
+--webui-mcp-proxy
+`;
+
+const splitFlags = (flags: string) => {
+  return flags.trim().split(/\s+/).filter(Boolean);
+};
+
+const mergeFlags = (...flagGroups: string[][]) => {
+  return Array.from(new Set(flagGroups.flat()));
+};
+
+const formatOptions = (
+  flags: string[],
+  unsupportedFlags: Set<string>
+): Global.HintOptions[] => {
+  return flags
+    .filter((flag) => !unsupportedFlags.has(flag))
+    .filter((flag) => !flag.endsWith('-'))
+    .sort()
+    .map((flag) => {
+      const option = optionMap.get(flag);
+      return {
+        label: option?.label || flag,
+        value: flag,
+        opts: option?.options?.map((opt) => {
+          return {
+            label: opt,
+            value: opt
+          };
+        })
+      };
+    });
+};
+
+const baseFlags = options.map((option) => option.value);
+
+const llamaBoxConfig = formatOptions(
+  mergeFlags(baseFlags, splitFlags(llamaBoxAdditionalFlags)),
+  llamaBoxUnsupportedFlags
+);
+
+export const llamaCppConfig = formatOptions(
+  mergeFlags(baseFlags, splitFlags(llamaCppAdditionalFlags)),
+  llamaCppUnsupportedFlags
+);
+
+export default llamaBoxConfig;

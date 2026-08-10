@@ -30,10 +30,11 @@ import {
   placementStrategyOptions
 } from '../config';
 import { useFormContext } from '../config/form-context';
-import llamaConfig from '../config/llama-config';
+import llamaConfig, { llamaCppConfig } from '../config/llama-config';
 import mindieConfig from '../config/mindie-config';
 import { FormData } from '../config/types';
 import vllmConfig, { vllmOmniConfig } from '../config/vllm-config';
+import voxBoxConfig from '../config/vox-config';
 import dataformStyles from '../style/data-form.less';
 import GPUCard from './gpu-card';
 
@@ -109,7 +110,10 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
   const { onValuesChange } = useFormContext();
 
   const paramsConfig = useMemo(() => {
-    if (isGGUFBackend(backend)) {
+    if (backend === backendOptionsMap.llamaCpp) {
+      return llamaCppConfig;
+    }
+    if (backend === backendOptionsMap.llamaBox) {
       return llamaConfig;
     }
     if (backend === backendOptionsMap.vllm) {
@@ -120,6 +124,9 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
     }
     if (backend === backendOptionsMap.ascendMindie) {
       return mindieConfig;
+    }
+    if (backend === backendOptionsMap.voxBox) {
+      return voxBoxConfig;
     }
     return [];
   }, [backend]);
