@@ -157,9 +157,9 @@ export default [
         component: './resources/components/model-files'
       },
       {
-        name: 'modelcache',
+        name: 'modelarchive',
         path: '/resources/model-cache',
-        key: 'modelcache',
+        key: 'modelarchive',
         icon: 'icon-files',
         selectedIcon: 'icon-files-filled',
         defaultIcon: 'icon-files',

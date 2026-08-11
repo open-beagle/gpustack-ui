@@ -71,10 +71,12 @@ export default {
   'resources.filter.source': 'Фильтровать по источнику',
   'resources.modelfiles.delete.tips': 'Также удалить файл с диска',
   'resources.modelfiles.copy.tips': 'Скопировать полный путь',
-  'resources.modelcache.title': 'Кэш моделей',
-  'resources.modelcache.cached': 'В кэше',
-  'resources.modelcache.tasks': 'Задачи кэширования',
-  'resources.modelcache.cache': 'Кэшировать',
+  'resources.modelcache.title': 'Архив моделей',
+  'resources.modelcache.description':
+    'Архивирует загруженные модели ModelScope в Local S3. Архивные данные не добавляются автоматически в инвентарь предварительной загрузки.',
+  'resources.modelcache.cached': 'Архивные модели',
+  'resources.modelcache.tasks': 'Задачи архивации',
+  'resources.modelcache.cache': 'Архивировать в S3',
   'resources.modelcache.model': 'Модель',
   'resources.modelcache.sourceFile': 'Локальный файл модели',
   'resources.modelcache.sourceWorker': 'Исходный воркер',
@@ -91,14 +93,14 @@ export default {
   'resources.modelcache.state.uploading': 'Загрузка',
   'resources.modelcache.state.ready': 'Готово',
   'resources.modelcache.state.error': 'Ошибка',
-  'resources.modelcache.deleteCache': 'Удалить кэш',
+  'resources.modelcache.deleteCache': 'Удалить архивную модель',
   'resources.modelcache.deleteCache.content':
     '{model} · файлов: {files} · {size}',
-  'resources.modelcache.deleteTask': 'Удалить задачу кэширования',
+  'resources.modelcache.deleteTask': 'Удалить задачу архивации',
   'resources.modelcache.deleteTask.running':
     'Удаление задачи #{id} остановит загрузку и удалит загруженные ею файлы.',
   'resources.modelcache.deleteTask.finished':
-    'Будет удалена только запись задачи #{id}. Готовый кэш модели сохранится.',
+    'Будет удалена только запись задачи #{id}. Архивные файлы модели сохранятся.',
   'resources.filter.path': 'Фильтрация по пути',
   'resources.register.worker.step1':
     'В меню выберите <span class="bold-text">Скопировать токен</span>.',

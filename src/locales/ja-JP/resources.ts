@@ -73,10 +73,12 @@ export default {
   'resources.filter.source': 'ソースでフィルタ',
   'resources.modelfiles.delete.tips': 'ディスクからファイルも削除します',
   'resources.modelfiles.copy.tips': 'フルパスをコピー',
-  'resources.modelcache.title': 'モデルキャッシュ',
-  'resources.modelcache.cached': 'キャッシュ済み',
-  'resources.modelcache.tasks': 'キャッシュタスク',
-  'resources.modelcache.cache': 'キャッシュ',
+  'resources.modelcache.title': 'モデルアーカイブ',
+  'resources.modelcache.description':
+    'Worker にダウンロード済みの ModelScope モデルを Local S3 にアーカイブします。アーカイブデータはモデルプリヒートのインベントリには自動登録されません。',
+  'resources.modelcache.cached': 'アーカイブ済みモデル',
+  'resources.modelcache.tasks': 'アーカイブタスク',
+  'resources.modelcache.cache': 'S3 にアーカイブ',
   'resources.modelcache.model': 'モデル',
   'resources.modelcache.sourceFile': 'ローカルモデルファイル',
   'resources.modelcache.sourceWorker': 'ソース Worker',
@@ -93,14 +95,14 @@ export default {
   'resources.modelcache.state.uploading': 'アップロード中',
   'resources.modelcache.state.ready': '完了',
   'resources.modelcache.state.error': '失敗',
-  'resources.modelcache.deleteCache': 'キャッシュを削除',
+  'resources.modelcache.deleteCache': 'アーカイブ済みモデルを削除',
   'resources.modelcache.deleteCache.content':
     '{model} · {files} ファイル · {size}',
-  'resources.modelcache.deleteTask': 'キャッシュタスクを削除',
+  'resources.modelcache.deleteTask': 'アーカイブタスクを削除',
   'resources.modelcache.deleteTask.running':
     'タスク #{id} を削除すると、アップロードを停止してアップロード済みファイルを削除します。',
   'resources.modelcache.deleteTask.finished':
-    'タスク #{id} の記録のみ削除し、完了したモデルキャッシュは削除しません。',
+    'タスク #{id} の記録のみ削除し、アーカイブ済みモデルファイルは削除しません。',
   'resources.filter.path': 'パスでフィルタ',
   'resources.register.worker.step1':
     'Click the <span class="bold-text">Copy Token</span> menu in the application.',

@@ -1,12 +1,15 @@
 import AutoTooltip from '@/components/auto-tooltip';
 import { convertFileSize } from '@/utils';
-import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  QuestionCircleOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl } from '@umijs/max';
 import {
   Button,
   Input,
-  Modal,
   Progress,
   Segmented,
   Space,
@@ -31,12 +34,17 @@ import {
   ModelCacheTask,
   ListItem as WorkerListItem
 } from '../config/types';
+import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 
-const HighlightTable = styled(Table)`
+const HighlightTable = styled.div`
   .model-cache-task-highlight > td {
     background: var(--ant-color-primary-bg) !important;
   }
 `;
+
+type DeleteConfirmation =
+  | { kind: 'model'; record: ModelCacheItem }
+  | { kind: 'task'; record: ModelCacheTask; running: boolean };
 
 const ModelCache: React.FC = () => {
   const intl = useIntl();
@@ -50,6 +58,10 @@ const ModelCache: React.FC = () => {
   const [tasks, setTasks] = useState<ModelCacheTask[]>([]);
   const [workers, setWorkers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const [confirmation, setConfirmation] = useState<DeleteConfirmation | null>(
+    null
+  );
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const text = useCallback(
     (id: string, values?: Record<string, string | number>) =>
@@ -97,43 +109,32 @@ const ModelCache: React.FC = () => {
   };
 
   const confirmDeleteModel = (record: ModelCacheItem) => {
-    Modal.confirm({
-      title: text('resources.modelcache.deleteCache'),
-      content: text('resources.modelcache.deleteCache.content', {
-        model: record.model_id,
-        files: record.file_count,
-        size: convertFileSize(record.total_size, 1, true)
-      }),
-      okText: text('common.button.delete'),
-      cancelText: text('common.button.cancel'),
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        await deleteModelCache(record.model_id);
-        message.success(text('common.message.success'));
-        load();
-      }
-    });
+    setConfirmation({ kind: 'model', record });
   };
 
   const confirmDeleteTask = (record: ModelCacheTask) => {
-    const running = ['pending', 'uploading'].includes(record.state);
-    Modal.confirm({
-      title: text('resources.modelcache.deleteTask'),
-      content: text(
-        running
-          ? 'resources.modelcache.deleteTask.running'
-          : 'resources.modelcache.deleteTask.finished',
-        { id: record.id }
-      ),
-      okText: text('common.button.delete'),
-      cancelText: text('common.button.cancel'),
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        await deleteModelCacheTask(record.id);
-        message.success(text('common.message.success'));
-        load();
-      }
+    setConfirmation({
+      kind: 'task',
+      record,
+      running: ['pending', 'uploading'].includes(record.state)
     });
+  };
+
+  const handleDelete = async () => {
+    if (!confirmation || confirmLoading) return;
+    setConfirmLoading(true);
+    try {
+      if (confirmation.kind === 'model') {
+        await deleteModelCache(confirmation.record.model_id);
+      } else {
+        await deleteModelCacheTask(confirmation.record.id);
+      }
+      setConfirmation(null);
+      message.success(text('common.message.success'));
+      await load();
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   const operation = (onClick: () => void, label: string) => (
@@ -250,7 +251,20 @@ const ModelCache: React.FC = () => {
   return (
     <PageContainer
       ghost
-      header={{ title: text('resources.modelcache.title'), breadcrumb: {} }}
+      header={{
+        title: (
+          <span>
+            {text('resources.modelcache.title')}{' '}
+            <Tooltip title={text('resources.modelcache.description')}>
+              <QuestionCircleOutlined
+                aria-label={text('resources.modelcache.description')}
+                style={{ color: 'var(--ant-color-text-tertiary)' }}
+              />
+            </Tooltip>
+          </span>
+        ),
+        breadcrumb: {}
+      }}
     >
       <Space
         direction="vertical"
@@ -290,21 +304,50 @@ const ModelCache: React.FC = () => {
             scroll={{ x: 980 }}
           />
         ) : (
-          <HighlightTable<ModelCacheTask>
-            rowKey="id"
-            loading={loading}
-            columns={taskColumns}
-            dataSource={tasks}
-            rowClassName={(record) =>
-              record.id === highlightedTaskId
-                ? 'model-cache-task-highlight'
-                : ''
-            }
-            pagination={{ pageSize: 20 }}
-            scroll={{ x: 1100 }}
-          />
+          <HighlightTable>
+            <Table<ModelCacheTask>
+              rowKey="id"
+              loading={loading}
+              columns={taskColumns}
+              dataSource={tasks}
+              rowClassName={(record) =>
+                record.id === highlightedTaskId
+                  ? 'model-cache-task-highlight'
+                  : ''
+              }
+              pagination={{ pageSize: 20 }}
+              scroll={{ x: 1100 }}
+            />
+          </HighlightTable>
         )}
       </Space>
+      <ModelPreheatConfirmModal
+        open={!!confirmation}
+        title={text(
+          confirmation?.kind === 'model'
+            ? 'resources.modelcache.deleteCache'
+            : 'resources.modelcache.deleteTask'
+        )}
+        content={
+          confirmation?.kind === 'model'
+            ? text('resources.modelcache.deleteCache.content', {
+                model: confirmation.record.model_id,
+                files: confirmation.record.file_count,
+                size: convertFileSize(confirmation.record.total_size, 1, true)
+              })
+            : text(
+                confirmation?.running
+                  ? 'resources.modelcache.deleteTask.running'
+                  : 'resources.modelcache.deleteTask.finished',
+                { id: confirmation?.record.id || '' }
+              )
+        }
+        okText={text('common.button.delete')}
+        loading={confirmLoading}
+        danger
+        onOk={handleDelete}
+        onCancel={() => setConfirmation(null)}
+      />
     </PageContainer>
   );
 };

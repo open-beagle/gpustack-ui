@@ -5,7 +5,6 @@ import DropdownButtons from '@/components/drop-down-buttons';
 import ModalFooter from '@/components/modal-footer';
 import { TooltipOverlayScroller } from '@/components/overlay-scroller';
 import { FilterBar } from '@/components/page-tools';
-import GSDrawer from '@/components/scroller-modal/gs-drawer';
 import StatusTag from '@/components/status-tag';
 import { PageAction } from '@/config';
 import useAppUtils from '@/hooks/use-app-utils';
@@ -26,16 +25,20 @@ import { convertFileSize } from '@/utils';
 import {
   CheckCircleFilled,
   CopyOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  QuestionCircleOutlined
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { useIntl, useNavigate } from '@umijs/max';
+import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
   ConfigProvider,
   Descriptions,
   Empty,
+  Modal,
   Table,
+  Tabs,
   Tag,
+  Tooltip,
   Typography,
   message
 } from 'antd';
@@ -66,10 +69,14 @@ import {
   WorkerStatusMap
 } from '../config';
 import {
-  ModelCachePreview,
   ModelFile as ListItem,
+  ModelCachePreview,
   ListItem as WorkerListItem
 } from '../config/types';
+import ModelPreheatPolicies from './model-preheat-policies';
+import ModelPreheatS3Models from './model-preheat-s3-models';
+import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
+import ModelPreheatTasks from './model-preheat-tasks';
 
 const { Paragraph } = Typography;
 
@@ -299,7 +306,7 @@ const ResolvedPathColumn = (props: { record: ListItem }) => {
   );
 };
 
-const ModelFiles = () => {
+const LocalModelFiles = () => {
   const { getGPUList } = useGenerateFormEditInitialValues();
   const { saveScrollHeight, restoreScrollHeight } = useBodyScroll();
   const [modelsExpandKeys, setModelsExpandKeys] = useAtom(modelsExpandKeysAtom);
@@ -360,7 +367,9 @@ const ModelFiles = () => {
     isGGUF: false
   });
   const [cacheRecord, setCacheRecord] = useState<ListItem | null>(null);
-  const [cachePreview, setCachePreview] = useState<ModelCachePreview | null>(null);
+  const [cachePreview, setCachePreview] = useState<ModelCachePreview | null>(
+    null
+  );
   const [cacheSubmitting, setCacheSubmitting] = useState(false);
 
   useEffect(() => {
@@ -689,148 +698,217 @@ const ModelFiles = () => {
 
   return (
     <>
-      <PageContainer
-        ghost
-        header={{
-          title: intl.formatMessage({ id: 'resources.modelfiles.modelfile' }),
-          style: {
-            paddingInline: 'var(--layout-content-header-inlinepadding)'
-          },
-          breadcrumb: {}
-        }}
-        extra={[]}
-      >
-        <FilterBar
-          marginBottom={22}
-          marginTop={30}
-          actionType="dropdown"
-          selectHolder="resources.filter.worker"
-          inputHolder="resources.filter.path"
-          buttonText={intl.formatMessage({
-            id: 'resources.modelfiles.download'
-          })}
-          handleSelectChange={handleWorkerChange}
-          handleDeleteByBatch={handleDeleteByBatch}
-          handleClickPrimary={handleClickDropdown}
-          handleSearch={handleSearch}
-          selectOptions={workersList}
-          handleInputChange={handleNameChange}
+      <FilterBar
+        marginBottom={22}
+        marginTop={20}
+        actionType="dropdown"
+        selectHolder="resources.filter.worker"
+        inputHolder="resources.filter.path"
+        buttonText={intl.formatMessage({
+          id: 'resources.modelfiles.download'
+        })}
+        handleSelectChange={handleWorkerChange}
+        handleDeleteByBatch={handleDeleteByBatch}
+        handleClickPrimary={handleClickDropdown}
+        handleSearch={handleSearch}
+        selectOptions={workersList}
+        handleInputChange={handleNameChange}
+        rowSelection={rowSelection}
+        actionItems={onLineSourceOptions}
+        showSelect={true}
+      ></FilterBar>
+      <ConfigProvider renderEmpty={renderEmpty}>
+        <Table
+          rowKey="id"
+          tableLayout="fixed"
+          style={{ width: '100%' }}
+          onChange={handleTableChange}
+          dataSource={dataSource.dataList}
+          loading={dataSource.loading}
           rowSelection={rowSelection}
-          actionItems={onLineSourceOptions}
-          showSelect={true}
-        ></FilterBar>
-        <ConfigProvider renderEmpty={renderEmpty}>
-          <Table
-            rowKey="id"
-            tableLayout="fixed"
-            style={{ width: '100%' }}
-            onChange={handleTableChange}
-            dataSource={dataSource.dataList}
-            loading={dataSource.loading}
-            rowSelection={rowSelection}
-            columns={columns}
-            pagination={{
-              showSizeChanger: true,
-              pageSize: queryParams.perPage,
-              current: queryParams.page,
-              total: dataSource.total,
-              hideOnSinglePage: queryParams.perPage === 10,
-              onChange: handlePageChange
-            }}
-          ></Table>
-        </ConfigProvider>
-        <DeleteModal ref={modalRef}></DeleteModal>
-        <DownloadModal
-          onCancel={handleDownloadCancel}
-          onOk={handleDownload}
-          title={intl.formatMessage({ id: 'resources.modelfiles.download' })}
-          open={downloadModalStatus.show}
-          source={downloadModalStatus.source}
-          width={downloadModalStatus.width}
-          hasLinuxWorker={downloadModalStatus.hasLinuxWorker}
-          workersList={readyWorkers}
-        ></DownloadModal>
-        <DeployModal
-          deploymentType="modelFiles"
-          title={intl.formatMessage({ id: 'models.button.deploy' })}
-          onCancel={handleDeployModalCancel}
-          onOk={handleCreateModel}
-          open={openDeployModal.show}
-          action={PageAction.CREATE}
-          source={openDeployModal.source}
-          width={openDeployModal.width}
-          gpuOptions={openDeployModal.gpuOptions}
-          modelFileOptions={openDeployModal.modelFileOptions || []}
-          initialValues={openDeployModal.initialValues}
-          isGGUF={openDeployModal.isGGUF}
-        ></DeployModal>
-        <GSDrawer
-          title={intl.formatMessage({ id: 'resources.modelcache.cache' })}
-          open={!!cacheRecord}
-          width={520}
-          destroyOnClose
-          maskClosable={false}
-          onClose={() => {
-            setCacheRecord(null);
-            setCachePreview(null);
+          columns={columns}
+          pagination={{
+            showSizeChanger: true,
+            pageSize: queryParams.perPage,
+            current: queryParams.page,
+            total: dataSource.total,
+            hideOnSinglePage: queryParams.perPage === 10,
+            onChange: handlePageChange
           }}
-          footer={
-            <ModalFooter
-              onCancel={() => {
-                setCacheRecord(null);
-                setCachePreview(null);
-              }}
-              onOk={handleCreateCacheTask}
-              loading={cacheSubmitting}
-            />
-          }
-        >
-          {cacheRecord && (
-            <>
-              <Descriptions column={1} size="small" bordered>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.model'
-                  })}
-                >
-                  {cachePreview?.model_id}
-                </Descriptions.Item>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.sourceFile'
-                  })}
-                >
-                  {cacheRecord.resolved_paths.join(', ')}
-                </Descriptions.Item>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.sourceWorker'
-                  })}
-                >
-                  {getWorkerName(cacheRecord.worker_id, workersList)}
-                </Descriptions.Item>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.target'
-                  })}
-                >
-                  {cachePreview?.s3_path}
-                </Descriptions.Item>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.filesAndSize'
-                  })}
-                >
-                  {cachePreview?.file_count}{' '}
-                  {intl.formatMessage({ id: 'models.form.files' })} ·{' '}
-                  {convertFileSize(cachePreview?.total_size || 0, 1, true)}
-                </Descriptions.Item>
-              </Descriptions>
-            </>
-          )}
-        </GSDrawer>
-      </PageContainer>
+        ></Table>
+      </ConfigProvider>
+      <DeleteModal ref={modalRef}></DeleteModal>
+      <DownloadModal
+        onCancel={handleDownloadCancel}
+        onOk={handleDownload}
+        title={intl.formatMessage({ id: 'resources.modelfiles.download' })}
+        open={downloadModalStatus.show}
+        source={downloadModalStatus.source}
+        width={downloadModalStatus.width}
+        hasLinuxWorker={downloadModalStatus.hasLinuxWorker}
+        workersList={readyWorkers}
+      ></DownloadModal>
+      <DeployModal
+        deploymentType="modelFiles"
+        title={intl.formatMessage({ id: 'models.button.deploy' })}
+        onCancel={handleDeployModalCancel}
+        onOk={handleCreateModel}
+        open={openDeployModal.show}
+        action={PageAction.CREATE}
+        source={openDeployModal.source}
+        width={openDeployModal.width}
+        gpuOptions={openDeployModal.gpuOptions}
+        modelFileOptions={openDeployModal.modelFileOptions || []}
+        initialValues={openDeployModal.initialValues}
+        isGGUF={openDeployModal.isGGUF}
+      ></DeployModal>
+      <Modal
+        title={intl.formatMessage({ id: 'resources.modelcache.cache' })}
+        open={!!cacheRecord}
+        width={520}
+        centered
+        destroyOnHidden
+        maskClosable={false}
+        keyboard={false}
+        closable={!cacheSubmitting}
+        onCancel={() => {
+          if (cacheSubmitting) return;
+          setCacheRecord(null);
+          setCachePreview(null);
+        }}
+        footer={
+          <ModalFooter
+            onCancel={() => {
+              if (cacheSubmitting) return;
+              setCacheRecord(null);
+              setCachePreview(null);
+            }}
+            onOk={handleCreateCacheTask}
+            loading={cacheSubmitting}
+            okBtnProps={{ disabled: cacheSubmitting }}
+            cancelBtnProps={{ disabled: cacheSubmitting }}
+          />
+        }
+      >
+        {cacheRecord && (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.modelcache.model' })}
+            >
+              {cachePreview?.model_id}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.modelcache.sourceFile'
+              })}
+            >
+              {cacheRecord.resolved_paths.join(', ')}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.modelcache.sourceWorker'
+              })}
+            >
+              {getWorkerName(cacheRecord.worker_id, workersList)}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.modelcache.target' })}
+            >
+              {cachePreview?.s3_path}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.modelcache.filesAndSize'
+              })}
+            >
+              {cachePreview?.file_count}{' '}
+              {intl.formatMessage({ id: 'models.form.files' })} ·{' '}
+              {convertFileSize(cachePreview?.total_size || 0, 1, true)}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
     </>
+  );
+};
+
+const ModelFiles = () => {
+  const intl = useIntl();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const requestedTab = new URLSearchParams(location.search).get('tab');
+  const tabKeys = ['local', 'profiles', 'models', 'tasks', 'policies'];
+  const activeTab = tabKeys.includes(requestedTab || '')
+    ? requestedTab || 'local'
+    : 'local';
+
+  const handleTabChange = (key: string) => {
+    const search = new URLSearchParams(location.search);
+    search.set('tab', key);
+    navigate(`${location.pathname}?${search.toString()}`, { replace: true });
+  };
+
+  return (
+    <PageContainer
+      ghost
+      header={{
+        title: (
+          <span>
+            {intl.formatMessage({ id: 'resources.preheat.title' })}{' '}
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'resources.preheat.description'
+              })}
+            >
+              <QuestionCircleOutlined
+                aria-label={intl.formatMessage({
+                  id: 'resources.preheat.description'
+                })}
+                style={{ color: 'var(--ant-color-text-tertiary)' }}
+              />
+            </Tooltip>
+          </span>
+        ),
+        style: {
+          paddingInline: 'var(--layout-content-header-inlinepadding)'
+        },
+        breadcrumb: {}
+      }}
+    >
+      <Tabs
+        activeKey={activeTab}
+        onChange={handleTabChange}
+        items={[
+          {
+            key: 'local',
+            label: intl.formatMessage({ id: 'resources.preheat.localModels' }),
+            children: <LocalModelFiles />
+          },
+          {
+            key: 'profiles',
+            label: intl.formatMessage({
+              id: 'resources.preheat.profile.title'
+            }),
+            children: <ModelPreheatS3Profiles />
+          },
+          {
+            key: 'models',
+            label: intl.formatMessage({ id: 'resources.preheat.s3Models' }),
+            children: <ModelPreheatS3Models />
+          },
+          {
+            key: 'tasks',
+            label: intl.formatMessage({ id: 'resources.preheat.tasks' }),
+            children: <ModelPreheatTasks />
+          },
+          {
+            key: 'policies',
+            label: intl.formatMessage({ id: 'resources.preheat.policies' }),
+            children: <ModelPreheatPolicies />
+          }
+        ]}
+      />
+    </PageContainer>
   );
 };
 

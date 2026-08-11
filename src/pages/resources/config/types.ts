@@ -95,6 +95,7 @@ export interface ListItem {
   id: number;
   created_at: string;
   updated_at: string;
+  worker_uuid: string;
 }
 
 export interface ModelFile {
@@ -154,6 +155,238 @@ export interface ModelCacheTask {
   uploaded_size: number;
   total_size: number;
   error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ModelPreheatS3ConnectivityState =
+  | 'no_workers'
+  | 'pending'
+  | 'checking'
+  | 'available'
+  | 'partial'
+  | 'unavailable'
+  | 'stale';
+
+export type ModelPreheatConnectivityCheckState =
+  | 'pending'
+  | 'running'
+  | 'available'
+  | 'partial'
+  | 'unavailable'
+  | 'error';
+
+export type ModelPreheatWorkerTaskState =
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'ready'
+  | 'error'
+  | 'canceled'
+  | 'skipped_worker_removed';
+
+export type ModelPreheatExecutionState =
+  | 'pending'
+  | 'resolving'
+  | 'scanning'
+  | 'staging'
+  | 'publishing'
+  | 'distributing'
+  | 'paused'
+  | 'ready'
+  | 'partial'
+  | 'error'
+  | 'canceled';
+
+export type ModelPreheatTargetScope =
+  | 'seed_worker'
+  | 'same_gpu_model'
+  | 'selected_workers';
+
+export type ModelPreheatBackfillPolicy = 'always' | 'when_missing' | 'never';
+
+export type ModelPreheatManifestState = 'valid' | 'missing' | 'invalid';
+
+export type ModelPreheatInventoryJobState =
+  | 'pending'
+  | 'running'
+  | 'ready'
+  | 'error';
+
+export interface ModelPreheatWorker {
+  id: number;
+  worker_uuid: string;
+  name: string;
+  state: string;
+  status?: {
+    gpu_devices?: Array<{ name: string }>;
+  } | null;
+}
+
+export interface ModelPreheatS3ProfileBase {
+  name: string;
+  description?: string | null;
+  endpoint: string;
+  bucket: string;
+  prefix?: string;
+  tls_enabled?: boolean;
+  tls_verify?: boolean;
+  region?: string | null;
+  use_virtual_hosted_style?: boolean;
+  is_default?: boolean;
+}
+
+export interface ModelPreheatS3ProfileWrite extends ModelPreheatS3ProfileBase {
+  access_key?: string;
+  secret_key?: string;
+}
+
+export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
+  id: number;
+  credential_configured: boolean;
+  config_version: number;
+  connectivity_state: ModelPreheatS3ConnectivityState;
+  last_connectivity_check_id: number | null;
+  last_connectivity_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPreheatConnectivityWorker {
+  worker_uuid: string;
+  worker_id: number | null;
+  worker_name: string | null;
+  state: ModelPreheatWorkerTaskState;
+  readable: boolean;
+  writable: boolean;
+  deletable: boolean;
+  cleanup_failed: boolean;
+  latency_ms: number | null;
+  error_code: string | null;
+  failed_stage: string | null;
+}
+
+export interface ModelPreheatConnectivityCheck {
+  id: number;
+  profile_id: number;
+  profile_config_version: number;
+  state: ModelPreheatConnectivityCheckState;
+  summary: {
+    success: number;
+    failed: number;
+    not_checked: number;
+  };
+  workers: ModelPreheatConnectivityWorker[];
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface ModelPreheatCreate {
+  source: 'huggingface' | 'modelscope';
+  model_id: string;
+  revision?: string | null;
+  include_patterns: string[];
+  exclude_patterns: string[];
+  target_scope: ModelPreheatTargetScope;
+  target_worker_ids: number[];
+  seed_worker_id?: number | null;
+  s3_profile_id: number;
+  s3_backfill_policy: ModelPreheatBackfillPolicy;
+  keep_new_workers_in_sync: boolean;
+}
+
+export interface ModelPreheatTargetSnapshot {
+  worker_uuid: string;
+  worker_id: number;
+  worker_name: string;
+}
+
+export interface ModelPreheatTask {
+  id: number;
+  attempt: number;
+  source: string;
+  model_id: string;
+  requested_revision: string | null;
+  resolved_revision: string;
+  include_patterns: string[];
+  exclude_patterns: string[];
+  selection_digest: string;
+  cache_key: string;
+  generation_id: string;
+  desired_state: 'running' | 'paused' | 'canceled';
+  execution_state: ModelPreheatExecutionState;
+  paused_from_state: ModelPreheatExecutionState | null;
+  target_scope: ModelPreheatTargetScope;
+  target_worker_uuids: string[];
+  target_worker_snapshot: ModelPreheatTargetSnapshot[];
+  s3_profile_id: number;
+  s3_profile_config_version: number;
+  s3_backfill_policy: ModelPreheatBackfillPolicy;
+  keep_new_workers_in_sync: boolean;
+  created_at: string;
+  updated_at: string;
+  deduplicated: boolean;
+}
+
+export interface ModelPreheatCachedModel {
+  cache_key: string;
+  source: string;
+  model_id: string;
+  resolved_revision: string;
+  include_patterns: string[];
+  exclude_patterns: string[];
+  generation_id: string;
+  ready_path: string;
+  manifest_path: string;
+  manifest_digest: string;
+  file_count: number;
+  total_size: number;
+  manifest_state: ModelPreheatManifestState;
+  last_verified_at: string;
+  created_by_task_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPreheatCachedModelsPage {
+  items: ModelPreheatCachedModel[];
+  next_cursor: string | null;
+}
+
+export interface ModelPreheatInventoryJob {
+  id: number;
+  profile_id: number;
+  profile_config_version: number;
+  kind: string;
+  state: ModelPreheatInventoryJobState;
+  scanned_count: number;
+  valid_count: number;
+  invalid_count: number;
+  orphan_count: number;
+  deleted_count: number;
+  skipped_count: number;
+  failed_count: number;
+  error_code: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPreheatDistributionPolicy {
+  id: number;
+  name: string;
+  enabled: boolean;
+  profile_id: number;
+  profile_config_version: number;
+  cache_key: string;
+  target_scope: ModelPreheatTargetScope;
+  worker_selector: Record<string, unknown>;
+  gpu_selector: Record<string, unknown>;
+  created_by_task_id: number | null;
+  last_reconciled_at: string | null;
   created_at: string;
   updated_at: string;
 }
