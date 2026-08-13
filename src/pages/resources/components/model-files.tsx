@@ -34,8 +34,6 @@ import {
   ConfigProvider,
   Descriptions,
   Empty,
-  Form,
-  Input,
   Table,
   Tag,
   Typography,
@@ -56,6 +54,7 @@ import {
   createModelCacheTask,
   deleteModelFile,
   downloadModelFile,
+  previewModelCacheTask,
   queryModelFilesList,
   queryWorkersList,
   retryDownloadModelFile
@@ -67,6 +66,7 @@ import {
   WorkerStatusMap
 } from '../config';
 import {
+  ModelCachePreview,
   ModelFile as ListItem,
   ListItem as WorkerListItem
 } from '../config/types';
@@ -360,8 +360,8 @@ const ModelFiles = () => {
     isGGUF: false
   });
   const [cacheRecord, setCacheRecord] = useState<ListItem | null>(null);
+  const [cachePreview, setCachePreview] = useState<ModelCachePreview | null>(null);
   const [cacheSubmitting, setCacheSubmitting] = useState(false);
-  const [cacheForm] = Form.useForm<{ model_id: string }>();
 
   useEffect(() => {
     const fetchWorkerList = async () => {
@@ -471,7 +471,8 @@ const ModelFiles = () => {
           show: true
         });
       } else if (val === 'cache') {
-        cacheForm.resetFields();
+        const preview = await previewModelCacheTask(record.id);
+        setCachePreview(preview);
         setCacheRecord(record);
       }
     } catch (error) {
@@ -528,7 +529,14 @@ const ModelFiles = () => {
   const setActionList = (record: ListItem) => {
     return _.filter(modelFileActions, (item: { key: string }) => {
       if (record.state === ModelfileStateMap.Ready) {
-        return ['deploy', 'cache', 'delete'].includes(item.key);
+        const actions = ['deploy', 'delete'];
+        if (
+          record.source === modelSourceMap.modelscope_value &&
+          record.model_scope_model_id
+        ) {
+          actions.splice(1, 0, 'cache');
+        }
+        return actions.includes(item.key);
       }
       return ['retry', 'delete'].includes(item.key);
     });
@@ -537,10 +545,10 @@ const ModelFiles = () => {
   const handleCreateCacheTask = async () => {
     if (!cacheRecord) return;
     try {
-      const values = await cacheForm.validateFields();
       setCacheSubmitting(true);
-      const task = await createModelCacheTask(cacheRecord.id, values.model_id);
+      const task = await createModelCacheTask(cacheRecord.id);
       setCacheRecord(null);
+      setCachePreview(null);
       navigate(`/resources/model-cache?tab=tasks&task_id=${task.id}`);
     } finally {
       setCacheSubmitting(false);
@@ -762,10 +770,16 @@ const ModelFiles = () => {
           width={520}
           destroyOnClose
           maskClosable={false}
-          onClose={() => setCacheRecord(null)}
+          onClose={() => {
+            setCacheRecord(null);
+            setCachePreview(null);
+          }}
           footer={
             <ModalFooter
-              onCancel={() => setCacheRecord(null)}
+              onCancel={() => {
+                setCacheRecord(null);
+                setCachePreview(null);
+              }}
               onOk={handleCreateCacheTask}
               loading={cacheSubmitting}
             />
@@ -774,6 +788,13 @@ const ModelFiles = () => {
           {cacheRecord && (
             <>
               <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.model'
+                  })}
+                >
+                  {cachePreview?.model_id}
+                </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
                     id: 'resources.modelcache.sourceFile'
@@ -793,42 +814,18 @@ const ModelFiles = () => {
                     id: 'resources.modelcache.target'
                   })}
                 >
-                  s3://bd-wind/datamodel/model_&#123;organization&#125;/&#123;model-name&#125;/
+                  {cachePreview?.s3_path}
                 </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
                     id: 'resources.modelcache.filesAndSize'
                   })}
                 >
-                  {cacheRecord.resolved_paths.length}{' '}
+                  {cachePreview?.file_count}{' '}
                   {intl.formatMessage({ id: 'models.form.files' })} ·{' '}
-                  {convertFileSize(cacheRecord.size, 1, true)}
+                  {convertFileSize(cachePreview?.total_size || 0, 1, true)}
                 </Descriptions.Item>
               </Descriptions>
-              <Form
-                form={cacheForm}
-                layout="vertical"
-                style={{ marginTop: 20 }}
-              >
-                <Form.Item
-                  name="model_id"
-                  label={intl.formatMessage({
-                    id: 'resources.modelcache.modelId'
-                  })}
-                  rules={[
-                    { required: true },
-                    {
-                      pattern:
-                        /^[^/\\\u0000-\u001f\u007f]+\/[^/\\\u0000-\u001f\u007f]+$/,
-                      message: intl.formatMessage({
-                        id: 'resources.modelcache.modelId.invalid'
-                      })
-                    }
-                  ]}
-                >
-                  <Input placeholder="Qwen/Qwen3.5-35B-A3B-FP8" />
-                </Form.Item>
-              </Form>
             </>
           )}
         </GSDrawer>

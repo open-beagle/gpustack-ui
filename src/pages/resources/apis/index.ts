@@ -4,7 +4,8 @@ import {
   ListItem,
   ModelCacheItem,
   ModelCacheTask,
-  ModelFile
+  ModelFile,
+  ModelCachePreview
 } from '../config/types';
 
 export const WORKERS_API = '/workers';
@@ -102,13 +103,15 @@ export async function queryModelCacheTasks(params?: Global.SearchParams) {
   });
 }
 
-export async function createModelCacheTask(
-  modelFileId: number,
-  modelId: string
-) {
+export async function previewModelCacheTask(modelFileId: number) {
+  return request<ModelCachePreview>(`${MODEL_FILES_API}/${modelFileId}/cache`, {
+    method: 'GET'
+  });
+}
+
+export async function createModelCacheTask(modelFileId: number) {
   return request<ModelCacheTask>(`${MODEL_FILES_API}/${modelFileId}/cache`, {
-    method: 'POST',
-    data: { model_id: modelId }
+    method: 'POST'
   });
 }
 

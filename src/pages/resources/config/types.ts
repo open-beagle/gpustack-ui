@@ -136,6 +136,13 @@ export interface ModelCacheItem {
   updated_at: string;
 }
 
+export interface ModelCachePreview {
+  model_id: string;
+  s3_path: string;
+  file_count: number;
+  total_size: number;
+}
+
 export interface ModelCacheTask {
   id: number;
   model_file_id: number;

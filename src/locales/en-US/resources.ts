@@ -77,9 +77,6 @@ export default {
   'resources.modelcache.tasks': 'Cache Tasks',
   'resources.modelcache.cache': 'Cache',
   'resources.modelcache.model': 'Model',
-  'resources.modelcache.modelId': 'Cache Model ID',
-  'resources.modelcache.modelId.invalid':
-    'Use the organization/model-name format',
   'resources.modelcache.sourceFile': 'Local Model File',
   'resources.modelcache.sourceWorker': 'Source Worker',
   'resources.modelcache.target': 'Target Local S3',

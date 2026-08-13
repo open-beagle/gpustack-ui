@@ -78,9 +78,6 @@ export default {
   'resources.modelcache.tasks': 'キャッシュタスク',
   'resources.modelcache.cache': 'キャッシュ',
   'resources.modelcache.model': 'モデル',
-  'resources.modelcache.modelId': 'キャッシュモデル ID',
-  'resources.modelcache.modelId.invalid':
-    '組織/モデル名の形式で入力してください',
   'resources.modelcache.sourceFile': 'ローカルモデルファイル',
   'resources.modelcache.sourceWorker': 'ソース Worker',
   'resources.modelcache.target': 'ターゲット Local S3',

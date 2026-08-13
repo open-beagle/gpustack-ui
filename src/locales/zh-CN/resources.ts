@@ -75,8 +75,6 @@ export default {
   'resources.modelcache.tasks': '缓存任务',
   'resources.modelcache.cache': '缓存',
   'resources.modelcache.model': '模型',
-  'resources.modelcache.modelId': '缓存模型 ID',
-  'resources.modelcache.modelId.invalid': '请输入组织/模型名称格式的模型 ID',
   'resources.modelcache.sourceFile': '本地模型文件',
   'resources.modelcache.sourceWorker': '来源 Worker',
   'resources.modelcache.target': '目标 Local S3',

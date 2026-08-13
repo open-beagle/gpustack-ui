@@ -76,9 +76,6 @@ export default {
   'resources.modelcache.tasks': 'Задачи кэширования',
   'resources.modelcache.cache': 'Кэшировать',
   'resources.modelcache.model': 'Модель',
-  'resources.modelcache.modelId': 'ID модели в кэше',
-  'resources.modelcache.modelId.invalid':
-    'Используйте формат организация/имя-модели',
   'resources.modelcache.sourceFile': 'Локальный файл модели',
   'resources.modelcache.sourceWorker': 'Исходный воркер',
   'resources.modelcache.target': 'Целевой Local S3',
