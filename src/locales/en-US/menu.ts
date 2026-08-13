@@ -20,6 +20,7 @@ export default {
   'menu.resources.workers': 'Workers',
   'menu.resources.gpus': 'GPUs',
   'menu.resources.modelfiles': 'Model Files',
+  'menu.resources.modelcache': 'Model Cache',
   'menu.accessControl': 'Access Control',
   'menu.accessControl.apikeys': 'API Keys',
   'menu.accessControl.users': 'Users',

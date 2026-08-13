@@ -127,3 +127,26 @@ export interface ModelFileFormData {
   local_path: string;
   local_dir: string;
 }
+
+export interface ModelCacheItem {
+  model_id: string;
+  s3_path: string;
+  file_count: number;
+  total_size: number;
+  updated_at: string;
+}
+
+export interface ModelCacheTask {
+  id: number;
+  model_file_id: number;
+  worker_id: number;
+  model_id: string;
+  target_path: string;
+  state: 'pending' | 'uploading' | 'ready' | 'error';
+  progress: number;
+  uploaded_size: number;
+  total_size: number;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}

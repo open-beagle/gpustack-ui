@@ -23,6 +23,7 @@ export default {
   'menu.resources.workers': 'Воркеры',
   'menu.resources.gpus': 'GPUs',
   'menu.resources.modelfiles': 'Файлы модлей',
+  'menu.resources.modelcache': 'Кэш моделей',
   'menu.accessControl': 'Управление доступом',
   'menu.accessControl.apikeys': 'API Ключи',
   'menu.accessControl.users': 'Пользователи'

@@ -1,6 +1,7 @@
 import IconFont from '@/components/icon-font';
 import {
   ApiOutlined,
+  CloudUploadOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
@@ -18,6 +19,7 @@ const icons = {
   RetweetOutlined: React.createElement(RetweetOutlined),
   DownloadOutlined: React.createElement(DownloadOutlined),
   ApiOutlined: React.createElement(ApiOutlined),
+  CloudUploadOutlined: React.createElement(CloudUploadOutlined),
   Stop: React.createElement(IconFont, { type: 'icon-stop1' }),
   Play: React.createElement(IconFont, { type: 'icon-outline-play' }),
   Catalog: React.createElement(IconFont, { type: 'icon-catalog' }),

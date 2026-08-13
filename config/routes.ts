@@ -155,6 +155,15 @@ export default [
         selectedIcon: 'icon-files-filled',
         defaultIcon: 'icon-files',
         component: './resources/components/model-files'
+      },
+      {
+        name: 'modelcache',
+        path: '/resources/model-cache',
+        key: 'modelcache',
+        icon: 'icon-files',
+        selectedIcon: 'icon-files-filled',
+        defaultIcon: 'icon-files',
+        component: './resources/components/model-cache'
       }
     ]
   },

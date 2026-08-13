@@ -172,6 +172,11 @@ export const modelFileActions = [
     icon: icons.Deployment
   },
   {
+    label: 'resources.modelcache.cache',
+    key: 'cache',
+    icon: icons.CloudUploadOutlined
+  },
+  {
     label: 'resources.modelfiles.retry.download',
     key: 'retry',
     icon: icons.DownloadOutlined

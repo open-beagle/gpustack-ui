@@ -2,8 +2,10 @@ import { modelsExpandKeysAtom } from '@/atoms/models';
 import AutoTooltip from '@/components/auto-tooltip';
 import DeleteModal from '@/components/delete-modal';
 import DropdownButtons from '@/components/drop-down-buttons';
+import ModalFooter from '@/components/modal-footer';
 import { TooltipOverlayScroller } from '@/components/overlay-scroller';
 import { FilterBar } from '@/components/page-tools';
+import GSDrawer from '@/components/scroller-modal/gs-drawer';
 import StatusTag from '@/components/status-tag';
 import { PageAction } from '@/config';
 import useAppUtils from '@/hooks/use-app-utils';
@@ -28,7 +30,17 @@ import {
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl, useNavigate } from '@umijs/max';
-import { ConfigProvider, Empty, Table, Tag, Typography, message } from 'antd';
+import {
+  ConfigProvider,
+  Descriptions,
+  Empty,
+  Form,
+  Input,
+  Table,
+  Tag,
+  Typography,
+  message
+} from 'antd';
 import dayjs from 'dayjs';
 import { useAtom } from 'jotai';
 import _ from 'lodash';
@@ -41,6 +53,7 @@ import {
 } from '../../llmodels/hooks';
 import {
   MODEL_FILES_API,
+  createModelCacheTask,
   deleteModelFile,
   downloadModelFile,
   queryModelFilesList,
@@ -346,6 +359,9 @@ const ModelFiles = () => {
     initialValues: {},
     isGGUF: false
   });
+  const [cacheRecord, setCacheRecord] = useState<ListItem | null>(null);
+  const [cacheSubmitting, setCacheSubmitting] = useState(false);
+  const [cacheForm] = Form.useForm<{ model_id: string }>();
 
   useEffect(() => {
     const fetchWorkerList = async () => {
@@ -454,6 +470,9 @@ const ModelFiles = () => {
           isGGUF: initialValues.isGGUF,
           show: true
         });
+      } else if (val === 'cache') {
+        cacheForm.resetFields();
+        setCacheRecord(record);
       }
     } catch (error) {
       // console.log('error', error);
@@ -508,11 +527,24 @@ const ModelFiles = () => {
 
   const setActionList = (record: ListItem) => {
     return _.filter(modelFileActions, (item: { key: string }) => {
-      if (item.key === 'deploy') {
-        return record.state === ModelfileStateMap.Ready;
+      if (record.state === ModelfileStateMap.Ready) {
+        return ['deploy', 'cache', 'delete'].includes(item.key);
       }
-      return true;
+      return ['retry', 'delete'].includes(item.key);
     });
+  };
+
+  const handleCreateCacheTask = async () => {
+    if (!cacheRecord) return;
+    try {
+      const values = await cacheForm.validateFields();
+      setCacheSubmitting(true);
+      const task = await createModelCacheTask(cacheRecord.id, values.model_id);
+      setCacheRecord(null);
+      navigate(`/resources/model-cache?tab=tasks&task_id=${task.id}`);
+    } finally {
+      setCacheSubmitting(false);
+    }
   };
   const handleDeployModalCancel = () => {
     setOpenDeployModal({
@@ -724,6 +756,82 @@ const ModelFiles = () => {
           initialValues={openDeployModal.initialValues}
           isGGUF={openDeployModal.isGGUF}
         ></DeployModal>
+        <GSDrawer
+          title={intl.formatMessage({ id: 'resources.modelcache.cache' })}
+          open={!!cacheRecord}
+          width={520}
+          destroyOnClose
+          maskClosable={false}
+          onClose={() => setCacheRecord(null)}
+          footer={
+            <ModalFooter
+              onCancel={() => setCacheRecord(null)}
+              onOk={handleCreateCacheTask}
+              loading={cacheSubmitting}
+            />
+          }
+        >
+          {cacheRecord && (
+            <>
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.sourceFile'
+                  })}
+                >
+                  {cacheRecord.resolved_paths.join(', ')}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.sourceWorker'
+                  })}
+                >
+                  {getWorkerName(cacheRecord.worker_id, workersList)}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.target'
+                  })}
+                >
+                  s3://bd-wind/datamodel/model_&#123;organization&#125;/&#123;model-name&#125;/
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.filesAndSize'
+                  })}
+                >
+                  {cacheRecord.resolved_paths.length}{' '}
+                  {intl.formatMessage({ id: 'models.form.files' })} ·{' '}
+                  {convertFileSize(cacheRecord.size, 1, true)}
+                </Descriptions.Item>
+              </Descriptions>
+              <Form
+                form={cacheForm}
+                layout="vertical"
+                style={{ marginTop: 20 }}
+              >
+                <Form.Item
+                  name="model_id"
+                  label={intl.formatMessage({
+                    id: 'resources.modelcache.modelId'
+                  })}
+                  rules={[
+                    { required: true },
+                    {
+                      pattern:
+                        /^[^/\\\u0000-\u001f\u007f]+\/[^/\\\u0000-\u001f\u007f]+$/,
+                      message: intl.formatMessage({
+                        id: 'resources.modelcache.modelId.invalid'
+                      })
+                    }
+                  ]}
+                >
+                  <Input placeholder="Qwen/Qwen3.5-35B-A3B-FP8" />
+                </Form.Item>
+              </Form>
+            </>
+          )}
+        </GSDrawer>
       </PageContainer>
     </>
   );
