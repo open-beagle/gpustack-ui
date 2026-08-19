@@ -101,6 +101,7 @@ export default {
     'Удаление задачи #{id} остановит загрузку и удалит загруженные ею файлы.',
   'resources.modelcache.deleteTask.finished':
     'Будет удалена только запись задачи #{id}. Архивные файлы модели сохранятся.',
+  'resources.preheat.archive': 'Архив Local S3',
   'resources.filter.path': 'Фильтрация по пути',
   'resources.register.worker.step1':
     'В меню выберите <span class="bold-text">Скопировать токен</span>.',

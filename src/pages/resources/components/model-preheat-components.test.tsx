@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -7,12 +8,15 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import routes from '../../../../config/routes';
 import type {
   ModelCacheItem,
+  ModelCacheTask,
   ModelPreheatConnectivityCheck,
   ModelPreheatS3Profile
 } from '../config/types';
 import ModelCache from './model-cache';
+import ModelFiles from './model-files';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatS3Models from './model-preheat-s3-models';
 import ModelPreheatS3ProfileModal from './model-preheat-s3-profile-modal';
@@ -24,22 +28,53 @@ const api = vi.hoisted(() => ({
   deleteModelCache: vi.fn(),
   deleteModelPreheatS3Profile: vi.fn(),
   queryModelCache: vi.fn(),
+  queryModelCacheTasks: vi.fn(),
   queryModelPreheatCachedModels: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatInventoryJob: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
+  queryWorkersList: vi.fn(),
   updateModelPreheatS3Profile: vi.fn()
 }));
 
 const request = vi.hoisted(() => vi.fn());
 
-vi.mock('@umijs/max', () => ({
-  request,
-  useIntl: () => ({
-    formatMessage: ({ id }: { id: string }, values?: { name?: string }) =>
-      values?.name ? `${id}:${values.name}` : id
-  })
-}));
+vi.mock('@/components/icon-font', () => ({ default: () => null }));
+vi.mock('@/components/icon-font/icons', () => ({ default: {} }));
+
+vi.mock('@umijs/max', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  const subscribe = (callback: () => void) => {
+    window.addEventListener('popstate', callback);
+    return () => window.removeEventListener('popstate', callback);
+  };
+  const getSnapshot = () =>
+    `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  return {
+    request,
+    useIntl: () => ({
+      formatMessage: ({ id }: { id: string }, values?: { name?: string }) =>
+        values?.name ? `${id}:${values.name}` : id
+    }),
+    useLocation: () => {
+      React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+      return {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash
+      };
+    },
+    useNavigate: () => (to: string, options?: { replace?: boolean }) => {
+      window.history[options?.replace ? 'replaceState' : 'pushState'](
+        null,
+        '',
+        to
+      );
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  };
+});
 
 vi.mock('../apis', async () => ({
   ...(await vi.importActual('../apis')),
@@ -97,13 +132,126 @@ const deferred = <T,>() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.history.replaceState(null, '', '/');
   api.queryModelCache.mockResolvedValue({ items: [] });
+  api.queryModelCacheTasks.mockResolvedValue({ items: [] });
+  api.queryWorkersList.mockResolvedValue({ items: [] });
   api.queryModelPreheatS3Profiles.mockResolvedValue(pageOfProfiles());
   api.queryModelPreheatConnectivityCheck.mockResolvedValue(check);
 });
 
 afterEach(() => {
   cleanup();
+});
+
+describe('模型预热与归档入口', () => {
+  const archiveTask: ModelCacheTask = {
+    id: 42,
+    model_file_id: 7,
+    worker_id: 3,
+    model_id: 'team/model-a',
+    target_path: 'models/team/model-a',
+    state: 'uploading',
+    progress: 50,
+    uploaded_size: 512,
+    total_size: 1024,
+    created_at: '2026-08-19T08:00:00Z',
+    updated_at: '2026-08-19T08:01:00Z'
+  };
+
+  it('旧模型归档路由保留但不显示在资源菜单', () => {
+    const resourcesRoute = routes.find((route) => route.path === '/resources');
+    const archiveRoute = resourcesRoute?.routes?.find(
+      (route) => route.path === '/resources/model-cache'
+    );
+
+    expect(archiveRoute).toMatchObject({
+      component: './resources/components/model-cache',
+      hideInMenu: true
+    });
+  });
+
+  it('嵌入预热页时使用 archive_tab，且不嵌套 PageContainer', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(
+      null,
+      '',
+      '/resources/modelfiles?tab=archive&archive_tab=tasks&task_id=42'
+    );
+    api.queryModelCacheTasks.mockResolvedValue({ items: [archiveTask] });
+
+    const { container } = render(<ModelCache embedded />);
+
+    expect(await screen.findByText(archiveTask.model_id)).toBeInTheDocument();
+    expect(container.querySelector('.ant-pro-page-container')).toBeNull();
+    expect(
+      screen.getByLabelText('resources.modelcache.description')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByText('resources.modelcache.cached'));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('tab')).toBe('archive');
+    expect(params.get('archive_tab')).toBe('cached');
+    expect(params.has('task_id')).toBe(false);
+
+    act(() => {
+      window.history.pushState(
+        null,
+        '',
+        '/resources/modelfiles?tab=archive&archive_tab=tasks&task_id=42'
+      );
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(await screen.findByText(archiveTask.model_id)).toBeInTheDocument();
+  });
+
+  it('父级页签切换后保留归档子页签路由状态', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(
+      null,
+      '',
+      '/resources/modelfiles?tab=archive&archive_tab=tasks&task_id=42'
+    );
+    api.queryModelCacheTasks.mockResolvedValue({ items: [archiveTask] });
+
+    render(<ModelFiles />);
+    expect(await screen.findByText(archiveTask.model_id)).toBeInTheDocument();
+
+    await user.click(screen.getByText('resources.preheat.archive'));
+    await user.click(screen.getByText('resources.preheat.profile.title'));
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get('tab')).toBe(
+        'profiles'
+      )
+    );
+    expect(new URLSearchParams(window.location.search).get('archive_tab')).toBe(
+      'tasks'
+    );
+
+    await user.click(screen.getByText('resources.preheat.archive'));
+    expect(await screen.findByText(archiveTask.model_id)).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('archive_tab')).toBe(
+      'tasks'
+    );
+  });
+
+  it('旧独立页面继续识别并更新 tab 参数', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(
+      null,
+      '',
+      '/resources/model-cache?tab=tasks&task_id=42'
+    );
+    api.queryModelCacheTasks.mockResolvedValue({ items: [archiveTask] });
+
+    render(<ModelCache />);
+    expect(await screen.findByText(archiveTask.model_id)).toBeInTheDocument();
+
+    await user.click(screen.getByText('resources.modelcache.cached'));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('tab')).toBe('cached');
+    expect(params.has('archive_tab')).toBe(false);
+  });
 });
 
 describe('业务确认弹窗', () => {

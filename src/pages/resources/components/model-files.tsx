@@ -73,6 +73,7 @@ import {
   ModelCachePreview,
   ListItem as WorkerListItem
 } from '../config/types';
+import ModelCache from './model-cache';
 import ModelPreheatPolicies from './model-preheat-policies';
 import ModelPreheatS3Models from './model-preheat-s3-models';
 import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
@@ -558,7 +559,9 @@ const LocalModelFiles = () => {
       const task = await createModelCacheTask(cacheRecord.id);
       setCacheRecord(null);
       setCachePreview(null);
-      navigate(`/resources/model-cache?tab=tasks&task_id=${task.id}`);
+      navigate(
+        `/resources/modelfiles?tab=archive&archive_tab=tasks&task_id=${task.id}`
+      );
     } finally {
       setCacheSubmitting(false);
     }
@@ -837,7 +840,14 @@ const ModelFiles = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const requestedTab = new URLSearchParams(location.search).get('tab');
-  const tabKeys = ['local', 'profiles', 'models', 'tasks', 'policies'];
+  const tabKeys = [
+    'local',
+    'archive',
+    'profiles',
+    'models',
+    'tasks',
+    'policies'
+  ];
   const activeTab = tabKeys.includes(requestedTab || '')
     ? requestedTab || 'local'
     : 'local';
@@ -883,6 +893,11 @@ const ModelFiles = () => {
             key: 'local',
             label: intl.formatMessage({ id: 'resources.preheat.localModels' }),
             children: <LocalModelFiles />
+          },
+          {
+            key: 'archive',
+            label: intl.formatMessage({ id: 'resources.preheat.archive' }),
+            children: <ModelCache embedded />
           },
           {
             key: 'profiles',

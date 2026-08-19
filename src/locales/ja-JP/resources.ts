@@ -103,6 +103,7 @@ export default {
     'タスク #{id} を削除すると、アップロードを停止してアップロード済みファイルを削除します。',
   'resources.modelcache.deleteTask.finished':
     'タスク #{id} の記録のみ削除し、アーカイブ済みモデルファイルは削除しません。',
+  'resources.preheat.archive': 'Local S3 アーカイブ',
   'resources.filter.path': 'パスでフィルタ',
   'resources.register.worker.step1':
     'Click the <span class="bold-text">Copy Token</span> menu in the application.',

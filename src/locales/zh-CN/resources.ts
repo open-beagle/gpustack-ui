@@ -72,7 +72,7 @@ export default {
   'resources.modelfiles.copy.tips': '复制完整路径',
   'resources.modelcache.title': '模型归档',
   'resources.modelcache.description':
-    '将 Worker 已下载的 ModelScope 模型单向归档到 Local S3，供 ModelScope 下载复用；归档数据不会自动成为模型预热库存。',
+    '将 Worker 已校验的 ModelScope 模型归档到内置 Local S3，供后续 ModelScope 下载或模型预热复用；不负责向目标节点主动分发。',
   'resources.modelcache.cached': '已归档模型',
   'resources.modelcache.tasks': '归档任务',
   'resources.modelcache.cache': '归档到 S3',
@@ -122,8 +122,9 @@ export default {
   'resource.register.windows.support': 'win 10, win 11',
   'resources.preheat.title': '模型预热',
   'resources.preheat.description':
-    '通过 S3 将模型提前准备到目标节点，并支持分发策略和定时调度；仅复用通过预热协议校验的本地或 S3 数据。',
+    '将模型提前准备到目标节点，并支持分发策略和定时调度；优先复用任一节点上通过模型文件或模型归档校验的可信文件，所有节点均无可用副本时才下载。',
   'resources.preheat.localModels': '本地模型文件',
+  'resources.preheat.archive': 'Local S3 归档',
   'resources.preheat.s3Models': 'S3 模型',
   'resources.preheat.tasks': '预热任务',
   'resources.preheat.policies': '同步策略',

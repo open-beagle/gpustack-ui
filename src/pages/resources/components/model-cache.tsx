@@ -6,7 +6,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { useIntl } from '@umijs/max';
+import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
   Button,
   Input,
@@ -46,13 +46,18 @@ type DeleteConfirmation =
   | { kind: 'model'; record: ModelCacheItem }
   | { kind: 'task'; record: ModelCacheTask; running: boolean };
 
-const ModelCache: React.FC = () => {
+interface ModelCacheProps {
+  embedded?: boolean;
+}
+
+const ModelCache: React.FC<ModelCacheProps> = ({ embedded = false }) => {
   const intl = useIntl();
-  const params = new URLSearchParams(window.location.search);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = new URLSearchParams(location.search);
+  const tabSearchParam = embedded ? 'archive_tab' : 'tab';
   const highlightedTaskId = Number(params.get('task_id')) || undefined;
-  const [tab, setTab] = useState(
-    params.get('tab') === 'tasks' ? 'tasks' : 'cached'
-  );
+  const tab = params.get(tabSearchParam) === 'tasks' ? 'tasks' : 'cached';
   const [search, setSearch] = useState('');
   const [models, setModels] = useState<ModelCacheItem[]>([]);
   const [tasks, setTasks] = useState<ModelCacheTask[]>([]);
@@ -101,11 +106,13 @@ const ModelCache: React.FC = () => {
 
   const switchTab = (value: string | number) => {
     const next = String(value);
-    setTab(next);
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', next);
-    if (next !== 'tasks') url.searchParams.delete('task_id');
-    window.history.replaceState(null, '', url);
+    const search = new URLSearchParams(location.search);
+    search.set(tabSearchParam, next);
+    if (next !== 'tasks') search.delete('task_id');
+    navigate(
+      `${location.pathname}?${search.toString()}${location.hash || ''}`,
+      { replace: true }
+    );
   };
 
   const confirmDeleteModel = (record: ModelCacheItem) => {
@@ -248,28 +255,24 @@ const ModelCache: React.FC = () => {
     }
   ];
 
-  return (
-    <PageContainer
-      ghost
-      header={{
-        title: (
-          <span>
-            {text('resources.modelcache.title')}{' '}
-            <Tooltip title={text('resources.modelcache.description')}>
-              <QuestionCircleOutlined
-                aria-label={text('resources.modelcache.description')}
-                style={{ color: 'var(--ant-color-text-tertiary)' }}
-              />
-            </Tooltip>
-          </span>
-        ),
-        breadcrumb: {}
-      }}
-    >
+  const title = (
+    <span>
+      {text('resources.modelcache.title')}{' '}
+      <Tooltip title={text('resources.modelcache.description')}>
+        <QuestionCircleOutlined
+          aria-label={text('resources.modelcache.description')}
+          style={{ color: 'var(--ant-color-text-tertiary)' }}
+        />
+      </Tooltip>
+    </span>
+  );
+
+  const content = (
+    <>
       <Space
         direction="vertical"
         size={18}
-        style={{ width: '100%', marginTop: 24 }}
+        style={{ width: '100%', marginTop: embedded ? 12 : 24 }}
       >
         <Segmented
           value={tab}
@@ -290,7 +293,7 @@ const ModelCache: React.FC = () => {
           ) : (
             <span />
           )}
-          <Button icon={<ReloadOutlined />} onClick={load}>
+          <Button icon={<ReloadOutlined />} onClick={() => void load()}>
             {text('resources.modelcache.refresh')}
           </Button>
         </Space>
@@ -348,6 +351,27 @@ const ModelCache: React.FC = () => {
         onOk={handleDelete}
         onCancel={() => setConfirmation(null)}
       />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <section aria-label={text('resources.modelcache.title')}>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{title}</div>
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <PageContainer
+      ghost
+      header={{
+        title,
+        breadcrumb: {}
+      }}
+    >
+      {content}
     </PageContainer>
   );
 };

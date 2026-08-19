@@ -74,7 +74,7 @@ export default {
   'resources.modelfiles.copy.tips': 'Copy Full Path',
   'resources.modelcache.title': 'Model Archive',
   'resources.modelcache.description':
-    'Archive downloaded ModelScope models to Local S3 for ModelScope downloads. Archived data is not automatically part of preheat inventory.',
+    'Archive verified ModelScope models from a worker to the built-in Local S3 for later ModelScope downloads or preheat reuse. This does not actively distribute models to target workers.',
   'resources.modelcache.cached': 'Archived Models',
   'resources.modelcache.tasks': 'Archive Tasks',
   'resources.modelcache.cache': 'Archive to S3',
@@ -124,8 +124,9 @@ export default {
   'resource.register.windows.support': 'win 10, win 11',
   'resources.preheat.title': 'Model Preheat',
   'resources.preheat.description':
-    'Prepare models on target workers through S3 with policies and schedules. Only locally or remotely verified preheat data is reused.',
+    'Prepare models on target workers with policies and schedules. Trusted files verified by Model Files or Model Archive on any worker are reused first; a download starts only when no worker has a usable copy.',
   'resources.preheat.localModels': 'Local Model Files',
+  'resources.preheat.archive': 'Local S3 Archive',
   'resources.preheat.s3Models': 'S3 Models',
   'resources.preheat.tasks': 'Preheat Tasks',
   'resources.preheat.policies': 'Sync Policies',

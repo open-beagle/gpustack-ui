@@ -160,6 +160,7 @@ export default [
         name: 'modelarchive',
         path: '/resources/model-cache',
         key: 'modelarchive',
+        hideInMenu: true,
         icon: 'icon-files',
         selectedIcon: 'icon-files-filled',
         defaultIcon: 'icon-files',
