@@ -2,29 +2,24 @@ import { request } from '@umijs/max';
 import {
   GPUDeviceItem,
   ListItem,
-  ModelCacheItem,
-  ModelCachePreview,
-  ModelCacheTask,
   ModelFile,
-  ModelPreheatCachedModelsPage,
   ModelPreheatConnectivityCheck,
   ModelPreheatCreate,
   ModelPreheatDistributionPolicy,
-  ModelPreheatInventoryJob,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
   ModelPreheatTask,
   ModelStorageArtifact,
   ModelStorageCapabilities,
   ModelStorageConnectionTest,
+  ModelStorageConnectionTestRequest,
+  ModelStorageSyncTaskDetail,
   ModelStorageSyncTask
 } from '../config/types';
 
 export const WORKERS_API = '/workers';
 export const GPU_DEVICES_API = '/gpu-devices';
 export const MODEL_FILES_API = '/model-files';
-export const MODEL_CACHE_API = '/model-cache';
-export const MODEL_CACHE_TASKS_API = '/model-cache-tasks';
 export const MODEL_PREHEAT_S3_PROFILES_API = '/model-preheat-s3-profiles';
 export const MODEL_STORAGE_API = '/model-storage';
 export const MODEL_STORAGE_SYNC_TASKS_API = '/model-storage-sync-tasks';
@@ -107,13 +102,6 @@ export async function retryDownloadModelFile(id: string | number) {
   );
 }
 
-export async function queryModelCache(params?: Record<string, any>) {
-  return request<{ items: ModelCacheItem[] }>(MODEL_CACHE_API, {
-    method: 'GET',
-    params
-  });
-}
-
 export async function queryModelPreheatS3Profiles(params: Global.SearchParams) {
   return request<Global.PageResponse<ModelPreheatS3Profile>>(
     MODEL_PREHEAT_S3_PROFILES_API,
@@ -165,7 +153,7 @@ export async function queryModelStorageCapabilities() {
   });
 }
 
-export async function testModelStorageConnection(data: ModelPreheatS3ProfileWrite) {
+export async function testModelStorageConnection(data: ModelStorageConnectionTestRequest) {
   return request<ModelStorageConnectionTest>(
     `${MODEL_STORAGE_API}/connection-tests`,
     { method: 'POST', data }
@@ -188,6 +176,12 @@ export async function queryModelStorageSyncTasks(params: Global.SearchParams) {
     MODEL_STORAGE_SYNC_TASKS_API,
     { method: 'GET', params }
   );
+}
+
+export async function queryModelStorageSyncTask(id: number) {
+  return request<ModelStorageSyncTaskDetail>(`${MODEL_STORAGE_SYNC_TASKS_API}/${id}`, {
+    method: 'GET'
+  });
 }
 
 export async function deleteModelStorageSyncTask(id: number) {
@@ -231,41 +225,6 @@ export async function queryModelPreheatConnectivityCheck(
   );
 }
 
-export async function queryModelPreheatCachedModels(
-  profileId: number,
-  params: {
-    limit: number;
-    cursor?: string;
-    manifest_state?: string;
-    source?: string;
-  }
-) {
-  return request<ModelPreheatCachedModelsPage>(
-    `${MODEL_PREHEAT_S3_PROFILES_API}/${profileId}/cached-models`,
-    { method: 'GET', params }
-  );
-}
-
-export async function createModelPreheatInventoryJob(
-  profileId: number,
-  kind: 'refresh' | 'gc'
-) {
-  return request<ModelPreheatInventoryJob>(
-    `${MODEL_PREHEAT_S3_PROFILES_API}/${profileId}/inventory-jobs`,
-    { method: 'POST', params: { kind } }
-  );
-}
-
-export async function queryModelPreheatInventoryJob(
-  profileId: number,
-  jobId: number
-) {
-  return request<ModelPreheatInventoryJob>(
-    `${MODEL_PREHEAT_S3_PROFILES_API}/${profileId}/inventory-jobs/${jobId}`,
-    { method: 'GET' }
-  );
-}
-
 export async function queryModelPreheatTasks(params: Global.SearchParams) {
   return request<Global.PageResponse<ModelPreheatTask>>(MODEL_PREHEATS_API, {
     method: 'GET',
@@ -273,28 +232,9 @@ export async function queryModelPreheatTasks(params: Global.SearchParams) {
   });
 }
 
-export async function queryModelCacheTasks(params?: Global.SearchParams) {
-  return request<Global.PageResponse<ModelCacheTask>>(MODEL_CACHE_TASKS_API, {
-    method: 'GET',
-    params
-  });
-}
-
-export async function previewModelCacheTask(modelFileId: number) {
-  return request<ModelCachePreview>(`${MODEL_FILES_API}/${modelFileId}/cache`, {
-    method: 'GET'
-  });
-}
-
 export async function queryModelPreheatTask(id: number) {
   return request<ModelPreheatTask>(`${MODEL_PREHEATS_API}/${id}`, {
     method: 'GET'
-  });
-}
-
-export async function createModelCacheTask(modelFileId: number) {
-  return request<ModelCacheTask>(`${MODEL_FILES_API}/${modelFileId}/cache`, {
-    method: 'POST'
   });
 }
 
@@ -318,13 +258,6 @@ export async function runModelPreheatTaskAction(
   });
 }
 
-export async function deleteModelCache(modelId: string) {
-  return request(`${MODEL_CACHE_API}/${modelId}`, { method: 'DELETE' });
-}
-
-export async function deleteModelCacheTask(id: number) {
-  return request(`${MODEL_CACHE_TASKS_API}/${id}`, { method: 'DELETE' });
-}
 
 export async function queryModelPreheatPolicies(params: Global.SearchParams) {
   return request<Global.PageResponse<ModelPreheatDistributionPolicy>>(

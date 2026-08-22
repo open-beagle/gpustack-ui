@@ -308,5 +308,12 @@ export default {
   'resources.storage.testResult': 'Server 连接测试结果',
   'resources.storage.encryptionUnavailable': '服务端凭据加密不可用，请联系管理员检查数据目录或密钥配置',
   'resources.storage.endpointTlsMismatch': 'Endpoint 协议与 TLS 开关不一致。',
-  'resources.storage.sourceFallback': '未命中时允许从模型源下载'
+  'resources.storage.sourceFallback': '未命中时允许从模型源下载',
+  'resources.storage.sourceFallbackHint': '仅当此配置为默认配置时，该开关才影响普通模型下载。',
+  'resources.storage.testCredentialsRequired': '测试连接前请重新输入 Access Key 和 Secret Key。',
+  'resources.storage.refreshSubmitted': '库存刷新已提交，正在等待扫描结果。',
+  'resources.storage.checkWorkersConfirm': '检测节点连通性',
+  'resources.storage.checkWorkersContent': '确认检测 Worker 到 S3 配置“{name}”的连通性？',
+  'resources.storage.transferMethod': '获取方式',
+  'resources.storage.syncTaskDetail': '同步任务详情'
 };

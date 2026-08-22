@@ -531,23 +531,18 @@ const LocalModelFiles = () => {
   };
 
   const setActionList = (record: ListItem) => {
-    return _.filter(modelFileActions, (item: { key: string }) => {
+    const actions = _.filter(modelFileActions, (item: { key: string }) => {
       if (record.state === ModelfileStateMap.Ready) {
-        const actions = ['deploy', 'delete'];
-        if (
-          record.source === modelSourceMap.modelscope_value &&
-          record.model_scope_model_id
-        ) {
-          actions.splice(1, 0, 'cache');
-        }
-        return actions.includes(item.key);
+        return ['deploy', 'delete'].includes(item.key);
       }
       return ['retry', 'delete'].includes(item.key);
-    }).map((item: { key: string; label: string }) =>
-      item.key === 'cache'
-        ? { ...item, key: 'sync', label: 'resources.storage.sync' }
-        : item
-    );
+    });
+    const supportsSync = record.state === ModelfileStateMap.Ready &&
+      Boolean(record.resolved_revision) &&
+      [modelSourceMap.modelscope_value, modelSourceMap.huggingface_value].includes(record.source);
+    return supportsSync
+      ? [...actions.slice(0, 1), { key: 'sync', label: 'resources.storage.sync' }, ...actions.slice(1)]
+      : actions;
   };
 
   const handleDeployModalCancel = () => {

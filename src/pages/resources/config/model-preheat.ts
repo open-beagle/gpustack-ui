@@ -3,7 +3,6 @@ import type {
   ModelPreheatConnectivityWorker,
   ModelPreheatCreate,
   ModelPreheatExecutionState,
-  ModelPreheatInventoryJob,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
   ModelPreheatTask,
@@ -129,30 +128,6 @@ export async function loadAllPaginated<T>(
     items.push(...result.items);
   }
   return items;
-}
-
-export interface ScopedInventoryJob {
-  profileId: number;
-  job: ModelPreheatInventoryJob;
-}
-
-export function inventoryJobForProfile(
-  scopedJob: ScopedInventoryJob | null,
-  profileId?: number
-) {
-  if (!scopedJob || scopedJob.profileId !== profileId) return null;
-  return scopedJob.job;
-}
-
-export async function refreshScopedInventoryJob(
-  scopedJob: ScopedInventoryJob,
-  loadJob: (
-    profileId: number,
-    jobId: number
-  ) => Promise<ModelPreheatInventoryJob>
-) {
-  const job = await loadJob(scopedJob.profileId, scopedJob.job.id);
-  return { profileId: scopedJob.profileId, job };
 }
 
 export async function loadModelPreheatConnectivitySnapshot(

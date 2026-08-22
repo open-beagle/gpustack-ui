@@ -17,12 +17,10 @@ import type {
 } from '../config/types';
 import ModelPreheatModal from './model-preheat-modal';
 import ModelPreheatPolicies from './model-preheat-policies';
-import ModelPreheatS3Models from './model-preheat-s3-models';
 import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
 import ModelPreheatTasks from './model-preheat-tasks';
 
 const api = vi.hoisted(() => ({
-  queryModelPreheatCachedModels: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
   queryModelPreheatS3Profile: vi.fn(),
@@ -119,8 +117,9 @@ const task = (overrides: Partial<ModelPreheatTask> = {}): ModelPreheatTask => ({
   include_patterns: [],
   exclude_patterns: [],
   selection_digest: 'selection',
-  cache_key: 'cache-key',
-  generation_id: 'generation',
+  request_identity: {},
+  request_digest: 'request-digest',
+  artifact_id: null,
   desired_state: 'running',
   execution_state: 'distributing',
   paused_from_state: null,
@@ -133,6 +132,9 @@ const task = (overrides: Partial<ModelPreheatTask> = {}): ModelPreheatTask => ({
   s3_profile_config_version: 2,
   s3_backfill_policy: 'when_missing',
   keep_new_workers_in_sync: false,
+  transfer_source: null,
+  transfer_profile_id: null,
+  source_worker_id: null,
   created_at: '2026-08-11T08:00:00Z',
   updated_at: '2026-08-11T08:00:00Z',
   deduplicated: false,
@@ -205,10 +207,6 @@ beforeEach(() => {
   api.queryModelPreheatS3Profiles.mockResolvedValue(page([profile]));
   api.queryModelPreheatS3Profile.mockResolvedValue(profile);
   api.queryModelPreheatConnectivityCheck.mockResolvedValue(terminalCheck);
-  api.queryModelPreheatCachedModels.mockResolvedValue({
-    items: [],
-    next_cursor: null
-  });
   api.queryModelPreheatPolicies.mockResolvedValue(page([]));
   api.queryModelPreheatTasks.mockResolvedValue(page([]));
   api.queryWorkersList.mockResolvedValue(page([worker]));
@@ -319,28 +317,6 @@ describe('连通性串行轮询', () => {
 });
 
 describe('首次依赖加载失败恢复', () => {
-  it('库存页可重试 profile 初始加载', async () => {
-    const user = userEvent.setup();
-    api.queryModelPreheatS3Profiles
-      .mockRejectedValueOnce(new Error('profile unavailable'))
-      .mockResolvedValueOnce(page([profile]));
-    render(<ModelPreheatS3Models />);
-
-    await user.click(
-      await screen.findByRole('button', { name: /common\.button\.retry/ })
-    );
-
-    await waitFor(() =>
-      expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2)
-    );
-    await waitFor(() =>
-      expect(api.queryModelPreheatCachedModels).toHaveBeenCalledWith(
-        profile.id,
-        expect.any(Object)
-      )
-    );
-  });
-
   it('创建弹窗可重试 worker 和 profile 依赖加载', async () => {
     const user = userEvent.setup();
     api.queryWorkersList

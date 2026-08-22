@@ -131,36 +131,6 @@ export interface ModelFileFormData {
   local_dir: string;
 }
 
-export interface ModelCacheItem {
-  model_id: string;
-  s3_path: string;
-  file_count: number;
-  total_size: number;
-  updated_at: string;
-}
-
-export interface ModelCachePreview {
-  model_id: string;
-  s3_path: string;
-  file_count: number;
-  total_size: number;
-}
-
-export interface ModelCacheTask {
-  id: number;
-  model_file_id: number;
-  worker_id: number;
-  model_id: string;
-  target_path: string;
-  state: 'pending' | 'uploading' | 'ready' | 'error';
-  progress: number;
-  uploaded_size: number;
-  total_size: number;
-  error_message?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export type ModelPreheatS3ConnectivityState =
   | 'no_workers'
   | 'pending'
@@ -206,14 +176,6 @@ export type ModelPreheatTargetScope =
   | 'selected_workers';
 
 export type ModelPreheatBackfillPolicy = 'always' | 'when_missing' | 'never';
-
-export type ModelPreheatManifestState = 'valid' | 'missing' | 'invalid';
-
-export type ModelPreheatInventoryJobState =
-  | 'pending'
-  | 'running'
-  | 'ready'
-  | 'error';
 
 export interface ModelPreheatWorker {
   id: number;
@@ -281,6 +243,18 @@ export interface ModelStorageConnectionTest {
   error_code: string | null;
 }
 
+export interface ModelStorageConnectionTestRequest {
+  endpoint: string;
+  bucket: string;
+  prefix: string;
+  access_key: string;
+  secret_key: string;
+  tls_enabled: boolean;
+  tls_verify: boolean;
+  region?: string | null;
+  use_virtual_hosted_style: boolean;
+}
+
 export interface ModelStorageArtifact {
   artifact_id: string;
   source: string;
@@ -312,6 +286,18 @@ export interface ModelStorageSyncTask {
   source_worker_id: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ModelStorageSyncTaskDetail extends ModelStorageSyncTask {
+  profile: {
+    id: number;
+    name: string;
+    config_version: number;
+    system_managed: boolean;
+  } | null;
+  request_digest: string;
+  artifact_id: string | null;
+  source_worker_name: string | null;
 }
 
 export interface ModelPreheatConnectivityWorker {
@@ -375,8 +361,9 @@ export interface ModelPreheatTask {
   include_patterns: string[];
   exclude_patterns: string[];
   selection_digest: string;
-  cache_key: string;
-  generation_id: string;
+  request_identity: Record<string, unknown>;
+  request_digest: string;
+  artifact_id: string | null;
   desired_state: 'running' | 'paused' | 'canceled';
   execution_state: ModelPreheatExecutionState;
   paused_from_state: ModelPreheatExecutionState | null;
@@ -387,54 +374,12 @@ export interface ModelPreheatTask {
   s3_profile_config_version: number;
   s3_backfill_policy: ModelPreheatBackfillPolicy;
   keep_new_workers_in_sync: boolean;
+  transfer_source: string | null;
+  transfer_profile_id: number | null;
+  source_worker_id: number | null;
   created_at: string;
   updated_at: string;
   deduplicated: boolean;
-}
-
-export interface ModelPreheatCachedModel {
-  cache_key: string;
-  source: string;
-  model_id: string;
-  resolved_revision: string;
-  include_patterns: string[];
-  exclude_patterns: string[];
-  generation_id: string;
-  ready_path: string;
-  manifest_path: string;
-  manifest_digest: string;
-  file_count: number;
-  total_size: number;
-  manifest_state: ModelPreheatManifestState;
-  last_verified_at: string;
-  created_by_task_id: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ModelPreheatCachedModelsPage {
-  items: ModelPreheatCachedModel[];
-  next_cursor: string | null;
-}
-
-export interface ModelPreheatInventoryJob {
-  id: number;
-  profile_id: number;
-  profile_config_version: number;
-  kind: string;
-  state: ModelPreheatInventoryJobState;
-  scanned_count: number;
-  valid_count: number;
-  invalid_count: number;
-  orphan_count: number;
-  deleted_count: number;
-  skipped_count: number;
-  failed_count: number;
-  error_code: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface ModelPreheatDistributionPolicy {

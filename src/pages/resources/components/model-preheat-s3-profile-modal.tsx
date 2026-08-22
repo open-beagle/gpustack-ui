@@ -12,6 +12,7 @@ import { buildModelPreheatS3ProfilePayload } from '../config/model-preheat';
 import type {
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
+  ModelStorageConnectionTestRequest,
   ModelStorageConnectionTest
 } from '../config/types';
 
@@ -78,6 +79,28 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     return values;
   };
 
+  const buildConnectionTestPayload = async (): Promise<ModelStorageConnectionTestRequest> => {
+    const values = await validatePayload();
+    if (!values.access_key?.trim() || !values.secret_key?.trim()) {
+      form.setFields([
+        { name: 'access_key', errors: [intl.formatMessage({ id: 'resources.storage.testCredentialsRequired' })] },
+        { name: 'secret_key', errors: [intl.formatMessage({ id: 'resources.storage.testCredentialsRequired' })] }
+      ]);
+      throw new Error('test_credentials_required');
+    }
+    return {
+      endpoint: values.endpoint.trim(),
+      bucket: values.bucket.trim(),
+      prefix: values.prefix?.trim() || '',
+      access_key: values.access_key.trim(),
+      secret_key: values.secret_key.trim(),
+      tls_enabled: values.tls_enabled ?? true,
+      tls_verify: values.tls_verify ?? true,
+      region: values.region?.trim() || '',
+      use_virtual_hosted_style: values.use_virtual_hosted_style ?? true
+    };
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await validatePayload();
@@ -94,9 +117,11 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
 
   const handleTest = async () => {
     try {
-      const values = await validatePayload();
+      const values = await buildConnectionTestPayload();
       setTesting(true);
-      setTestResult(await testModelStorageConnection(buildModelPreheatS3ProfilePayload(values, editing)));
+      setTestResult(await testModelStorageConnection(values));
+    } catch {
+      // 表单错误已显示在字段上，避免产生未处理的测试连接拒绝。
     } finally {
       setTesting(false);
     }
@@ -132,7 +157,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     >
       {!encryptionAvailable && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.encryptionUnavailable' })} />}
       <Alert type="info" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.connectionScope' })} />
-      <Form form={form} layout="vertical" requiredMark="optional" disabled={busy}>
+      <Form form={form} layout="vertical" requiredMark="optional" disabled={busy} onValuesChange={() => setTestResult(null)}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -290,14 +315,15 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
             </Form.Item>
           </Col>
         </Row>
+        <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.storage.sourceFallbackHint' })} />
       </Form>
       {testResult && <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }} title={intl.formatMessage({ id: 'resources.storage.testResult' })}>
         <Descriptions.Item label="scope">{testResult.scope}</Descriptions.Item>
-        <Descriptions.Item label="connection">{String(testResult.connection.ok)}</Descriptions.Item>
-        <Descriptions.Item label="bucket">{String(testResult.bucket.ok)}</Descriptions.Item>
-        <Descriptions.Item label="write">{String(testResult.write.ok)}</Descriptions.Item>
-        <Descriptions.Item label="read">{String(testResult.read.ok)}</Descriptions.Item>
-        <Descriptions.Item label="delete">{String(testResult.delete.ok)}</Descriptions.Item>
+        <Descriptions.Item label="connection">{testResult.connection.ok ? 'OK' : testResult.connection.error_code || testResult.error_code || '-'}</Descriptions.Item>
+        <Descriptions.Item label="bucket">{testResult.bucket.ok ? 'OK' : testResult.bucket.error_code || '-'}</Descriptions.Item>
+        <Descriptions.Item label="write">{testResult.write.ok ? 'OK' : testResult.write.error_code || '-'}</Descriptions.Item>
+        <Descriptions.Item label="read">{testResult.read.ok ? 'OK' : testResult.read.error_code || '-'}</Descriptions.Item>
+        <Descriptions.Item label="delete">{testResult.delete.ok ? 'OK' : testResult.delete.error_code || '-'}</Descriptions.Item>
       </Descriptions>}
     </Modal>
   );

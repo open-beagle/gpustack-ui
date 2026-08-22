@@ -40,7 +40,11 @@ const connectivityColors: Record<string, string> = {
   stale: 'warning'
 };
 
-const ModelPreheatS3Profiles: React.FC = () => {
+interface Props {
+  onProfilesChanged?: () => void;
+}
+
+const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
   const intl = useIntl();
   const connectivityKeys = useRef(new IdempotencyKeyLifecycle());
   const profileRequests = useRef(new LatestRequestGate());
@@ -193,6 +197,7 @@ const ModelPreheatS3Profiles: React.FC = () => {
         message.success(intl.formatMessage({ id: 'common.message.success' }));
         setConfirm(null);
         await loadProfiles();
+        onProfilesChanged?.();
         return;
       }
       if (confirm.action === 'default') {
@@ -202,6 +207,7 @@ const ModelPreheatS3Profiles: React.FC = () => {
         message.success(intl.formatMessage({ id: 'common.message.success' }));
         setConfirm(null);
         await loadProfiles();
+        onProfilesChanged?.();
         return;
       }
       const result = await createModelPreheatConnectivityCheck(
@@ -291,17 +297,16 @@ const ModelPreheatS3Profiles: React.FC = () => {
       width: 180,
       render: (_: unknown, record: ModelPreheatS3Profile) => (
         <Space size={4}>
-          <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
+          {!record.system_managed && <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
             <Button
               type="text"
               icon={<EditOutlined />}
-              disabled={record.system_managed}
               onClick={() => {
                 setEditing(record);
                 setFormOpen(true);
               }}
             />
-          </Tooltip>
+          </Tooltip>}
           <Tooltip
             title={intl.formatMessage({
               id: 'resources.preheat.connectivity.detail'
@@ -332,15 +337,14 @@ const ModelPreheatS3Profiles: React.FC = () => {
               </Button>
             </Tooltip>
           )}
-          <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
+          {!record.system_managed && <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
             <Button
               danger
               type="text"
               icon={<DeleteOutlined />}
-              disabled={record.system_managed}
               onClick={() => openConfirm('delete', record)}
             />
-          </Tooltip>
+          </Tooltip>}
         </Space>
       )
     }
@@ -401,6 +405,7 @@ const ModelPreheatS3Profiles: React.FC = () => {
           setFormOpen(false);
           message.success(intl.formatMessage({ id: 'common.message.success' }));
           void loadProfiles().catch(() => undefined);
+          onProfilesChanged?.();
           if (profile.last_connectivity_check_id) openConnectivity(profile);
         }}
       />

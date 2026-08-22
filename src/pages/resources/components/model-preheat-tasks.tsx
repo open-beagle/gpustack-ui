@@ -25,6 +25,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   queryModelPreheatTask,
   queryModelPreheatTasks,
+  queryModelPreheatS3Profiles,
+  queryWorkersList,
   runModelPreheatTaskAction
 } from '../apis';
 import {
@@ -77,6 +79,26 @@ const ModelPreheatTasks: React.FC = () => {
     action: ModelPreheatTaskAction;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [profileNames, setProfileNames] = useState<Record<number, string>>({});
+  const [workerNames, setWorkerNames] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    void Promise.all([
+      queryModelPreheatS3Profiles({ page: 1, perPage: 100 }),
+      queryWorkersList({ page: 1, perPage: 100 })
+    ]).then(([profilePage, workerPage]) => {
+      setProfileNames(Object.fromEntries(profilePage.items.map((profile) => [profile.id, profile.name])));
+      setWorkerNames(Object.fromEntries(workerPage.items.map((worker) => [worker.id, worker.name])));
+    }).catch(() => undefined);
+  }, []);
+
+  const formatTransferMethod = (task: ModelPreheatTask | null) => {
+    if (!task?.transfer_source) return '-';
+    const parts = [task.transfer_source];
+    if (task.source_worker_id) parts.push(workerNames[task.source_worker_id] || `Worker #${task.source_worker_id}`);
+    if (task.transfer_profile_id) parts.push(profileNames[task.transfer_profile_id] || `Profile #${task.transfer_profile_id}`);
+    return parts.join(' · ');
+  };
 
   const loadTasks = useCallback(
     async (silent = false) => {
@@ -350,11 +372,11 @@ const ModelPreheatTasks: React.FC = () => {
             >
               {detail?.attempt}
             </Descriptions.Item>
-            <Descriptions.Item label="Cache Key" span={3}>
-              <Typography.Text copyable>{detail?.cache_key}</Typography.Text>
+            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.transferMethod' })} span={3}>
+              {formatTransferMethod(detail)}
             </Descriptions.Item>
-            <Descriptions.Item label="Generation ID" span={3}>
-              {detail?.generation_id}
+            <Descriptions.Item label="Artifact ID" span={3}>
+              <Typography.Text copyable>{detail?.artifact_id || '-'}</Typography.Text>
             </Descriptions.Item>
           </Descriptions>
         </Spin>
