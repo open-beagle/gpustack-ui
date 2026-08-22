@@ -113,6 +113,8 @@ export interface ModelFile {
   resolved_paths: string[];
   state: string;
   state_message: string;
+  requested_revision?: string | null;
+  resolved_revision?: string | null;
   id: number;
   created_at: string;
   updated_at: string;
@@ -233,7 +235,8 @@ export interface ModelPreheatS3ProfileBase {
   tls_verify?: boolean;
   region?: string | null;
   use_virtual_hosted_style?: boolean;
-  is_default?: boolean;
+  source_fallback_enabled?: boolean;
+  default_slot?: string | null;
 }
 
 export interface ModelPreheatS3ProfileWrite extends ModelPreheatS3ProfileBase {
@@ -244,10 +247,69 @@ export interface ModelPreheatS3ProfileWrite extends ModelPreheatS3ProfileBase {
 export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
   id: number;
   credential_configured: boolean;
+  provisioning_source?: 'manual' | 'worker_local_s3';
+  provisioning_key?: string | null;
+  system_managed?: boolean;
+  default_slot?: string | null;
+  source_fallback_enabled?: boolean;
+  is_default: boolean;
   config_version: number;
   connectivity_state: ModelPreheatS3ConnectivityState;
   last_connectivity_check_id: number | null;
   last_connectivity_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelStorageCapabilities {
+  credential_encryption_available: boolean;
+}
+
+export interface ModelStorageConnectionStage {
+  ok: boolean;
+  error_code: string | null;
+}
+
+export interface ModelStorageConnectionTest {
+  scope: 'server';
+  ok: boolean;
+  connection: ModelStorageConnectionStage;
+  bucket: ModelStorageConnectionStage;
+  write: ModelStorageConnectionStage;
+  read: ModelStorageConnectionStage;
+  delete: ModelStorageConnectionStage;
+  error_code: string | null;
+}
+
+export interface ModelStorageArtifact {
+  artifact_id: string;
+  source: string;
+  model_id: string;
+  resolved_revision: string;
+  manifest_digest: string;
+  manifest_state: string;
+  file_count: number;
+  total_size: number;
+  last_verified_at: string;
+}
+
+export interface ModelStorageSyncTask {
+  id: number;
+  model_file_id: number;
+  worker_id: number;
+  profile_id: number;
+  profile_config_version: number;
+  source: string;
+  model_id: string;
+  resolved_revision: string;
+  state: 'pending' | 'scanning' | 'publishing' | 'ready' | 'error' | 'canceled';
+  state_message: string | null;
+  error_code: string | null;
+  file_count: number;
+  total_size: number;
+  transfer_source: string | null;
+  transfer_profile_id: number | null;
+  source_worker_id: number | null;
   created_at: string;
   updated_at: string;
 }

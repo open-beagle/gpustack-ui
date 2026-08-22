@@ -400,7 +400,8 @@ export function buildModelPreheatS3ProfilePayload(
     tls_verify: values.tls_verify ?? true,
     region: values.region?.trim() || '',
     use_virtual_hosted_style: values.use_virtual_hosted_style ?? true,
-    is_default: values.is_default ?? false
+    source_fallback_enabled: values.source_fallback_enabled ?? true,
+    default_slot: values.default_slot ?? null
   };
   const accessKey = values.access_key?.trim();
   const secretKey = values.secret_key?.trim();

@@ -2,7 +2,6 @@ import { modelsExpandKeysAtom } from '@/atoms/models';
 import AutoTooltip from '@/components/auto-tooltip';
 import DeleteModal from '@/components/delete-modal';
 import DropdownButtons from '@/components/drop-down-buttons';
-import ModalFooter from '@/components/modal-footer';
 import { TooltipOverlayScroller } from '@/components/overlay-scroller';
 import { FilterBar } from '@/components/page-tools';
 import StatusTag from '@/components/status-tag';
@@ -34,7 +33,6 @@ import {
   ConfigProvider,
   Descriptions,
   Empty,
-  Modal,
   Table,
   Tabs,
   Tag,
@@ -54,11 +52,10 @@ import {
 } from '../../llmodels/hooks';
 import {
   MODEL_FILES_API,
-  createModelCacheTask,
   deleteModelFile,
   downloadModelFile,
-  previewModelCacheTask,
   queryModelFilesList,
+  queryModelPreheatS3Profiles,
   queryWorkersList,
   retryDownloadModelFile
 } from '../apis';
@@ -70,14 +67,14 @@ import {
 } from '../config';
 import {
   ModelFile as ListItem,
-  ModelCachePreview,
+  ModelPreheatS3Profile,
   ListItem as WorkerListItem
 } from '../config/types';
-import ModelCache from './model-cache';
 import ModelPreheatPolicies from './model-preheat-policies';
-import ModelPreheatS3Models from './model-preheat-s3-models';
-import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
 import ModelPreheatTasks from './model-preheat-tasks';
+import ModelStorage from './model-storage';
+import ModelStorageSyncModal from './model-storage-sync-modal';
+import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
 const { Paragraph } = Typography;
 
@@ -367,11 +364,8 @@ const LocalModelFiles = () => {
     initialValues: {},
     isGGUF: false
   });
-  const [cacheRecord, setCacheRecord] = useState<ListItem | null>(null);
-  const [cachePreview, setCachePreview] = useState<ModelCachePreview | null>(
-    null
-  );
-  const [cacheSubmitting, setCacheSubmitting] = useState(false);
+  const [syncRecord, setSyncRecord] = useState<ListItem | null>(null);
+  const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
 
   useEffect(() => {
     const fetchWorkerList = async () => {
@@ -480,10 +474,10 @@ const LocalModelFiles = () => {
           isGGUF: initialValues.isGGUF,
           show: true
         });
-      } else if (val === 'cache') {
-        const preview = await previewModelCacheTask(record.id);
-        setCachePreview(preview);
-        setCacheRecord(record);
+      } else if (val === 'sync') {
+        const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
+        setProfiles(result.items);
+        setSyncRecord(record);
       }
     } catch (error) {
       // console.log('error', error);
@@ -549,23 +543,13 @@ const LocalModelFiles = () => {
         return actions.includes(item.key);
       }
       return ['retry', 'delete'].includes(item.key);
-    });
+    }).map((item: { key: string; label: string }) =>
+      item.key === 'cache'
+        ? { ...item, key: 'sync', label: 'resources.storage.sync' }
+        : item
+    );
   };
 
-  const handleCreateCacheTask = async () => {
-    if (!cacheRecord) return;
-    try {
-      setCacheSubmitting(true);
-      const task = await createModelCacheTask(cacheRecord.id);
-      setCacheRecord(null);
-      setCachePreview(null);
-      navigate(
-        `/resources/modelfiles?tab=archive&archive_tab=tasks&task_id=${task.id}`
-      );
-    } finally {
-      setCacheSubmitting(false);
-    }
-  };
   const handleDeployModalCancel = () => {
     setOpenDeployModal({
       ...openDeployModal,
@@ -765,72 +749,7 @@ const LocalModelFiles = () => {
         initialValues={openDeployModal.initialValues}
         isGGUF={openDeployModal.isGGUF}
       ></DeployModal>
-      <Modal
-        title={intl.formatMessage({ id: 'resources.modelcache.cache' })}
-        open={!!cacheRecord}
-        width={520}
-        centered
-        destroyOnHidden
-        maskClosable={false}
-        keyboard={false}
-        closable={!cacheSubmitting}
-        onCancel={() => {
-          if (cacheSubmitting) return;
-          setCacheRecord(null);
-          setCachePreview(null);
-        }}
-        footer={
-          <ModalFooter
-            onCancel={() => {
-              if (cacheSubmitting) return;
-              setCacheRecord(null);
-              setCachePreview(null);
-            }}
-            onOk={handleCreateCacheTask}
-            loading={cacheSubmitting}
-            okBtnProps={{ disabled: cacheSubmitting }}
-            cancelBtnProps={{ disabled: cacheSubmitting }}
-          />
-        }
-      >
-        {cacheRecord && (
-          <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item
-              label={intl.formatMessage({ id: 'resources.modelcache.model' })}
-            >
-              {cachePreview?.model_id}
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'resources.modelcache.sourceFile'
-              })}
-            >
-              {cacheRecord.resolved_paths.join(', ')}
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'resources.modelcache.sourceWorker'
-              })}
-            >
-              {getWorkerName(cacheRecord.worker_id, workersList)}
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({ id: 'resources.modelcache.target' })}
-            >
-              {cachePreview?.s3_path}
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'resources.modelcache.filesAndSize'
-              })}
-            >
-              {cachePreview?.file_count}{' '}
-              {intl.formatMessage({ id: 'models.form.files' })} ·{' '}
-              {convertFileSize(cachePreview?.total_size || 0, 1, true)}
-            </Descriptions.Item>
-          </Descriptions>
-        )}
-      </Modal>
+      <ModelStorageSyncModal open={Boolean(syncRecord)} model={syncRecord} profiles={profiles} onCancel={() => setSyncRecord(null)} onCreated={() => { setSyncRecord(null); navigate('/resources/modelfiles?tab=sync-tasks'); }} />
     </>
   );
 };
@@ -842,10 +761,9 @@ const ModelFiles = () => {
   const requestedTab = new URLSearchParams(location.search).get('tab');
   const tabKeys = [
     'local',
-    'archive',
-    'profiles',
-    'models',
-    'tasks',
+    'storage',
+    'sync-tasks',
+    'preheat-tasks',
     'policies'
   ];
   const activeTab = tabKeys.includes(requestedTab || '')
@@ -864,15 +782,15 @@ const ModelFiles = () => {
       header={{
         title: (
           <span>
-            {intl.formatMessage({ id: 'resources.preheat.title' })}{' '}
+            {intl.formatMessage({ id: 'resources.storage.title' })}{' '}
             <Tooltip
               title={intl.formatMessage({
-                id: 'resources.preheat.description'
+                id: 'resources.storage.description'
               })}
             >
               <QuestionCircleOutlined
                 aria-label={intl.formatMessage({
-                  id: 'resources.preheat.description'
+                  id: 'resources.storage.description'
                 })}
                 style={{ color: 'var(--ant-color-text-tertiary)' }}
               />
@@ -891,34 +809,27 @@ const ModelFiles = () => {
         items={[
           {
             key: 'local',
-            label: intl.formatMessage({ id: 'resources.preheat.localModels' }),
+            label: intl.formatMessage({ id: 'resources.storage.nodeModels' }),
             children: <LocalModelFiles />
           },
           {
-            key: 'archive',
-            label: intl.formatMessage({ id: 'resources.preheat.archive' }),
-            children: <ModelCache embedded />
+            key: 'storage',
+            label: intl.formatMessage({ id: 'resources.storage.library' }),
+            children: <ModelStorage />
           },
           {
-            key: 'profiles',
-            label: intl.formatMessage({
-              id: 'resources.preheat.profile.title'
-            }),
-            children: <ModelPreheatS3Profiles />
+            key: 'sync-tasks',
+            label: intl.formatMessage({ id: 'resources.storage.syncTasks' }),
+            children: <ModelStorageSyncTasks />
           },
           {
-            key: 'models',
-            label: intl.formatMessage({ id: 'resources.preheat.s3Models' }),
-            children: <ModelPreheatS3Models />
-          },
-          {
-            key: 'tasks',
-            label: intl.formatMessage({ id: 'resources.preheat.tasks' }),
+            key: 'preheat-tasks',
+            label: intl.formatMessage({ id: 'resources.storage.preheatTasks' }),
             children: <ModelPreheatTasks />
           },
           {
             key: 'policies',
-            label: intl.formatMessage({ id: 'resources.preheat.policies' }),
+            label: intl.formatMessage({ id: 'resources.storage.policies' }),
             children: <ModelPreheatPolicies />
           }
         ]}

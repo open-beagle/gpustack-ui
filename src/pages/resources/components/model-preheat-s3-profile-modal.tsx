@@ -1,15 +1,18 @@
 import ModalFooter from '@/components/modal-footer';
 import { useIntl } from '@umijs/max';
-import { Col, Form, Input, Modal, Row, Switch } from 'antd';
+import { Alert, Button, Col, Descriptions, Form, Input, Modal, Row, Switch } from 'antd';
 import React, { useEffect, useState } from 'react';
 import {
   createModelPreheatS3Profile,
+  queryModelStorageCapabilities,
+  testModelStorageConnection,
   updateModelPreheatS3Profile
 } from '../apis';
 import { buildModelPreheatS3ProfilePayload } from '../config/model-preheat';
 import type {
   ModelPreheatS3Profile,
-  ModelPreheatS3ProfileWrite
+  ModelPreheatS3ProfileWrite,
+  ModelStorageConnectionTest
 } from '../config/types';
 
 interface Props {
@@ -28,6 +31,9 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
   const intl = useIntl();
   const [form] = Form.useForm<ModelPreheatS3ProfileWrite>();
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [encryptionAvailable, setEncryptionAvailable] = useState(true);
+  const [testResult, setTestResult] = useState<ModelStorageConnectionTest | null>(null);
   const editing = Boolean(record);
 
   useEffect(() => {
@@ -42,15 +48,39 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       tls_enabled: record?.tls_enabled ?? true,
       tls_verify: record?.tls_verify ?? true,
       use_virtual_hosted_style: record?.use_virtual_hosted_style ?? true,
-      is_default: record?.is_default ?? false,
+      default_slot: record?.default_slot ?? null,
+      source_fallback_enabled: record?.source_fallback_enabled ?? true,
       access_key: '',
       secret_key: ''
     });
   }, [form, open, record]);
 
+  useEffect(() => {
+    if (!open) return;
+    setTestResult(null);
+    void queryModelStorageCapabilities()
+      .then((result) => setEncryptionAvailable(result?.credential_encryption_available !== false))
+      .catch(() => setEncryptionAvailable(true));
+  }, [open]);
+
+  const tlsValid = (values: ModelPreheatS3ProfileWrite) => {
+    const endpoint = values.endpoint?.trim().toLowerCase();
+    return !((endpoint.startsWith('https://') && !values.tls_enabled) ||
+      (endpoint.startsWith('http://') && values.tls_enabled));
+  };
+
+  const validatePayload = async () => {
+    const values = await form.validateFields();
+    if (!tlsValid(values)) {
+      form.setFields([{ name: 'endpoint', errors: [intl.formatMessage({ id: 'resources.storage.endpointTlsMismatch' })] }]);
+      throw new Error('endpoint_tls_mismatch');
+    }
+    return values;
+  };
+
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      const values = await validatePayload();
       setLoading(true);
       const payload = buildModelPreheatS3ProfilePayload(values, editing);
       const result = record
@@ -61,6 +91,18 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       setLoading(false);
     }
   };
+
+  const handleTest = async () => {
+    try {
+      const values = await validatePayload();
+      setTesting(true);
+      setTestResult(await testModelStorageConnection(buildModelPreheatS3ProfilePayload(values, editing)));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const busy = loading || testing;
 
   return (
     <Modal
@@ -75,18 +117,22 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       destroyOnClose
       maskClosable={false}
       keyboard={false}
-      closable={!loading}
-      onCancel={loading ? undefined : onCancel}
+      closable={!busy}
+      onCancel={busy ? undefined : onCancel}
       footer={
         <ModalFooter
           onOk={handleSubmit}
           onCancel={onCancel}
           loading={loading}
-          cancelBtnProps={{ disabled: loading }}
+          okBtnProps={{ disabled: busy || !encryptionAvailable }}
+          cancelBtnProps={{ disabled: busy }}
+          extra={<Button onClick={handleTest} loading={testing} disabled={busy || !encryptionAvailable}>{intl.formatMessage({ id: 'resources.storage.testConnection' })}</Button>}
         />
       }
     >
-      <Form form={form} layout="vertical" requiredMark="optional">
+      {!encryptionAvailable && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.encryptionUnavailable' })} />}
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.connectionScope' })} />
+      <Form form={form} layout="vertical" requiredMark="optional" disabled={busy}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -234,9 +280,9 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
           </Col>
           <Col xs={12} md={6}>
             <Form.Item
-              name="is_default"
+              name="source_fallback_enabled"
               label={intl.formatMessage({
-                id: 'resources.preheat.profile.default'
+                id: 'resources.storage.sourceFallback'
               })}
               valuePropName="checked"
             >
@@ -245,6 +291,14 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
           </Col>
         </Row>
       </Form>
+      {testResult && <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }} title={intl.formatMessage({ id: 'resources.storage.testResult' })}>
+        <Descriptions.Item label="scope">{testResult.scope}</Descriptions.Item>
+        <Descriptions.Item label="connection">{String(testResult.connection.ok)}</Descriptions.Item>
+        <Descriptions.Item label="bucket">{String(testResult.bucket.ok)}</Descriptions.Item>
+        <Descriptions.Item label="write">{String(testResult.write.ok)}</Descriptions.Item>
+        <Descriptions.Item label="read">{String(testResult.read.ok)}</Descriptions.Item>
+        <Descriptions.Item label="delete">{String(testResult.delete.ok)}</Descriptions.Item>
+      </Descriptions>}
     </Modal>
   );
 };

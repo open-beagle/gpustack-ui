@@ -156,16 +156,6 @@ export default [
         defaultIcon: 'icon-files',
         component: './resources/components/model-files'
       },
-      {
-        name: 'modelarchive',
-        path: '/resources/model-cache',
-        key: 'modelarchive',
-        hideInMenu: true,
-        icon: 'icon-files',
-        selectedIcon: 'icon-files-filled',
-        defaultIcon: 'icon-files',
-        component: './resources/components/model-cache'
-      }
     ]
   },
   {

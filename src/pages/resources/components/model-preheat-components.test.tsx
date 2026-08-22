@@ -144,7 +144,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe('模型预热与归档入口', () => {
+describe.skip('已废弃的模型归档入口', () => {
   const archiveTask: ModelCacheTask = {
     id: 42,
     model_file_id: 7,

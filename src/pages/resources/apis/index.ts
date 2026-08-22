@@ -13,7 +13,11 @@ import {
   ModelPreheatInventoryJob,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
-  ModelPreheatTask
+  ModelPreheatTask,
+  ModelStorageArtifact,
+  ModelStorageCapabilities,
+  ModelStorageConnectionTest,
+  ModelStorageSyncTask
 } from '../config/types';
 
 export const WORKERS_API = '/workers';
@@ -22,6 +26,8 @@ export const MODEL_FILES_API = '/model-files';
 export const MODEL_CACHE_API = '/model-cache';
 export const MODEL_CACHE_TASKS_API = '/model-cache-tasks';
 export const MODEL_PREHEAT_S3_PROFILES_API = '/model-preheat-s3-profiles';
+export const MODEL_STORAGE_API = '/model-storage';
+export const MODEL_STORAGE_SYNC_TASKS_API = '/model-storage-sync-tasks';
 export const MODEL_PREHEATS_API = '/model-preheats';
 export const MODEL_PREHEAT_POLICIES_API =
   '/model-preheat-distribution-policies';
@@ -136,7 +142,7 @@ export async function createModelPreheatS3Profile(
 
 export async function updateModelPreheatS3Profile(
   id: number,
-  data: ModelPreheatS3ProfileWrite
+  data: Partial<ModelPreheatS3ProfileWrite>
 ) {
   return request<ModelPreheatS3Profile>(
     `${MODEL_PREHEAT_S3_PROFILES_API}/${id}`,
@@ -151,6 +157,55 @@ export async function deleteModelPreheatS3Profile(id: number) {
   return request<{ ok: boolean }>(`${MODEL_PREHEAT_S3_PROFILES_API}/${id}`, {
     method: 'DELETE'
   });
+}
+
+export async function queryModelStorageCapabilities() {
+  return request<ModelStorageCapabilities>(`${MODEL_STORAGE_API}/capabilities`, {
+    method: 'GET'
+  });
+}
+
+export async function testModelStorageConnection(data: ModelPreheatS3ProfileWrite) {
+  return request<ModelStorageConnectionTest>(
+    `${MODEL_STORAGE_API}/connection-tests`,
+    { method: 'POST', data }
+  );
+}
+
+export async function createModelStorageSyncTask(
+  data: { model_file_id: number; profile_id: number },
+  idempotencyKey: string
+) {
+  return request<ModelStorageSyncTask>(MODEL_STORAGE_SYNC_TASKS_API, {
+    method: 'POST',
+    data,
+    headers: { 'Idempotency-Key': idempotencyKey }
+  });
+}
+
+export async function queryModelStorageSyncTasks(params: Global.SearchParams) {
+  return request<Global.PageResponse<ModelStorageSyncTask>>(
+    MODEL_STORAGE_SYNC_TASKS_API,
+    { method: 'GET', params }
+  );
+}
+
+export async function deleteModelStorageSyncTask(id: number) {
+  return request(`${MODEL_STORAGE_SYNC_TASKS_API}/${id}`, { method: 'DELETE' });
+}
+
+export async function queryModelStorageArtifacts(profileId: number) {
+  return request<ModelStorageArtifact[]>(
+    `/model-storage-profiles/${profileId}/artifacts`,
+    { method: 'GET' }
+  );
+}
+
+export async function refreshModelStorageArtifacts(profileId: number) {
+  return request<{ job_id: number }>(
+    `/model-storage-profiles/${profileId}/artifacts/refresh`,
+    { method: 'POST' }
+  );
 }
 
 export async function createModelPreheatConnectivityCheck(

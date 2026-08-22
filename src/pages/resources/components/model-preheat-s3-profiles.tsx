@@ -13,7 +13,8 @@ import {
   createModelPreheatConnectivityCheck,
   deleteModelPreheatS3Profile,
   queryModelPreheatConnectivityCheck,
-  queryModelPreheatS3Profiles
+  queryModelPreheatS3Profiles,
+  updateModelPreheatS3Profile
 } from '../apis';
 import {
   IdempotencyKeyLifecycle,
@@ -27,7 +28,7 @@ import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatConnectivity from './model-preheat-connectivity';
 import ModelPreheatS3ProfileModal from './model-preheat-s3-profile-modal';
 
-type ConfirmAction = 'delete' | 'check';
+type ConfirmAction = 'delete' | 'check' | 'default';
 
 const connectivityColors: Record<string, string> = {
   available: 'success',
@@ -194,6 +195,15 @@ const ModelPreheatS3Profiles: React.FC = () => {
         await loadProfiles();
         return;
       }
+      if (confirm.action === 'default') {
+        await updateModelPreheatS3Profile(confirm.profile.id, {
+          default_slot: 'global'
+        });
+        message.success(intl.formatMessage({ id: 'common.message.success' }));
+        setConfirm(null);
+        await loadProfiles();
+        return;
+      }
       const result = await createModelPreheatConnectivityCheck(
         confirm.profile.id,
         connectivityKeys.current.current()
@@ -221,6 +231,9 @@ const ModelPreheatS3Profiles: React.FC = () => {
       render: (value: string, record: ModelPreheatS3Profile) => (
         <Space size={6}>
           <span>{value}</span>
+          {record.system_managed && (
+            <Tag>{intl.formatMessage({ id: 'resources.storage.systemProfile' })}</Tag>
+          )}
           {record.is_default && (
             <Tag color="blue">
               {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
@@ -282,6 +295,7 @@ const ModelPreheatS3Profiles: React.FC = () => {
             <Button
               type="text"
               icon={<EditOutlined />}
+              disabled={record.system_managed}
               onClick={() => {
                 setEditing(record);
                 setFormOpen(true);
@@ -302,7 +316,7 @@ const ModelPreheatS3Profiles: React.FC = () => {
           </Tooltip>
           <Tooltip
             title={intl.formatMessage({
-              id: 'resources.preheat.connectivity.recheck'
+              id: 'resources.storage.checkWorkers'
             })}
           >
             <Button
@@ -311,11 +325,19 @@ const ModelPreheatS3Profiles: React.FC = () => {
               onClick={() => openConfirm('check', record)}
             />
           </Tooltip>
+          {!record.is_default && (
+            <Tooltip title={intl.formatMessage({ id: 'resources.storage.setDefault' })}>
+              <Button type="text" disabled={record.system_managed} onClick={() => openConfirm('default', record)}>
+                {intl.formatMessage({ id: 'resources.storage.setDefault' })}
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
             <Button
               danger
               type="text"
               icon={<DeleteOutlined />}
+              disabled={record.system_managed}
               onClick={() => openConfirm('delete', record)}
             />
           </Tooltip>
@@ -388,14 +410,18 @@ const ModelPreheatS3Profiles: React.FC = () => {
           id:
             confirm?.action === 'delete'
               ? 'resources.preheat.profile.deleteConfirm'
-              : 'resources.preheat.connectivity.recheckConfirm'
+              : confirm?.action === 'default'
+                ? 'resources.storage.setDefaultConfirm'
+                : 'resources.preheat.connectivity.recheckConfirm'
         })}
         content={intl.formatMessage(
           {
             id:
               confirm?.action === 'delete'
                 ? 'resources.preheat.profile.deleteContent'
-                : 'resources.preheat.connectivity.recheckContent'
+                : confirm?.action === 'default'
+                  ? 'resources.storage.setDefaultContent'
+                  : 'resources.preheat.connectivity.recheckContent'
           },
           { name: confirm?.profile.name || '' }
         )}
@@ -403,7 +429,9 @@ const ModelPreheatS3Profiles: React.FC = () => {
           id:
             confirm?.action === 'delete'
               ? 'common.button.delete'
-              : 'resources.preheat.connectivity.recheck'
+              : confirm?.action === 'default'
+                ? 'resources.storage.setDefault'
+                : 'resources.storage.checkWorkers'
         })}
         danger={confirm?.action === 'delete'}
         loading={confirmLoading}
