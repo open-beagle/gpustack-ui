@@ -315,5 +315,13 @@ export default {
   'resources.storage.checkWorkersConfirm': '检测节点连通性',
   'resources.storage.checkWorkersContent': '确认检测 Worker 到 S3 配置“{name}”的连通性？',
   'resources.storage.transferMethod': '获取方式',
-  'resources.storage.syncTaskDetail': '同步任务详情'
+  'resources.storage.syncTaskDetail': '同步任务详情',
+  'resources.storage.refreshCompleted': '库存刷新完成。',
+  'resources.storage.refreshFailed': '库存刷新失败。',
+  'resources.storage.transfer.current_node': '当前节点（{worker}）',
+  'resources.storage.transfer.peer_via_s3': '其他节点（{worker}，经 S3 模型库 {profile}）',
+  'resources.storage.transfer.s3': 'S3 模型库（{profile}）',
+  'resources.storage.transfer.modelscope': '从 ModelScope 获取',
+  'resources.storage.transfer.huggingface': '从 Hugging Face 获取',
+  'resources.storage.transfer.unknown': '未知获取方式'
 };

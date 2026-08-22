@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelFile, ModelPreheatS3Profile } from '../config/types';
@@ -74,21 +74,9 @@ describe('统一模型存储交互', () => {
     expect((await screen.findAllByText('resources.preheat.connectivity.status')).length).toBeGreaterThan(0);
   });
 
-  it('库存刷新仅确认已提交，并在延迟后回拉真实 Artifact 列表', async () => {
+  it('库存刷新在后端同步扫描完成后立即回拉 Artifact 列表', async () => {
     const user = userEvent.setup();
-    type WindowTimerHandler = Parameters<typeof window.setTimeout>[0];
-    const refreshCallbacks: Array<() => void> = [];
-    const originalSetTimeout = window.setTimeout.bind(window);
-    vi.spyOn(window, 'setTimeout').mockImplementation(
-      ((handler: WindowTimerHandler, delay?: number, ...args: unknown[]) => {
-        if (delay === 2000 && typeof handler === 'function') {
-          refreshCallbacks.push(() => handler(...args));
-          return 9001;
-        }
-        return originalSetTimeout(handler, delay, ...args);
-      }) as typeof window.setTimeout
-    );
-    api.refreshModelStorageArtifacts.mockResolvedValue({ job_id: 'refresh-job' });
+    api.refreshModelStorageArtifacts.mockResolvedValue({ job_id: 71 });
     render(<ModelStorage />);
     await screen.findByText('resources.storage.artifacts');
     await user.click(screen.getByText('resources.storage.artifacts'));
@@ -98,9 +86,6 @@ describe('统一模型存储交互', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: /resources\.storage\.refresh/ }));
     expect(api.refreshModelStorageArtifacts).toHaveBeenCalledWith(3);
-    expect(api.queryModelStorageArtifacts).not.toHaveBeenCalled();
-    expect(refreshCallbacks).toHaveLength(1);
-    act(() => refreshCallbacks[0]());
     await waitFor(() => expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3));
   });
 });

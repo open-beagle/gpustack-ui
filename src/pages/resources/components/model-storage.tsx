@@ -28,7 +28,6 @@ const ModelStorage: React.FC = () => {
   const [artifacts, setArtifacts] = useState<ModelStorageArtifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshSubmitted, setRefreshSubmitted] = useState(false);
   const [confirmRefresh, setConfirmRefresh] = useState(false);
   const [confirmCheck, setConfirmCheck] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -55,22 +54,14 @@ const ModelStorage: React.FC = () => {
   useEffect(() => { void loadProfiles().catch(() => undefined); }, [loadProfiles]);
   useEffect(() => { void loadArtifacts().catch(() => undefined); }, [loadArtifacts]);
 
-  useEffect(() => {
-    if (!refreshSubmitted || !profileId) return;
-    const timer = window.setTimeout(() => {
-      void loadArtifacts().finally(() => setRefreshSubmitted(false));
-    }, 2000);
-    return () => window.clearTimeout(timer);
-  }, [loadArtifacts, profileId, refreshSubmitted]);
-
   const refresh = async () => {
     if (!profileId) return;
     setRefreshing(true);
     try {
       await refreshModelStorageArtifacts(profileId);
       setConfirmRefresh(false);
-      setRefreshSubmitted(true);
-      message.success(intl.formatMessage({ id: 'resources.storage.refreshSubmitted' }));
+      await loadArtifacts();
+      message.success(intl.formatMessage({ id: 'resources.storage.refreshCompleted' }));
     } finally { setRefreshing(false); }
   };
 
@@ -108,8 +99,8 @@ const ModelStorage: React.FC = () => {
       { key: 'artifacts', label: intl.formatMessage({ id: 'resources.storage.artifacts' }), children: <>
         <Space style={{ marginBottom: 16 }} wrap>
           <Select value={profileId} onChange={setProfileId} style={{ minWidth: 220 }} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
-          <Button icon={<ReloadOutlined />} onClick={() => setConfirmRefresh(true)} disabled={!profileId || refreshSubmitted}>{intl.formatMessage({ id: 'resources.storage.refresh' })}</Button>
-          {refreshSubmitted && <Spin size="small" />}
+          <Button icon={<ReloadOutlined />} onClick={() => setConfirmRefresh(true)} disabled={!profileId || refreshing}>{intl.formatMessage({ id: 'resources.storage.refresh' })}</Button>
+          {refreshing && <Spin size="small" />}
         </Space>
         <Table rowKey="artifact_id" loading={loading} dataSource={artifacts} scroll={{ x: 860 }} columns={[
           { title: intl.formatMessage({ id: 'resources.storage.model' }), dataIndex: 'model_id' },

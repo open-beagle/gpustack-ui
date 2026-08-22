@@ -11,7 +11,7 @@
     "preview": "max preview",
     "setup": "max setup",
     "start": "npm run dev",
-    "test:model-preheat": "vitest run src/pages/resources/components/model-storage.test.tsx src/pages/resources/components/model-preheat-final-regressions.test.tsx"
+    "test:model-preheat": "vitest run src/pages/resources/config/model-preheat.test.ts src/pages/resources/components/model-storage.test.tsx src/pages/resources/components/model-storage-sync-tasks.test.tsx src/pages/resources/components/model-preheat-components.test.tsx src/pages/resources/components/model-preheat-final-regressions.test.tsx"
   },
   "resolutions": {
     "immer": "^9.0.6"

@@ -267,6 +267,13 @@ export interface ModelStorageArtifact {
   last_verified_at: string;
 }
 
+export type ModelStorageTransferSource =
+  | 'current_node'
+  | 'peer_via_s3'
+  | 's3'
+  | 'modelscope'
+  | 'huggingface';
+
 export interface ModelStorageSyncTask {
   id: number;
   model_file_id: number;
@@ -281,7 +288,7 @@ export interface ModelStorageSyncTask {
   error_code: string | null;
   file_count: number;
   total_size: number;
-  transfer_source: string | null;
+  transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
   created_at: string;
@@ -374,7 +381,7 @@ export interface ModelPreheatTask {
   s3_profile_config_version: number;
   s3_backfill_policy: ModelPreheatBackfillPolicy;
   keep_new_workers_in_sync: boolean;
-  transfer_source: string | null;
+  transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
   created_at: string;
@@ -388,7 +395,8 @@ export interface ModelPreheatDistributionPolicy {
   enabled: boolean;
   profile_id: number;
   profile_config_version: number;
-  cache_key: string;
+  request_identity: Record<string, unknown>;
+  request_digest: string;
   target_scope: ModelPreheatTargetScope;
   worker_selector: Record<string, unknown>;
   gpu_selector: Record<string, unknown>;

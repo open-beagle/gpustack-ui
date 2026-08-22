@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   queryModelPreheatPolicies: vi.fn(),
   queryModelPreheatS3Profile: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
+  queryModelPreheatTask: vi.fn(),
   queryModelPreheatTasks: vi.fn(),
   queryWorkersList: vi.fn()
 }));
@@ -32,7 +33,12 @@ const api = vi.hoisted(() => ({
 vi.mock('@umijs/max', () => ({
   request: vi.fn(),
   useIntl: () => ({
-    formatMessage: ({ id }: { id: string }) => id
+    formatMessage: (
+      { id }: { id: string },
+      values?: { worker?: string; profile?: string }
+    ) => id.startsWith('resources.storage.transfer.')
+      ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
+      : id
   })
 }));
 
@@ -95,9 +101,10 @@ const policy = (id: number, name: string): ModelPreheatDistributionPolicy => ({
   id,
   name,
   enabled: true,
-  cache_key: `cache-${id}`,
   profile_id: 3,
   profile_config_version: 2,
+  request_identity: { source: 'modelscope', model_id: `scheduled/${id}` },
+  request_digest: `request-${id}`,
   target_scope: 'same_gpu_model',
   worker_selector: {},
   gpu_selector: {},
@@ -209,6 +216,7 @@ beforeEach(() => {
   api.queryModelPreheatConnectivityCheck.mockResolvedValue(terminalCheck);
   api.queryModelPreheatPolicies.mockResolvedValue(page([]));
   api.queryModelPreheatTasks.mockResolvedValue(page([]));
+  api.queryModelPreheatTask.mockResolvedValue(task());
   api.queryWorkersList.mockResolvedValue(page([worker]));
 });
 
@@ -347,6 +355,24 @@ describe('任务发现与串行轮询', () => {
       .then((cell) => cell.closest('tr')!);
     expect(row.querySelector('.anticon-play-circle')).toBeInTheDocument();
     expect(row.querySelector('.anticon-pause-circle')).not.toBeInTheDocument();
+  });
+
+  it('详情将 peer_via_s3 显示为本地化业务文案，并携带来源节点与 S3 Profile', async () => {
+    const peerTask = task({
+      transfer_source: 'peer_via_s3',
+      transfer_profile_id: 3,
+      source_worker_id: 12
+    });
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([peerTask]));
+    api.queryModelPreheatTask.mockResolvedValueOnce(peerTask);
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    fireEvent.click(container.querySelector('.anticon-eye')!.closest('button')!);
+    expect(
+      await screen.findByText(
+        'resources.storage.transfer.peer_via_s3:a100-58:center-cache'
+      )
+    ).toBeInTheDocument();
   });
 
   it('列表为空时仍继续轮询并发现 schedule 新任务', async () => {

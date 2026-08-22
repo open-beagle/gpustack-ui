@@ -6,10 +6,36 @@ import type {
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
   ModelPreheatTask,
-  ModelPreheatWorker
+  ModelPreheatWorker,
+  ModelStorageTransferSource
 } from './types';
 
 export type ModelPreheatTaskAction = 'pause' | 'resume' | 'cancel' | 'retry';
+
+export interface ModelStorageTransferPresentation {
+  messageId: string;
+  includeProfile: boolean;
+  includeWorker: boolean;
+}
+
+export function getModelStorageTransferPresentation(
+  source: ModelStorageTransferSource | null
+): ModelStorageTransferPresentation {
+  switch (source) {
+    case 'current_node':
+      return { messageId: 'resources.storage.transfer.current_node', includeProfile: false, includeWorker: true };
+    case 'peer_via_s3':
+      return { messageId: 'resources.storage.transfer.peer_via_s3', includeProfile: true, includeWorker: true };
+    case 's3':
+      return { messageId: 'resources.storage.transfer.s3', includeProfile: true, includeWorker: false };
+    case 'modelscope':
+      return { messageId: 'resources.storage.transfer.modelscope', includeProfile: false, includeWorker: false };
+    case 'huggingface':
+      return { messageId: 'resources.storage.transfer.huggingface', includeProfile: false, includeWorker: false };
+    default:
+      return { messageId: 'resources.storage.transfer.unknown', includeProfile: false, includeWorker: false };
+  }
+}
 
 export type ModelPreheatBlockingReasonCode =
   | 'profile_required'

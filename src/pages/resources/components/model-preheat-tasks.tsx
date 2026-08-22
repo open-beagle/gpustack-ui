@@ -32,6 +32,7 @@ import {
 import {
   LatestRequestGate,
   getModelPreheatTaskActions,
+  getModelStorageTransferPresentation,
   type ModelPreheatTaskAction
 } from '../config/model-preheat';
 import type {
@@ -93,11 +94,14 @@ const ModelPreheatTasks: React.FC = () => {
   }, []);
 
   const formatTransferMethod = (task: ModelPreheatTask | null) => {
-    if (!task?.transfer_source) return '-';
-    const parts = [task.transfer_source];
-    if (task.source_worker_id) parts.push(workerNames[task.source_worker_id] || `Worker #${task.source_worker_id}`);
-    if (task.transfer_profile_id) parts.push(profileNames[task.transfer_profile_id] || `Profile #${task.transfer_profile_id}`);
-    return parts.join(' · ');
+    const presentation = getModelStorageTransferPresentation(task?.transfer_source || null);
+    return intl.formatMessage(
+      { id: presentation.messageId },
+      {
+        worker: presentation.includeWorker ? workerNames[task?.source_worker_id || 0] || `Worker #${task?.source_worker_id || '-'}` : '',
+        profile: presentation.includeProfile ? profileNames[task?.transfer_profile_id || 0] || `Profile #${task?.transfer_profile_id || '-'}` : ''
+      }
+    );
   };
 
   const loadTasks = useCallback(

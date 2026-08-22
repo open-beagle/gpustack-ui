@@ -1,0 +1,216 @@
+import { describe, expect, it } from 'vitest';
+import {
+  IdempotencyKeyLifecycle,
+  LatestRequestGate,
+  buildModelPreheatPreview,
+  buildModelPreheatS3ProfilePayload,
+  getModelPreheatTaskActions,
+  loadAllPaginated,
+  loadModelPreheatConnectivitySnapshot,
+  shouldPollModelPreheatConnectivity,
+  submitModelPreheatWithFreshSnapshot
+} from './model-preheat';
+import type {
+  ModelPreheatConnectivityCheck,
+  ModelPreheatCreate,
+  ModelPreheatS3Profile,
+  ModelPreheatWorker
+} from './types';
+
+const profile: ModelPreheatS3Profile = {
+  id: 3, name: 'center-cache', endpoint: 'https://s3.example.com', bucket: 'models', prefix: 'team-a', tls_enabled: true, tls_verify: true, region: 'cn-north-1', use_virtual_hosted_style: false, is_default: true, credential_configured: true, config_version: 2, connectivity_state: 'available', last_connectivity_check_id: 21, last_connectivity_checked_at: '', created_at: '', updated_at: ''
+};
+const workers: ModelPreheatWorker[] = [
+  { id: 12, worker_uuid: 'worker-a', name: 'a100-58', state: 'ready', status: { gpu_devices: [{ name: ' NVIDIA A100 ' }] } },
+  { id: 18, worker_uuid: 'worker-b', name: 'a100-59', state: 'ready', status: { gpu_devices: [{ name: 'nvidia a100' }] } },
+  { id: 7, worker_uuid: 'worker-a', name: 'old-worker-a', state: 'not_ready', status: { gpu_devices: [] } }
+];
+const check: ModelPreheatConnectivityCheck = {
+  id: 21, profile_id: 3, profile_config_version: 2, state: 'available', summary: { success: 2, failed: 0, not_checked: 0 }, workers: [
+    { worker_uuid: 'worker-a', worker_id: 12, worker_name: 'a100-58', state: 'ready', readable: true, writable: true, deletable: true, cleanup_failed: false, latency_ms: 1, error_code: null, failed_stage: null },
+    { worker_uuid: 'worker-b', worker_id: 18, worker_name: 'a100-59', state: 'ready', readable: true, writable: true, deletable: true, cleanup_failed: false, latency_ms: 1, error_code: null, failed_stage: null }
+  ], created_at: '', updated_at: '', started_at: '', finished_at: ''
+};
+const values: ModelPreheatCreate = {
+  source: 'modelscope', model_id: 'Qwen/Test', revision: 'main', include_patterns: [], exclude_patterns: [], target_scope: 'same_gpu_model', target_worker_ids: [], seed_worker_id: 12, s3_profile_id: 3, s3_backfill_policy: 'when_missing', keep_new_workers_in_sync: true
+};
+
+describe('预热配置逻辑', () => {
+  it('按最新注册和 GPU 型号生成目标，并验证连通性', () => {
+    const preview = buildModelPreheatPreview(values, workers, profile, check);
+    expect(preview.rows.map((row) => row.worker.id)).toEqual([12, 18]);
+    expect(preview.canSubmit).toBe(true);
+  });
+
+  it('阻断旧配置检查和不在目标范围内的种子节点', () => {
+    expect(buildModelPreheatPreview(values, workers, profile, { ...check, profile_config_version: 1 }).blockingReasons).toEqual([{ code: 'connectivity_config_stale' }]);
+    expect(buildModelPreheatPreview({ ...values, target_scope: 'selected_workers', target_worker_ids: [12], seed_worker_id: 18 }, workers, profile, check).blockingReasons).toContainEqual({ code: 'seed_worker_not_in_target_scope', workerName: 'a100-59' });
+  });
+
+  it('编辑 Profile 不回传空凭据', () => {
+    expect(buildModelPreheatS3ProfilePayload({ ...profile, access_key: ' ', secret_key: '' }, true)).not.toMatchObject({ access_key: expect.anything(), secret_key: expect.anything() });
+  });
+
+  it('单节点目标不要求回源下载', () => {
+    const preview = buildModelPreheatPreview(
+      { ...values, target_scope: 'seed_worker' },
+      workers.slice(0, 1),
+      profile,
+      { ...check, workers: check.workers.slice(0, 1) }
+    );
+    expect(preview.singleWorker).toBe(true);
+    expect(preview.canSubmit).toBe(true);
+  });
+
+  it('Profile 标记为过期时不复用旧连通性矩阵', () => {
+    expect(
+      buildModelPreheatPreview(values, workers, { ...profile, connectivity_state: 'stale' }, check)
+        .blockingReasons
+    ).toEqual([{ code: 'profile_connectivity_stale' }]);
+  });
+
+  it('Worker 重注册后不复用旧 Worker ID 的连通性结果', () => {
+    const preview = buildModelPreheatPreview(
+      { ...values, target_scope: 'seed_worker', seed_worker_id: 30 },
+      [...workers, { ...workers[0], id: 30, name: 'a100-58-re-registered' }],
+      profile,
+      check
+    );
+    expect(preview.blockingReasons).toEqual([
+      { code: 'worker_connectivity_missing', workerName: 'a100-58-re-registered' }
+    ]);
+    expect(preview.rows[0].connectivity).toBeNull();
+  });
+});
+
+describe('任务状态与请求保护', () => {
+  it('只生成后端允许的任务动作', () => {
+    expect(getModelPreheatTaskActions('running', 'distributing')).toEqual(['pause', 'cancel']);
+    expect(getModelPreheatTaskActions('paused', 'distributing')).toEqual(['resume', 'cancel']);
+    expect(getModelPreheatTaskActions('running', 'error')).toEqual(['retry']);
+    expect(getModelPreheatTaskActions('running', 'ready')).toEqual([]);
+    expect(getModelPreheatTaskActions('canceled', 'distributing')).toEqual([]);
+  });
+
+  it('失败重试复用幂等键，变更请求与重新操作换键', () => {
+    const lifecycle = new IdempotencyKeyLifecycle(() => `key-${Math.random()}`);
+    const first = lifecycle.start();
+    expect(lifecycle.keyForRequest('a')).toBe(first);
+    expect(lifecycle.keyForRequest('a')).toBe(first);
+    expect(lifecycle.keyForRequest('b')).not.toBe(first);
+    lifecycle.complete();
+    expect(lifecycle.start()).not.toBe(first);
+  });
+
+  it('失败后相同请求复用 key，修改请求体后换新 key', () => {
+    const lifecycle = new IdempotencyKeyLifecycle(() => `key-${Math.random()}`);
+    lifecycle.start();
+    expect(lifecycle.keyForRequest('payload-a')).toBe(lifecycle.keyForRequest('payload-a'));
+    expect(lifecycle.keyForRequest('payload-b')).not.toBe(lifecycle.keyForRequest('payload-a'));
+  });
+
+  it('请求代次丢弃迟到结果', async () => {
+    const gate = new LatestRequestGate();
+    let resolveOld!: (value: string) => void;
+    let resolveNew!: (value: string) => void;
+    const applied: string[] = [];
+    const oldRequest = gate.run(() => new Promise<string>((resolve) => { resolveOld = resolve; }), (value) => applied.push(value));
+    const newRequest = gate.run(() => new Promise<string>((resolve) => { resolveNew = resolve; }), (value) => applied.push(value));
+    resolveNew('new');
+    resolveOld('old');
+    await expect(newRequest).resolves.toBe(true);
+    await expect(oldRequest).resolves.toBe(false);
+    expect(applied).toEqual(['new']);
+  });
+
+  it('已失效的请求完成后不再更新界面状态', async () => {
+    const gate = new LatestRequestGate();
+    let resolve!: (value: string) => void;
+    const applied: string[] = [];
+    const pending = gate.run(
+      () => new Promise<string>((done) => { resolve = done; }),
+      (value) => applied.push(value)
+    );
+    gate.invalidate();
+    resolve('closed-modal');
+    await expect(pending).resolves.toBe(false);
+    expect(applied).toEqual([]);
+  });
+});
+
+describe('预热前新鲜快照', () => {
+  it('完整遍历分页并按 Profile 最新检测读取快照', async () => {
+    const items = await loadAllPaginated(async (page, perPage) => ({ items: page === 1 ? [1] : [2], pagination: { page, perPage, total: 2, totalPage: 2 } }));
+    expect(items).toEqual([1, 2]);
+    const snapshot = await loadModelPreheatConnectivitySnapshot(3, async () => ({ ...profile, connectivity_state: 'checking', last_connectivity_check_id: 22 }), async () => ({ ...check, id: 22, state: 'running' }));
+    expect(shouldPollModelPreheatConnectivity(snapshot.profile, snapshot.check)).toBe(true);
+  });
+
+  it('提交前重新加载 Worker 和连通性，阻断过期 Profile', async () => {
+    const lifecycle = new IdempotencyKeyLifecycle(() => 'unused');
+    lifecycle.start();
+    const result = await submitModelPreheatWithFreshSnapshot({ values, workers, idempotency: lifecycle, loadWorkers: async () => workers, loadSnapshot: async () => ({ profile: { ...profile, connectivity_state: 'stale' }, check }), createTask: async () => 'unexpected' });
+    expect(result.submitted).toBe(false);
+    expect(result.preview.blockingReasons).toEqual([{ code: 'profile_connectivity_stale' }]);
+  });
+
+  it('提交前按 Profile 最新检测指针读取连通性结果', async () => {
+    const checkCalls: Array<[number, number]> = [];
+    const snapshot = await loadModelPreheatConnectivitySnapshot(
+      3,
+      async () => ({ ...profile, config_version: 3, connectivity_state: 'checking', last_connectivity_check_id: 22 }),
+      async (profileId, checkId) => {
+        checkCalls.push([profileId, checkId]);
+        return { ...check, id: 22, profile_config_version: 3, state: 'running' };
+      }
+    );
+    expect(checkCalls).toEqual([[3, 22]]);
+    expect(snapshot.check?.id).toBe(22);
+    expect(shouldPollModelPreheatConnectivity(snapshot.profile, snapshot.check)).toBe(true);
+    expect(shouldPollModelPreheatConnectivity(profile, check)).toBe(false);
+  });
+
+  it('提交前重载 Worker 后阻断重注册导致的旧选择', async () => {
+    const lifecycle = new IdempotencyKeyLifecycle(() => 'unused');
+    lifecycle.start();
+    let createCalled = false;
+    const result = await submitModelPreheatWithFreshSnapshot({
+      values,
+      workers,
+      idempotency: lifecycle,
+      loadWorkers: async () => [...workers, { ...workers[0], id: 30, name: 'a100-58-re-registered' }],
+      loadSnapshot: async () => ({ profile, check }),
+      createTask: async () => {
+        createCalled = true;
+        return 'unexpected';
+      }
+    });
+    expect(createCalled).toBe(false);
+    expect(result.preview.blockingReasons).toContainEqual({ code: 'seed_worker_not_ready' });
+  });
+
+  it('实际提交失败时复用 key，请求改变后换 key，成功后完成生命周期', async () => {
+    const generated = ['key-a', 'key-b'];
+    const lifecycle = new IdempotencyKeyLifecycle(() => generated.shift()!);
+    lifecycle.start();
+    const calls: Array<{ modelId: string; key: string }> = [];
+    const createTask = async (payload: ModelPreheatCreate, key: string) => {
+      calls.push({ modelId: payload.model_id, key });
+      if (calls.length < 3) throw new Error('network_error');
+      return 'task-created';
+    };
+    const submit = (input: ModelPreheatCreate) => submitModelPreheatWithFreshSnapshot({
+      values: input, workers, idempotency: lifecycle, loadWorkers: async () => workers,
+      loadSnapshot: async () => ({ profile, check }), createTask
+    });
+    await expect(submit(values)).rejects.toThrow('network_error');
+    await expect(submit(values)).rejects.toThrow('network_error');
+    await expect(submit({ ...values, model_id: 'Qwen/Changed' })).resolves.toMatchObject({ submitted: true, task: 'task-created' });
+    expect(calls).toEqual([
+      { modelId: 'Qwen/Test', key: 'key-a' },
+      { modelId: 'Qwen/Test', key: 'key-a' },
+      { modelId: 'Qwen/Changed', key: 'key-b' }
+    ]);
+    expect(() => lifecycle.current()).toThrow('幂等操作尚未开始');
+  });
+});
