@@ -21,8 +21,10 @@ import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
 import ModelPreheatTasks from './model-preheat-tasks';
 
 const api = vi.hoisted(() => ({
+  createModelPreheatSchedule: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
+  queryModelPreheatSchedules: vi.fn(),
   queryModelPreheatS3Profile: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
   queryModelPreheatTask: vi.fn(),
@@ -32,13 +34,16 @@ const api = vi.hoisted(() => ({
 
 vi.mock('@umijs/max', () => ({
   request: vi.fn(),
+  useLocation: () => ({ pathname: '/resources/modelfiles', search: '' }),
+  useNavigate: () => vi.fn(),
   useIntl: () => ({
     formatMessage: (
       { id }: { id: string },
       values?: { worker?: string; profile?: string }
-    ) => id.startsWith('resources.storage.transfer.')
-      ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
-      : id
+    ) =>
+      id.startsWith('resources.storage.transfer.')
+        ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
+        : id
   })
 }));
 
@@ -217,6 +222,8 @@ beforeEach(() => {
   api.queryModelPreheatS3Profile.mockResolvedValue(profile);
   api.queryModelPreheatConnectivityCheck.mockResolvedValue(terminalCheck);
   api.queryModelPreheatPolicies.mockResolvedValue(page([]));
+  api.queryModelPreheatSchedules.mockResolvedValue(page([]));
+  api.createModelPreheatSchedule.mockResolvedValue({ id: 1 });
   api.queryModelPreheatTasks.mockResolvedValue(page([]));
   api.queryModelPreheatTask.mockResolvedValue(task());
   api.queryWorkersList.mockResolvedValue(page([worker]));
@@ -255,6 +262,50 @@ describe('策略分页请求代次', () => {
 
     expect(screen.getByText('fresh-page-one')).toBeInTheDocument();
     expect(screen.queryByText('stale-page-two')).not.toBeInTheDocument();
+  });
+});
+
+describe('定时策略', () => {
+  it('从统一入口创建定时策略并使用节点 UUID', async () => {
+    const user = userEvent.setup();
+    render(<ModelPreheatPolicies />);
+
+    await user.click(
+      (await screen.findByText('resources.preheat.policy.create')).closest(
+        'button'
+      )!
+    );
+    await user.click(
+      screen.getByRole('radio', {
+        name: 'resources.preheat.schedule.triggerMode.scheduled'
+      })
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'common.button.next' })
+    );
+    await screen.findByText('resources.preheat.schedule.create');
+    await user.type(
+      screen.getByLabelText('resources.preheat.policy.name'),
+      'nightly-model'
+    );
+    await user.type(
+      screen.getByLabelText('resources.preheat.model'),
+      'team/model'
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'common.button.save' })
+    );
+
+    await waitFor(() =>
+      expect(api.createModelPreheatSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'nightly-model',
+          model_id: 'team/model',
+          s3_profile_id: 3,
+          target_worker_uuids: ['worker-a']
+        })
+      )
+    );
   });
 });
 
@@ -348,13 +399,29 @@ describe('首次依赖加载失败恢复', () => {
 describe('新任务 Profile 选择', () => {
   it('预热弹窗只展示 active Profile，并从 active 中选择默认项', async () => {
     const user = userEvent.setup();
-    const maintenance = { ...profile, id: 6, name: 'maintenance-profile', lifecycle_state: 'maintenance' as const, is_default: true };
-    api.queryModelPreheatS3Profiles.mockResolvedValueOnce(page([maintenance, profile]));
+    const maintenance = {
+      ...profile,
+      id: 6,
+      name: 'maintenance-profile',
+      lifecycle_state: 'maintenance' as const,
+      is_default: true
+    };
+    api.queryModelPreheatS3Profiles.mockResolvedValueOnce(
+      page([maintenance, profile])
+    );
     render(<ModelPreheatModal open onCancel={vi.fn()} onCreated={vi.fn()} />);
-    const profileSelect = (await screen.findByText('resources.preheat.profile.title')).closest('.ant-form-item')!.querySelector('[role="combobox"]')!;
+    const profileSelect = (
+      await screen.findByText('resources.preheat.profile.title')
+    )
+      .closest('.ant-form-item')!
+      .querySelector('[role="combobox"]')!;
     await user.click(profileSelect);
-    expect(await screen.findByRole('option', { name: profile.name })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: maintenance.name })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('option', { name: profile.name })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: maintenance.name })
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -382,7 +449,9 @@ describe('任务发现与串行轮询', () => {
     api.queryModelPreheatTask.mockResolvedValueOnce(peerTask);
     const { container } = render(<ModelPreheatTasks />);
     await screen.findByText('scheduled/model');
-    fireEvent.click(container.querySelector('.anticon-eye')!.closest('button')!);
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
     expect(
       await screen.findByText(
         'resources.storage.transfer.peer_via_s3:a100-58:center-cache'

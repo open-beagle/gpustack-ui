@@ -52,6 +52,10 @@ interface Props {
   open: boolean;
   onCancel: () => void;
   onCreated: (task: ModelPreheatTask) => void;
+  initialValues?: Partial<ModelPreheatCreate>;
+  forceKeepNewWorkersInSync?: boolean;
+  titleId?: string;
+  submitId?: string;
 }
 
 const defaultValues: ModelPreheatCreate = {
@@ -68,7 +72,15 @@ const defaultValues: ModelPreheatCreate = {
   keep_new_workers_in_sync: false
 };
 
-const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
+const ModelPreheatModal: React.FC<Props> = ({
+  open,
+  onCancel,
+  onCreated,
+  initialValues,
+  forceKeepNewWorkersInSync = false,
+  titleId = 'resources.preheat.task.create',
+  submitId = 'resources.preheat.task.submit'
+}) => {
   const intl = useIntl();
   const [form] = Form.useForm<ModelPreheatCreate>();
   const idempotency = useRef(new IdempotencyKeyLifecycle());
@@ -110,11 +122,17 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
             (item) => item.lifecycle_state === 'active'
           );
           const selectedProfile =
-            activeProfileItems.find((item) => item.is_default) || activeProfileItems[0];
+            activeProfileItems.find((item) => item.is_default) ||
+            activeProfileItems[0];
           const values = {
             ...defaultValues,
+            ...initialValues,
             target_worker_ids: readyWorkerIds,
-            s3_profile_id: selectedProfile?.id || 0
+            s3_profile_id:
+              initialValues?.s3_profile_id || selectedProfile?.id || 0,
+            keep_new_workers_in_sync:
+              forceKeepNewWorkersInSync ||
+              Boolean(initialValues?.keep_new_workers_in_sync)
           };
           setWorkers(nextWorkers);
           setProfiles(activeProfileItems);
@@ -126,7 +144,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
     } catch {
       setDataError(true);
     }
-  }, [form]);
+  }, [forceKeepNewWorkersInSync, form, initialValues]);
 
   useEffect(() => {
     if (!open) {
@@ -188,7 +206,9 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
             currentSnapshot = snapshot;
             setProfiles((current) =>
               current
-                .map((item) => item.id === snapshot.profile.id ? snapshot.profile : item)
+                .map((item) =>
+                  item.id === snapshot.profile.id ? snapshot.profile : item
+                )
                 .filter((item) => item.lifecycle_state === 'active')
             );
             setConnectivity(snapshot.check);
@@ -335,7 +355,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
       open={open}
       centered
       width={920}
-      title={intl.formatMessage({ id: 'resources.preheat.task.create' })}
+      title={intl.formatMessage({ id: titleId })}
       destroyOnClose
       maskClosable={false}
       keyboard={false}
@@ -347,7 +367,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
           onOk={handleSubmit}
           onCancel={close}
           loading={submitting}
-          okText={intl.formatMessage({ id: 'resources.preheat.task.submit' })}
+          okText={intl.formatMessage({ id: submitId })}
           okBtnProps={{
             disabled:
               submitting ||
@@ -528,7 +548,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
               label={intl.formatMessage({ id: 'resources.preheat.keepInSync' })}
               valuePropName="checked"
             >
-              <Switch />
+              <Switch disabled={forceKeepNewWorkersInSync} />
             </Form.Item>
           </Col>
         </Row>
@@ -539,7 +559,9 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
           <Alert
             type="info"
             showIcon
-            message={intl.formatMessage({ id: 'resources.preheat.noReadyWorkers' })}
+            message={intl.formatMessage({
+              id: 'resources.preheat.noReadyWorkers'
+            })}
           />
         ) : (
           <Button
@@ -582,7 +604,9 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
       </Space>
       <ModelPreheatConfirmModal
         open={confirmCheck}
-        title={intl.formatMessage({ id: 'resources.storage.checkWorkersConfirm' })}
+        title={intl.formatMessage({
+          id: 'resources.storage.checkWorkersConfirm'
+        })}
         content={intl.formatMessage(
           { id: 'resources.storage.checkWorkersContent' },
           { name: selectedProfile?.name || '' }

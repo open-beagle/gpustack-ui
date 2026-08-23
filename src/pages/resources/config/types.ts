@@ -301,6 +301,13 @@ export interface ModelStorageSyncTask {
   transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
+  source_worker_name: string | null;
+  profile_name: string | null;
+  profile_endpoint: string | null;
+  profile_bucket: string | null;
+  profile_prefix: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -314,7 +321,6 @@ export interface ModelStorageSyncTaskDetail extends ModelStorageSyncTask {
   } | null;
   request_digest: string;
   artifact_id: string | null;
-  source_worker_name: string | null;
 }
 
 export type ModelStorageSyncScope =
@@ -439,6 +445,59 @@ export interface ModelPreheatDistributionPolicy {
   gpu_selector: Record<string, unknown>;
   created_by_task_id: number | null;
   last_reconciled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ModelPreheatScheduleRunState =
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'ready'
+  | 'skipped'
+  | 'error';
+
+export interface ModelPreheatScheduleCreate {
+  name: string;
+  trigger_mode: 'manual' | 'scheduled';
+  cron_expression: string | null;
+  timezone: string;
+  window_duration_minutes: number;
+  max_concurrency: number;
+  bandwidth_limit_mbps?: number | null;
+  source: 'huggingface' | 'modelscope';
+  model_id: string;
+  revision?: string | null;
+  include_patterns: string[];
+  exclude_patterns: string[];
+  target_scope: ModelPreheatTargetScope;
+  target_worker_uuids: string[];
+  seed_worker_uuid?: string | null;
+  s3_profile_id: number;
+  s3_backfill_policy: ModelPreheatBackfillPolicy;
+  keep_new_workers_in_sync: boolean;
+}
+
+export interface ModelPreheatSchedule extends ModelPreheatScheduleCreate {
+  id: number;
+  enabled: boolean;
+  next_window_start_utc: string | null;
+  last_window_start_utc: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPreheatScheduleRun {
+  id: number;
+  schedule_id: number;
+  window_start_utc: string;
+  window_end_utc: string;
+  trigger: 'scheduled' | 'manual';
+  state: ModelPreheatScheduleRunState;
+  task_id: number | null;
+  error_code: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   created_at: string;
   updated_at: string;
 }

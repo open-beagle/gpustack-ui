@@ -8,6 +8,9 @@ import {
   ModelPreheatDistributionPolicy,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
+  ModelPreheatSchedule,
+  ModelPreheatScheduleCreate,
+  ModelPreheatScheduleRun,
   ModelPreheatTask,
   ModelStorageArtifact,
   ModelStorageCapabilities,
@@ -15,8 +18,8 @@ import {
   ModelStorageConnectionTestRequest,
   ModelStorageSyncBatchCreate,
   ModelStorageSyncBatchResult,
-  ModelStorageSyncTaskDetail,
-  ModelStorageSyncTask
+  ModelStorageSyncTask,
+  ModelStorageSyncTaskDetail
 } from '../config/types';
 
 export const WORKERS_API = '/workers';
@@ -28,6 +31,7 @@ export const MODEL_STORAGE_SYNC_TASKS_API = '/model-storage-sync-tasks';
 export const MODEL_PREHEATS_API = '/model-preheats';
 export const MODEL_PREHEAT_POLICIES_API =
   '/model-preheat-distribution-policies';
+export const MODEL_PREHEAT_SCHEDULES_API = '/model-preheat-schedules';
 
 export async function queryWorkersList(params: Global.SearchParams) {
   return request<Global.PageResponse<ListItem>>(`${WORKERS_API}`, {
@@ -150,12 +154,17 @@ export async function deleteModelPreheatS3Profile(id: number) {
 }
 
 export async function queryModelStorageCapabilities() {
-  return request<ModelStorageCapabilities>(`${MODEL_STORAGE_API}/capabilities`, {
-    method: 'GET'
-  });
+  return request<ModelStorageCapabilities>(
+    `${MODEL_STORAGE_API}/capabilities`,
+    {
+      method: 'GET'
+    }
+  );
 }
 
-export async function testModelStorageConnection(data: ModelStorageConnectionTestRequest) {
+export async function testModelStorageConnection(
+  data: ModelStorageConnectionTestRequest
+) {
   return request<ModelStorageConnectionTest>(
     `${MODEL_STORAGE_API}/connection-tests`,
     { method: 'POST', data }
@@ -192,9 +201,12 @@ export async function queryModelStorageSyncTasks(params: Global.SearchParams) {
 }
 
 export async function queryModelStorageSyncTask(id: number) {
-  return request<ModelStorageSyncTaskDetail>(`${MODEL_STORAGE_SYNC_TASKS_API}/${id}`, {
-    method: 'GET'
-  });
+  return request<ModelStorageSyncTaskDetail>(
+    `${MODEL_STORAGE_SYNC_TASKS_API}/${id}`,
+    {
+      method: 'GET'
+    }
+  );
 }
 
 export async function deleteModelStorageSyncTask(id: number) {
@@ -271,7 +283,6 @@ export async function runModelPreheatTaskAction(
   });
 }
 
-
 export async function queryModelPreheatPolicies(params: Global.SearchParams) {
   return request<Global.PageResponse<ModelPreheatDistributionPolicy>>(
     MODEL_PREHEAT_POLICIES_API,
@@ -299,5 +310,47 @@ export async function reconcileModelPreheatPolicy(id: number) {
   return request<ModelPreheatDistributionPolicy>(
     `${MODEL_PREHEAT_POLICIES_API}/${id}/reconcile`,
     { method: 'POST' }
+  );
+}
+
+export async function queryModelPreheatSchedules(params: Global.SearchParams) {
+  return request<Global.PageResponse<ModelPreheatSchedule>>(
+    MODEL_PREHEAT_SCHEDULES_API,
+    { method: 'GET', params }
+  );
+}
+
+export async function createModelPreheatSchedule(
+  data: ModelPreheatScheduleCreate
+) {
+  return request<ModelPreheatSchedule>(MODEL_PREHEAT_SCHEDULES_API, {
+    method: 'POST',
+    data
+  });
+}
+
+export async function updateModelPreheatSchedule(
+  id: number,
+  data: Partial<ModelPreheatScheduleCreate> & { enabled?: boolean }
+) {
+  return request<ModelPreheatSchedule>(`${MODEL_PREHEAT_SCHEDULES_API}/${id}`, {
+    method: 'PATCH',
+    data
+  });
+}
+
+export async function deleteModelPreheatSchedule(id: number) {
+  return request<{ ok: boolean }>(`${MODEL_PREHEAT_SCHEDULES_API}/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function runModelPreheatScheduleNow(
+  id: number,
+  idempotencyKey: string
+) {
+  return request<ModelPreheatScheduleRun>(
+    `${MODEL_PREHEAT_SCHEDULES_API}/${id}/run-now`,
+    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }
   );
 }

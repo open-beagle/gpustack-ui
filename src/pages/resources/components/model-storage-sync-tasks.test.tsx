@@ -1,4 +1,12 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelFile, ModelStorageSyncTaskDetail } from '../config/types';
@@ -7,6 +15,7 @@ import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
 const api = vi.hoisted(() => ({
   createModelStorageSyncBatch: vi.fn(),
+  deleteModelStorageSyncTask: vi.fn(),
   queryModelFilesList: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
   queryModelStorageSyncTask: vi.fn(),
@@ -15,13 +24,15 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@umijs/max', () => ({
+  useNavigate: () => vi.fn(),
   useIntl: () => ({
     formatMessage: (
       { id }: { id: string },
       values?: { worker?: string; profile?: string }
-    ) => id.startsWith('resources.storage.transfer.')
-      ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
-      : id
+    ) =>
+      id.startsWith('resources.storage.transfer.')
+        ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
+        : id
   })
 }));
 
@@ -49,10 +60,21 @@ const task = (
   transfer_source: 's3',
   transfer_profile_id: 3,
   source_worker_id: 12,
-  profile: { id: 3, name: 'center-cache', config_version: 2, system_managed: false },
+  source_worker_name: 'a100-58',
+  profile_name: 'center-cache',
+  profile_endpoint: 'https://s3.example.com',
+  profile_bucket: 'models',
+  profile_prefix: 'team-a',
+  profile: {
+    id: 3,
+    name: 'center-cache',
+    config_version: 2,
+    system_managed: false
+  },
   request_digest: 'request-5',
   artifact_id: 'artifact-5',
-  source_worker_name: 'a100-58',
+  started_at: null,
+  finished_at: null,
   created_at: '',
   updated_at: '',
   ...overrides
@@ -66,13 +88,50 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
 });
 
 describe('同步任务获取方式', () => {
+  it('失败任务显示业务状态并允许删除', async () => {
+    const user = userEvent.setup();
+    api.queryModelStorageSyncTasks.mockResolvedValue({
+      items: [
+        task({
+          state: 'error',
+          transfer_source: null,
+          created_at: '2026-08-23T22:08:05+08:00'
+        })
+      ],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.deleteModelStorageSyncTask.mockResolvedValue(undefined);
+
+    render(<ModelStorageSyncTasks />);
+
+    expect(
+      await screen.findByText('resources.storage.syncTask.state.error')
+    ).toBeInTheDocument();
+    expect(screen.getByText('2026-08-23 22:08:05')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'resources.storage.deleteSync' })
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.deleteSync'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.deleteModelStorageSyncTask).toHaveBeenCalledWith(5)
+    );
+  });
+
   it('活动任务自动刷新并及时显示失败终态', async () => {
     vi.useFakeTimers();
     const pending = task({ state: 'pending', transfer_source: null });
@@ -96,14 +155,18 @@ describe('同步任务获取方式', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(screen.getByText('pending')).toBeInTheDocument();
+    expect(
+      screen.getByText('resources.storage.syncTask.state.pending')
+    ).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000);
     });
 
     expect(api.queryModelStorageSyncTasks).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('error')).toBeInTheDocument();
+    expect(
+      screen.getByText('resources.storage.syncTask.state.error')
+    ).toBeInTheDocument();
   });
 
   it('忽略晚返回的旧轮询响应，终态不会回退为 pending', async () => {
@@ -143,8 +206,12 @@ describe('同步任务获取方式', () => {
       await stalePolling.promise;
     });
 
-    expect(screen.getByText('error')).toBeInTheDocument();
-    expect(screen.queryByText('pending')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('resources.storage.syncTask.state.error')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('resources.storage.syncTask.state.pending')
+    ).not.toBeInTheDocument();
   });
 
   it('后台轮询接管手动刷新后会正常结束 loading', async () => {
@@ -164,7 +231,9 @@ describe('同步任务获取方式', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    const refreshButton = screen.getByText('common.button.refresh').closest('button');
+    const refreshButton = screen
+      .getByText('common.button.refresh')
+      .closest('button');
     fireEvent.click(refreshButton!);
     expect(refreshButton).toHaveClass('ant-btn-loading');
     await act(async () => {
@@ -196,14 +265,41 @@ describe('同步任务获取方式', () => {
       .mockReturnValueOnce(secondWorkers.promise);
 
     const { rerender } = render(
-      <ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />
+      <ModelStorageSyncBatchModal
+        open
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
     );
-    await waitFor(() => expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(1));
-    rerender(<ModelStorageSyncBatchModal open={false} onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
-    rerender(<ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
-    await waitFor(() => expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(1)
+    );
+    rerender(
+      <ModelStorageSyncBatchModal
+        open={false}
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
+    rerender(
+      <ModelStorageSyncBatchModal
+        open
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
+    await waitFor(() =>
+      expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2)
+    );
     secondProfiles.resolve({
-      items: [{ id: 8, name: 'profile-new', lifecycle_state: 'active', is_default: true }],
+      items: [
+        {
+          id: 8,
+          name: 'profile-new',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     secondWorkers.resolve({
@@ -213,7 +309,14 @@ describe('同步任务获取方式', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('profile-new')).toBeInTheDocument();
     firstProfiles.resolve({
-      items: [{ id: 3, name: 'profile-old', lifecycle_state: 'active', is_default: true }],
+      items: [
+        {
+          id: 3,
+          name: 'profile-old',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     firstWorkers.resolve({
@@ -223,7 +326,9 @@ describe('同步任务获取方式', () => {
     await firstProfiles.promise;
     await firstWorkers.promise;
     await user.click(within(dialog).getAllByRole('combobox')[0]);
-    expect((await screen.findAllByText('profile-new')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('profile-new')).length).toBeGreaterThan(
+      0
+    );
     expect(screen.queryByText('profile-old')).not.toBeInTheDocument();
   });
 
@@ -252,7 +357,14 @@ describe('同步任务获取方式', () => {
       updated_at: ''
     });
     api.queryModelPreheatS3Profiles.mockResolvedValue({
-      items: [{ id: 3, name: 'default-s3', lifecycle_state: 'active', is_default: true }],
+      items: [
+        {
+          id: 3,
+          name: 'default-s3',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     api.queryWorkersList.mockResolvedValue({
@@ -262,14 +374,25 @@ describe('同步任务获取方式', () => {
       ],
       pagination: { page: 1, perPage: 100, total: 2, totalPage: 1 }
     });
-    api.queryModelFilesList.mockImplementation(({ worker_id }: { worker_id: number }) =>
-      worker_id === 12 ? first.promise : second.promise
+    api.queryModelFilesList.mockImplementation(
+      ({ worker_id }: { worker_id: number }) =>
+        worker_id === 12 ? first.promise : second.promise
     );
     api.createModelStorageSyncBatch.mockResolvedValue({
-      scope: 'single_model', planned: 1, created: [], skipped: [], failed: []
+      scope: 'single_model',
+      planned: 1,
+      created: [],
+      skipped: [],
+      failed: []
     });
 
-    render(<ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
+    render(
+      <ModelStorageSyncBatchModal
+        open
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getAllByRole('combobox')[2]);
     await user.click(await screen.findByText('worker-a'));
@@ -279,7 +402,13 @@ describe('同步任务获取方式', () => {
       items: [model(18, 18, 'model-b')],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
-    await waitFor(() => expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 1, perPage: 100, worker_id: 18 }));
+    await waitFor(() =>
+      expect(api.queryModelFilesList).toHaveBeenCalledWith({
+        page: 1,
+        perPage: 100,
+        worker_id: 18
+      })
+    );
     first.resolve({
       items: [model(12, 12, 'model-a')],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
@@ -288,11 +417,17 @@ describe('同步任务获取方式', () => {
     expect(await screen.findByText('model-b (revision)')).toBeInTheDocument();
     expect(screen.queryByText('model-a (revision)')).not.toBeInTheDocument();
     await user.click(screen.getByText('model-b (revision)'));
-    await user.click(within(dialog).getByRole('button', { name: 'resources.storage.sync.submit' }));
-    await waitFor(() => expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
-      { profile_id: 3, scope: 'single_model', model_file_id: 18 },
-      expect.any(String)
-    ));
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    );
+    await waitFor(() =>
+      expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+        { profile_id: 3, scope: 'single_model', model_file_id: 18 },
+        expect.any(String)
+      )
+    );
   });
 
   it('批量创建会加载后续页面的节点和模型，并在刷新列表后保留结果页', async () => {
@@ -322,12 +457,20 @@ describe('同步任务获取方式', () => {
       pagination: { page: 1, perPage: 100, total: 0, totalPage: 1 }
     });
     api.queryModelPreheatS3Profiles.mockResolvedValue({
-      items: [{ id: 3, name: 'default-s3', lifecycle_state: 'active', is_default: true }],
+      items: [
+        {
+          id: 3,
+          name: 'default-s3',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     api.queryWorkersList.mockImplementation(({ page }: { page: number }) =>
       Promise.resolve({
-        items: page === 2 ? [{ id: 22, name: 'worker-page-2', state: 'ready' }] : [],
+        items:
+          page === 2 ? [{ id: 22, name: 'worker-page-2', state: 'ready' }] : [],
         pagination: { page, perPage: 100, total: 101, totalPage: 2 }
       })
     );
@@ -354,21 +497,42 @@ describe('同步任务获取方式', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getAllByRole('combobox')[2]);
     await user.click(await screen.findByText('worker-page-2'));
-    await waitFor(() => expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 2, perPage: 100, worker_id: 22 }));
+    await waitFor(() =>
+      expect(api.queryModelFilesList).toHaveBeenCalledWith({
+        page: 2,
+        perPage: 100,
+        worker_id: 22
+      })
+    );
     await user.click(within(dialog).getAllByRole('combobox')[3]);
     await user.click(await screen.findByText('team/model-page-2 (revision-2)'));
-    await user.click(within(dialog).getByRole('button', { name: 'resources.storage.sync.submit' }));
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    );
 
-    await waitFor(() => expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
-      { profile_id: 3, scope: 'single_model', model_file_id: 31 },
-      expect.any(String)
-    ));
-    expect(await within(dialog).findByText('resources.storage.syncBatch.result')).toBeInTheDocument();
-    expect(api.queryWorkersList).toHaveBeenCalledWith({ page: 2, perPage: 100 });
-    expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 2, perPage: 100, worker_id: 22 });
+    await waitFor(() =>
+      expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+        { profile_id: 3, scope: 'single_model', model_file_id: 31 },
+        expect.any(String)
+      )
+    );
+    expect(
+      await within(dialog).findByText('resources.storage.syncBatch.result')
+    ).toBeInTheDocument();
+    expect(api.queryWorkersList).toHaveBeenCalledWith({
+      page: 2,
+      perPage: 100
+    });
+    expect(api.queryModelFilesList).toHaveBeenCalledWith({
+      page: 2,
+      perPage: 100,
+      worker_id: 22
+    });
   });
 
-  it('s3 详情只展示 S3 Profile，不拼接来源节点', async () => {
+  it('列表和详情使用任务冻结的来源与 S3 目标，不查询当前配置', async () => {
     const detail = task();
     api.queryModelStorageSyncTasks.mockResolvedValue({
       items: [detail],
@@ -377,14 +541,26 @@ describe('同步任务获取方式', () => {
     api.queryModelStorageSyncTask.mockResolvedValue(detail);
     const { container } = render(<ModelStorageSyncTasks />);
     await screen.findByText('team/model');
-    fireEvent.click(container.querySelector('.anticon-eye')!.closest('button')!);
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+    expect(await screen.findByText('a100-58')).toBeInTheDocument();
     expect(
-      await screen.findByText('resources.storage.transfer.s3::center-cache')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('center-cache · models/team-a')).length
+    ).toBeGreaterThan(1);
+    expect(api.queryModelPreheatS3Profiles).not.toHaveBeenCalled();
+    expect(api.queryWorkersList).not.toHaveBeenCalled();
   });
 
-  it('peer_via_s3 详情同时展示来源节点和 S3 Profile', async () => {
-    const detail = task({ transfer_source: 'peer_via_s3' });
+  it('冻结字段缺失时只显示 ID 和配置版本', async () => {
+    const detail = task({
+      transfer_source: 'peer_via_s3',
+      source_worker_name: null,
+      profile_name: null,
+      profile_endpoint: null,
+      profile_bucket: null,
+      profile_prefix: null
+    });
     api.queryModelStorageSyncTasks.mockResolvedValue({
       items: [detail],
       pagination: { page: 1, per_page: 100, total: 1, total_page: 1 }
@@ -392,11 +568,14 @@ describe('同步任务获取方式', () => {
     api.queryModelStorageSyncTask.mockResolvedValue(detail);
     const { container } = render(<ModelStorageSyncTasks />);
     await screen.findByText('team/model');
-    fireEvent.click(container.querySelector('.anticon-eye')!.closest('button')!);
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+    expect(await screen.findByText('Worker #12')).toBeInTheDocument();
     expect(
-      await screen.findByText(
-        'resources.storage.transfer.peer_via_s3:a100-58:center-cache'
-      )
-    ).toBeInTheDocument();
+      (await screen.findAllByText('S3 Profile #3 · v2')).length
+    ).toBeGreaterThan(1);
+    expect(api.queryModelPreheatS3Profiles).not.toHaveBeenCalled();
+    expect(api.queryWorkersList).not.toHaveBeenCalled();
   });
 });
