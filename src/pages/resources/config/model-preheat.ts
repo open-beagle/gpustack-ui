@@ -415,6 +415,16 @@ export function buildModelPreheatS3ProfilePayload(
   return payload;
 }
 
+export function buildSystemManagedModelPreheatS3ProfilePayload(values: ModelPreheatS3ProfileWrite): Pick<ModelPreheatS3ProfileWrite, 'default_slot' | 'tls_enabled' | 'tls_verify' | 'use_virtual_hosted_style' | 'source_fallback_enabled'> {
+  return {
+    default_slot: values.default_slot ?? null,
+    tls_enabled: values.tls_enabled ?? true,
+    tls_verify: values.tls_verify ?? true,
+    use_virtual_hosted_style: values.use_virtual_hosted_style ?? true,
+    source_fallback_enabled: values.source_fallback_enabled ?? true
+  };
+}
+
 export function getModelPreheatTaskActions(
   desiredState: ModelPreheatTask['desired_state'],
   executionState: ModelPreheatExecutionState

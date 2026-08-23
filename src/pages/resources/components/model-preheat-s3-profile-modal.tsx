@@ -1,6 +1,7 @@
 import ModalFooter from '@/components/modal-footer';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
-import { Alert, Button, Col, Descriptions, Form, Input, Modal, Row, Switch } from 'antd';
+import { Alert, Button, Col, Descriptions, Form, Input, Modal, Row, Switch, Tooltip } from 'antd';
 import React, { useEffect, useState } from 'react';
 import {
   createModelPreheatS3Profile,
@@ -8,7 +9,7 @@ import {
   testModelStorageConnection,
   updateModelPreheatS3Profile
 } from '../apis';
-import { buildModelPreheatS3ProfilePayload } from '../config/model-preheat';
+import { buildModelPreheatS3ProfilePayload, buildSystemManagedModelPreheatS3ProfilePayload } from '../config/model-preheat';
 import type {
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
@@ -36,6 +37,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
   const [encryptionAvailable, setEncryptionAvailable] = useState(true);
   const [testResult, setTestResult] = useState<ModelStorageConnectionTest | null>(null);
   const editing = Boolean(record);
+  const systemManaged = record?.system_managed === true;
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +74,8 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
 
   const validatePayload = async () => {
     const values = await form.validateFields();
-    if (!tlsValid(values)) {
+    // 系统配置的 endpoint 固定，由后端按 tls_enabled 选择 HTTP 或 HTTPS。
+    if (!systemManaged && !tlsValid(values)) {
       form.setFields([{ name: 'endpoint', errors: [intl.formatMessage({ id: 'resources.storage.endpointTlsMismatch' })] }]);
       throw new Error('endpoint_tls_mismatch');
     }
@@ -105,7 +108,9 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     try {
       const values = await validatePayload();
       setLoading(true);
-      const payload = buildModelPreheatS3ProfilePayload(values, editing);
+      const payload = systemManaged
+        ? buildSystemManagedModelPreheatS3ProfilePayload({ ...values, default_slot: record?.default_slot ?? null })
+        : buildModelPreheatS3ProfilePayload(values, editing);
       const result = record
         ? await updateModelPreheatS3Profile(record.id, payload)
         : await createModelPreheatS3Profile(payload);
@@ -128,6 +133,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
   };
 
   const busy = loading || testing;
+  const switchLabel = (labelId: string, hintId: string) => <span>{intl.formatMessage({ id: labelId })}<Tooltip title={intl.formatMessage({ id: hintId })}><span aria-label={intl.formatMessage({ id: hintId })} style={{ marginLeft: 6, color: 'rgba(0, 0, 0, 0.45)', cursor: 'help' }} tabIndex={0}><QuestionCircleOutlined /></span></Tooltip></span>;
 
   return (
     <Modal
@@ -151,13 +157,13 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
           loading={loading}
           okBtnProps={{ disabled: busy || !encryptionAvailable }}
           cancelBtnProps={{ disabled: busy }}
-          extra={<Button onClick={handleTest} loading={testing} disabled={busy || !encryptionAvailable}>{intl.formatMessage({ id: 'resources.storage.testConnection' })}</Button>}
+          extra={!systemManaged && <Button onClick={handleTest} loading={testing} disabled={busy || !encryptionAvailable}>{intl.formatMessage({ id: 'resources.storage.testConnection' })}</Button>}
         />
       }
     >
       {!encryptionAvailable && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.encryptionUnavailable' })} />}
-      <Alert type="info" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.connectionScope' })} />
-      <Form form={form} layout="vertical" requiredMark="optional" disabled={busy} onValuesChange={() => setTestResult(null)}>
+      {!systemManaged && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.connectionScope' })} />}
+      <Form form={form} layout="vertical" requiredMark={false} disabled={busy} onValuesChange={() => setTestResult(null)}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -167,7 +173,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               })}
               rules={[{ required: true }]}
             >
-              <Input maxLength={255} />
+              <Input disabled={systemManaged} maxLength={255} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -178,7 +184,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               })}
               rules={[{ required: true, type: 'url' }]}
             >
-              <Input placeholder="https://s3.example.com" />
+              <Input disabled={systemManaged} placeholder="https://s3.example.com" />
             </Form.Item>
           </Col>
         </Row>
@@ -191,7 +197,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               })}
               rules={[{ required: true }]}
             >
-              <Input />
+              <Input disabled={systemManaged} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -201,7 +207,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
                 id: 'resources.preheat.profile.prefix'
               })}
             >
-              <Input />
+              <Input disabled={systemManaged} />
             </Form.Item>
           </Col>
         </Row>
@@ -215,6 +221,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               rules={[{ required: !editing }]}
             >
               <Input.Password
+                disabled={systemManaged}
                 autoComplete="new-password"
                 placeholder={
                   editing
@@ -235,6 +242,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               rules={[{ required: !editing }]}
             >
               <Input.Password
+                disabled={systemManaged}
                 autoComplete="new-password"
                 placeholder={
                   editing
@@ -255,7 +263,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
                 id: 'resources.preheat.profile.region'
               })}
             >
-              <Input />
+              <Input disabled={systemManaged} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -265,57 +273,48 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
                 id: 'resources.preheat.profile.description'
               })}
             >
-              <Input maxLength={500} />
+              <Input disabled={systemManaged} maxLength={500} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col xs={12} md={6}>
+          <Col xs={24} sm={12}>
             <Form.Item
               name="tls_enabled"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.tlsEnabled'
-              })}
+              label={switchLabel('resources.preheat.profile.tlsEnabled', 'resources.storage.tlsEnabledHint')}
               valuePropName="checked"
             >
               <Switch />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}>
+          <Col xs={24} sm={12}>
             <Form.Item
               name="tls_verify"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.tlsVerify'
-              })}
+              label={switchLabel('resources.preheat.profile.tlsVerify', 'resources.storage.tlsVerifyHint')}
               valuePropName="checked"
             >
               <Switch />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}>
+          <Col xs={24} sm={12}>
             <Form.Item
               name="use_virtual_hosted_style"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.virtualHosted'
-              })}
+              label={switchLabel('resources.preheat.profile.virtualHosted', 'resources.storage.virtualHostedHint')}
               valuePropName="checked"
             >
               <Switch />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}>
+          <Col xs={24} sm={12}>
             <Form.Item
               name="source_fallback_enabled"
-              label={intl.formatMessage({
-                id: 'resources.storage.sourceFallback'
-              })}
+              label={switchLabel('resources.storage.sourceFallback', 'resources.storage.sourceFallbackDetail')}
               valuePropName="checked"
             >
               <Switch />
             </Form.Item>
           </Col>
         </Row>
-        <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.storage.sourceFallbackHint' })} />
       </Form>
       {testResult && <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }} title={intl.formatMessage({ id: 'resources.storage.testResult' })}>
         <Descriptions.Item label="scope">{testResult.scope}</Descriptions.Item>

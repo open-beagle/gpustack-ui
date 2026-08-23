@@ -9,6 +9,7 @@ import { useIntl } from '@umijs/max';
 import { Button, Space, Table, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
 import {
   createModelPreheatConnectivityCheck,
   deleteModelPreheatS3Profile,
@@ -39,6 +40,37 @@ const connectivityColors: Record<string, string> = {
   checking: 'processing',
   stale: 'warning'
 };
+
+const ProfileNameCell = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+`;
+
+const ProfileNameText = styled.span`
+  min-width: 0;
+  writing-mode: horizontal-tb;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+`;
+
+const ProfileNameTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 6px;
+  min-width: 0;
+
+  > .ant-tag {
+    max-width: 100%;
+    margin-inline-end: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+`;
 
 interface Props {
   onProfilesChanged?: () => void;
@@ -188,6 +220,19 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     setConfirm(null);
   };
 
+  const deleteContentId = (profile: ModelPreheatS3Profile) => {
+    if (profile.system_managed && profile.is_default) {
+      return 'resources.preheat.profile.deleteContent.systemDefault';
+    }
+    if (profile.system_managed) {
+      return 'resources.preheat.profile.deleteContent.system';
+    }
+    if (profile.is_default) {
+      return 'resources.preheat.profile.deleteContent.default';
+    }
+    return 'resources.preheat.profile.deleteContent';
+  };
+
   const handleConfirm = async () => {
     if (!confirm) return;
     setConfirmLoading(true);
@@ -234,18 +279,25 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.name' }),
       dataIndex: 'name',
+      width: 220,
       render: (value: string, record: ModelPreheatS3Profile) => (
-        <Space size={6}>
-          <span>{value}</span>
-          {record.system_managed && (
-            <Tag>{intl.formatMessage({ id: 'resources.storage.systemProfile' })}</Tag>
+        <ProfileNameCell className="model-preheat-profile-name-cell">
+          <ProfileNameText className="model-preheat-profile-name-text">
+            {value}
+          </ProfileNameText>
+          {(record.system_managed || record.is_default) && (
+            <ProfileNameTags className="model-preheat-profile-name-tags">
+              {record.system_managed && (
+                <Tag>{intl.formatMessage({ id: 'resources.storage.systemProfile' })}</Tag>
+              )}
+              {record.is_default && (
+                <Tag color="blue">
+                  {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
+                </Tag>
+              )}
+            </ProfileNameTags>
           )}
-          {record.is_default && (
-            <Tag color="blue">
-              {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
-            </Tag>
-          )}
-        </Space>
+        </ProfileNameCell>
       )
     },
     {
@@ -297,7 +349,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
       width: 180,
       render: (_: unknown, record: ModelPreheatS3Profile) => (
         <Space size={4}>
-          {!record.system_managed && <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
+          <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
             <Button
               type="text"
               icon={<EditOutlined />}
@@ -306,7 +358,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 setFormOpen(true);
               }}
             />
-          </Tooltip>}
+          </Tooltip>
           <Tooltip
             title={intl.formatMessage({
               id: 'resources.preheat.connectivity.detail'
@@ -332,19 +384,19 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           </Tooltip>
           {!record.is_default && (
             <Tooltip title={intl.formatMessage({ id: 'resources.storage.setDefault' })}>
-              <Button type="text" disabled={record.system_managed} onClick={() => openConfirm('default', record)}>
+              <Button type="text" onClick={() => openConfirm('default', record)}>
                 {intl.formatMessage({ id: 'resources.storage.setDefault' })}
               </Button>
             </Tooltip>
           )}
-          {!record.system_managed && <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
+          <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
             <Button
               danger
               type="text"
               icon={<DeleteOutlined />}
               onClick={() => openConfirm('delete', record)}
             />
-          </Tooltip>}
+          </Tooltip>
         </Space>
       )
     }
@@ -423,7 +475,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           {
             id:
               confirm?.action === 'delete'
-                ? 'resources.preheat.profile.deleteContent'
+                ? deleteContentId(confirm.profile)
                 : confirm?.action === 'default'
                   ? 'resources.storage.setDefaultContent'
                   : 'resources.preheat.connectivity.recheckContent'

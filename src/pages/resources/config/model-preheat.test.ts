@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import enUSResources from '../../../locales/en-US/resources';
+import jaJPResources from '../../../locales/ja-JP/resources';
+import ruRUResources from '../../../locales/ru-RU/resources';
+import zhCNResources from '../../../locales/zh-CN/resources';
 import {
   IdempotencyKeyLifecycle,
   LatestRequestGate,
   buildModelPreheatPreview,
   buildModelPreheatS3ProfilePayload,
+  buildSystemManagedModelPreheatS3ProfilePayload,
   getModelPreheatTaskActions,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
@@ -51,6 +56,10 @@ describe('预热配置逻辑', () => {
     expect(buildModelPreheatS3ProfilePayload({ ...profile, access_key: ' ', secret_key: '' }, true)).not.toMatchObject({ access_key: expect.anything(), secret_key: expect.anything() });
   });
 
+  it('系统管理 Profile 的更新载荷只包含允许调整的开关', () => {
+    expect(buildSystemManagedModelPreheatS3ProfilePayload({ ...profile, name: '不应回传', endpoint: 'https://frozen.example.com', bucket: 'frozen-bucket', access_key: 'frozen-access-key', secret_key: 'frozen-secret-key', tls_enabled: false, tls_verify: false, use_virtual_hosted_style: true, source_fallback_enabled: false, default_slot: 'global' })).toEqual({ default_slot: 'global', tls_enabled: false, tls_verify: false, use_virtual_hosted_style: true, source_fallback_enabled: false });
+  });
+
   it('单节点目标不要求回源下载', () => {
     const preview = buildModelPreheatPreview(
       { ...values, target_scope: 'seed_worker' },
@@ -80,6 +89,28 @@ describe('预热配置逻辑', () => {
       { code: 'worker_connectivity_missing', workerName: 'a100-58-re-registered' }
     ]);
     expect(preview.rows[0].connectivity).toBeNull();
+  });
+});
+
+describe('S3 配置删除文案', () => {
+  const locales = [
+    ['zh-CN', zhCNResources],
+    ['en-US', enUSResources],
+    ['ja-JP', jaJPResources],
+    ['ru-RU', ruRUResources]
+  ] as const;
+  const contentKeys = [
+    'resources.preheat.profile.deleteContent',
+    'resources.preheat.profile.deleteContent.default',
+    'resources.preheat.profile.deleteContent.system',
+    'resources.preheat.profile.deleteContent.systemDefault'
+  ] as const;
+
+  it.each(locales)('%s 包含删除标题和四态正文，正文明确目标名称', (_locale, resources) => {
+    expect(resources['resources.preheat.profile.deleteConfirm']).toBeTruthy();
+    for (const key of contentKeys) {
+      expect(resources[key]).toContain('{name}');
+    }
   });
 });
 

@@ -323,5 +323,12 @@ export default {
   'resources.storage.transfer.s3': 'S3 模型库（{profile}）',
   'resources.storage.transfer.modelscope': '从 ModelScope 获取',
   'resources.storage.transfer.huggingface': '从 Hugging Face 获取',
-  'resources.storage.transfer.unknown': '未知获取方式'
+  'resources.storage.transfer.unknown': '未知获取方式',
+  'resources.storage.tlsEnabledHint': '控制与 S3 的传输是否使用 TLS 加密。关闭后将使用未加密连接。',
+  'resources.storage.tlsVerifyHint': '仅在私有 CA 或自签名证书场景下关闭。关闭后不会校验证书，存在中间人攻击风险。',
+  'resources.storage.virtualHostedHint': '启用时使用 bucket.endpoint 形式的虚拟主机寻址；关闭时使用 endpoint/bucket 路径寻址。请按 S3 服务兼容性选择。',
+  'resources.storage.sourceFallbackDetail': '仅当此配置为默认配置时生效。S3 中没有缓存模型时，开启后允许继续从原模型源下载；关闭后该下载会失败。',
+  'resources.preheat.profile.deleteContent.default': '确定删除 S3 配置“{name}”吗？删除后，新下载将直接从模型源获取，直到重新设置默认 S3 配置。',
+  'resources.preheat.profile.deleteContent.system': '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。',
+  'resources.preheat.profile.deleteContent.systemDefault': '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3，新下载将直接从模型源获取，直到重新设置默认 S3 配置。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。'
 };
