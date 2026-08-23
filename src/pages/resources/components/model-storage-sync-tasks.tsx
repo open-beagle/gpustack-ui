@@ -69,7 +69,23 @@ const ModelStorageSyncTasks: React.FC = () => {
     return `${task.profile_name} · ${task.profile_bucket}${prefix}`;
   };
 
-  const sourceWorker = (task: ModelStorageSyncTask) => {
+  const detailProfileDestination = (task: ModelStorageSyncTaskDetail) => {
+    const profile = task.profile;
+    if (!profile?.name || !profile.bucket) {
+      return `S3 Profile #${profile?.id || task.transfer_profile_id || '-'} · v${task.profile_config_version}`;
+    }
+    const prefix = profile.prefix
+      ? `/${profile.prefix.replace(/^\/+|\/+$/g, '')}`
+      : '';
+    return `${profile.name} · ${profile.bucket}${prefix}`;
+  };
+
+  const sourceWorker = (
+    task: Pick<
+      ModelStorageSyncTask,
+      'source_worker_id' | 'worker_id' | 'source_worker_name'
+    >
+  ) => {
     const workerId = task.source_worker_id || task.worker_id;
     return task.source_worker_name || `Worker #${workerId}`;
   };
@@ -326,7 +342,7 @@ const ModelStorageSyncTasks: React.FC = () => {
                 id: 'resources.storage.syncTask.to'
               })}
             >
-              {detail ? profileDestination(detail) : '-'}
+              {detail ? detailProfileDestination(detail) : '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({ id: 'common.table.status' })}

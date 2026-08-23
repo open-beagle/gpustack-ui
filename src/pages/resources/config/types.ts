@@ -312,10 +312,37 @@ export interface ModelStorageSyncTask {
   updated_at: string;
 }
 
-export interface ModelStorageSyncTaskDetail extends ModelStorageSyncTask {
+export interface ModelStorageSyncTaskDetail {
+  id: number;
+  model_file_id: number;
+  worker_id: number;
+  profile_config_version: number;
+  source: string;
+  model_id: string;
+  resolved_revision: string;
+  state: 'pending' | 'scanning' | 'publishing' | 'ready' | 'error' | 'canceled';
+  state_message: string | null;
+  error_code: string | null;
+  file_count: number;
+  total_size: number;
+  transfer_source: ModelStorageTransferSource | null;
+  transfer_profile_id: number | null;
+  source_worker_id: number | null;
+  source_worker_name: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
   profile: {
     id: number;
     name: string;
+    endpoint: string | null;
+    bucket: string | null;
+    prefix: string | null;
+    tls_enabled: boolean | null;
+    tls_verify: boolean | null;
+    region: string | null;
+    use_virtual_hosted_style: boolean | null;
     config_version: number;
     system_managed: boolean;
   } | null;

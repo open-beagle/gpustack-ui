@@ -9,7 +9,11 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ModelFile, ModelStorageSyncTaskDetail } from '../config/types';
+import type {
+  ModelFile,
+  ModelStorageSyncTask,
+  ModelStorageSyncTaskDetail
+} from '../config/types';
 import ModelStorageSyncBatchModal from './model-storage-sync-batch-modal';
 import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
@@ -41,9 +45,9 @@ vi.mock('../apis', async () => ({
   ...api
 }));
 
-const task = (
-  overrides: Partial<ModelStorageSyncTaskDetail> = {}
-): ModelStorageSyncTaskDetail => ({
+const listTask = (
+  overrides: Partial<ModelStorageSyncTask> = {}
+): ModelStorageSyncTask => ({
   id: 5,
   model_file_id: 7,
   worker_id: 12,
@@ -65,18 +69,51 @@ const task = (
   profile_endpoint: 'https://s3.example.com',
   profile_bucket: 'models',
   profile_prefix: 'team-a',
+  started_at: null,
+  finished_at: null,
+  created_at: '',
+  updated_at: '',
+  ...overrides
+});
+
+const detailTask = (
+  overrides: Partial<ModelStorageSyncTaskDetail> = {}
+): ModelStorageSyncTaskDetail => ({
+  id: 5,
+  model_file_id: 7,
+  worker_id: 12,
+  profile_config_version: 2,
+  source: 'modelscope',
+  model_id: 'team/model',
+  resolved_revision: 'main',
+  state: 'ready',
+  state_message: null,
+  error_code: null,
+  file_count: 1,
+  total_size: 1024,
+  transfer_source: 's3',
+  transfer_profile_id: 3,
+  source_worker_id: 12,
+  source_worker_name: 'a100-58',
+  started_at: null,
+  finished_at: null,
+  created_at: '',
+  updated_at: '',
   profile: {
     id: 3,
     name: 'center-cache',
+    endpoint: 'https://s3.example.com',
+    bucket: 'models',
+    prefix: 'team-a',
+    tls_enabled: true,
+    tls_verify: true,
+    region: null,
+    use_virtual_hosted_style: false,
     config_version: 2,
     system_managed: false
   },
   request_digest: 'request-5',
   artifact_id: 'artifact-5',
-  started_at: null,
-  finished_at: null,
-  created_at: '',
-  updated_at: '',
   ...overrides
 });
 
@@ -101,7 +138,7 @@ describe('同步任务获取方式', () => {
     const user = userEvent.setup();
     api.queryModelStorageSyncTasks.mockResolvedValue({
       items: [
-        task({
+        listTask({
           state: 'error',
           transfer_source: null,
           created_at: '2026-08-23T22:08:05+08:00'
@@ -134,8 +171,8 @@ describe('同步任务获取方式', () => {
 
   it('活动任务自动刷新并及时显示失败终态', async () => {
     vi.useFakeTimers();
-    const pending = task({ state: 'pending', transfer_source: null });
-    const failed = task({
+    const pending = listTask({ state: 'pending', transfer_source: null });
+    const failed = listTask({
       state: 'error',
       transfer_source: null,
       error_code: 'worker_execution_failed'
@@ -175,7 +212,7 @@ describe('同步任务获取方式', () => {
     const latestRefresh = deferred<any>();
     api.queryModelStorageSyncTasks
       .mockResolvedValueOnce({
-        items: [task({ state: 'pending', transfer_source: null })],
+        items: [listTask({ state: 'pending', transfer_source: null })],
         pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
       })
       .mockReturnValueOnce(stalePolling.promise)
@@ -192,14 +229,14 @@ describe('同步任务获取方式', () => {
     fireEvent.click(screen.getByText('common.button.refresh'));
 
     latestRefresh.resolve({
-      items: [task({ state: 'error', transfer_source: null })],
+      items: [listTask({ state: 'error', transfer_source: null })],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     await act(async () => {
       await latestRefresh.promise;
     });
     stalePolling.resolve({
-      items: [task({ state: 'pending', transfer_source: null })],
+      items: [listTask({ state: 'pending', transfer_source: null })],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     await act(async () => {
@@ -220,7 +257,7 @@ describe('同步任务获取方式', () => {
     const latestPolling = deferred<any>();
     api.queryModelStorageSyncTasks
       .mockResolvedValueOnce({
-        items: [task({ state: 'pending', transfer_source: null })],
+        items: [listTask({ state: 'pending', transfer_source: null })],
         pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
       })
       .mockReturnValueOnce(manualRefresh.promise)
@@ -241,7 +278,7 @@ describe('同步任务获取方式', () => {
     });
 
     latestPolling.resolve({
-      items: [task({ state: 'error', transfer_source: null })],
+      items: [listTask({ state: 'error', transfer_source: null })],
       pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
     });
     await act(async () => {
@@ -533,9 +570,10 @@ describe('同步任务获取方式', () => {
   });
 
   it('列表和详情使用任务冻结的来源与 S3 目标，不查询当前配置', async () => {
-    const detail = task();
+    const list = listTask();
+    const detail = detailTask();
     api.queryModelStorageSyncTasks.mockResolvedValue({
-      items: [detail],
+      items: [list],
       pagination: { page: 1, per_page: 100, total: 1, total_page: 1 }
     });
     api.queryModelStorageSyncTask.mockResolvedValue(detail);
@@ -553,7 +591,7 @@ describe('同步任务获取方式', () => {
   });
 
   it('冻结字段缺失时只显示 ID 和配置版本', async () => {
-    const detail = task({
+    const list = listTask({
       transfer_source: 'peer_via_s3',
       source_worker_name: null,
       profile_name: null,
@@ -561,8 +599,25 @@ describe('同步任务获取方式', () => {
       profile_bucket: null,
       profile_prefix: null
     });
+    const detail = detailTask({
+      transfer_source: 'peer_via_s3',
+      source_worker_name: null,
+      profile: {
+        id: 3,
+        name: 'center-cache',
+        endpoint: 'https://s3.example.com',
+        bucket: null,
+        prefix: null,
+        tls_enabled: true,
+        tls_verify: true,
+        region: null,
+        use_virtual_hosted_style: false,
+        config_version: 2,
+        system_managed: false
+      }
+    });
     api.queryModelStorageSyncTasks.mockResolvedValue({
-      items: [detail],
+      items: [list],
       pagination: { page: 1, per_page: 100, total: 1, total_page: 1 }
     });
     api.queryModelStorageSyncTask.mockResolvedValue(detail);
