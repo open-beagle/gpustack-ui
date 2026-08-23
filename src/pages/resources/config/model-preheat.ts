@@ -18,6 +18,76 @@ export interface ModelStorageTransferPresentation {
   includeWorker: boolean;
 }
 
+export type ModelFileSyncActionReason =
+  | 'unsupported'
+  | 'missing_revision'
+  | 'already_from_default';
+
+export interface ModelFileSyncActionState {
+  visible: boolean;
+  disabled: boolean;
+  reason: ModelFileSyncActionReason | null;
+}
+
+export interface ModelStorageRevisionPresentation {
+  full: string;
+  short: string;
+  kind: 'modelscope_filelist' | 'revision';
+}
+
+const MODELSCOPE_FILELIST_REVISION_PREFIX = 'modelscope-filelist-v1-';
+
+export function getModelStorageRevisionPresentation(
+  revision: string
+): ModelStorageRevisionPresentation {
+  if (revision.startsWith(MODELSCOPE_FILELIST_REVISION_PREFIX)) {
+    const fingerprint = revision.slice(MODELSCOPE_FILELIST_REVISION_PREFIX.length);
+    return {
+      full: revision,
+      short: fingerprint.slice(0, 12),
+      kind: 'modelscope_filelist'
+    };
+  }
+  return {
+    full: revision,
+    short: revision.length > 16 ? revision.slice(0, 12) : revision,
+    kind: 'revision'
+  };
+}
+
+export function getModelFileSyncActionState(
+  model: {
+    state: string;
+    source: string;
+    resolved_revision?: string | null;
+    transfer_source?: ModelStorageTransferSource | null;
+    transfer_profile_id?: number | null;
+  },
+  defaultProfileId?: number
+): ModelFileSyncActionState {
+  const supported =
+    model.state === 'ready' &&
+    ['model_scope', 'huggingface'].includes(model.source);
+  if (!supported) {
+    return { visible: false, disabled: true, reason: 'unsupported' };
+  }
+  if (!model.resolved_revision) {
+    return { visible: true, disabled: true, reason: 'missing_revision' };
+  }
+  if (
+    defaultProfileId !== undefined &&
+    ['s3', 'peer_via_s3'].includes(model.transfer_source || '') &&
+    model.transfer_profile_id === defaultProfileId
+  ) {
+    return {
+      visible: true,
+      disabled: true,
+      reason: 'already_from_default'
+    };
+  }
+  return { visible: true, disabled: false, reason: null };
+}
+
 export function getModelStorageTransferPresentation(
   source: ModelStorageTransferSource | null
 ): ModelStorageTransferPresentation {

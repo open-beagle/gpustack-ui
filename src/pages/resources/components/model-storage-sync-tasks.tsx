@@ -1,9 +1,9 @@
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import { Button, Descriptions, Modal, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteModelStorageSyncTask, queryModelStorageSyncTask, queryModelStorageSyncTasks } from '../apis';
-import { getModelStorageTransferPresentation } from '../config/model-preheat';
+import { getModelStorageTransferPresentation, LatestRequestGate } from '../config/model-preheat';
 import type { ModelStorageSyncTask, ModelStorageSyncTaskDetail } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelStorageSyncBatchModal from './model-storage-sync-batch-modal';
@@ -26,6 +26,7 @@ const cancellableStates = new Set(['pending', 'scanning', 'publishing']);
 
 const ModelStorageSyncTasks: React.FC = () => {
   const intl = useIntl();
+  const taskRequests = useRef(new LatestRequestGate());
   const [tasks, setTasks] = useState<ModelStorageSyncTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ModelStorageSyncTask | null>(null);
@@ -33,13 +34,27 @@ const ModelStorageSyncTasks: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
-  const load = useCallback(async () => { setLoading(true); try { setTasks((await queryModelStorageSyncTasks({ page: 1, perPage: 100 })).items); } finally { setLoading(false); } }, []);
+  const load = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    return taskRequests.current.run(
+      () => queryModelStorageSyncTasks({ page: 1, perPage: 100 }),
+      (result) => setTasks(result.items),
+      () => setLoading(false)
+    );
+  }, []);
   useEffect(() => { void load().catch(() => undefined); }, [load]);
+  useEffect(() => {
+    if (!tasks.some((task) => cancellableStates.has(task.state))) return;
+    const timer = window.setInterval(() => {
+      void load(false).catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [load, tasks]);
   const openDetail = async (task: ModelStorageSyncTask) => { setDetailLoading(true); try { setDetail(await queryModelStorageSyncTask(task.id)); } finally { setDetailLoading(false); } };
   const remove = async () => { if (!selected) return; setSubmitting(true); try { await deleteModelStorageSyncTask(selected.id); setSelected(null); message.success(intl.formatMessage({ id: 'common.message.success' })); await load(); } finally { setSubmitting(false); } };
   return <>
     <Space style={{ marginBottom: 16 }}>
-      <Button icon={<ReloadOutlined />} loading={loading} onClick={load}>{intl.formatMessage({ id: 'common.button.refresh' })}</Button>
+      <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{intl.formatMessage({ id: 'common.button.refresh' })}</Button>
       <Button type="primary" icon={<PlusOutlined />} onClick={() => setBatchOpen(true)}>{intl.formatMessage({ id: 'resources.storage.syncBatch.create' })}</Button>
     </Space>
     <Table rowKey="id" loading={loading} dataSource={tasks} scroll={{ x: 900 }} columns={[
@@ -49,7 +64,7 @@ const ModelStorageSyncTasks: React.FC = () => {
       { title: intl.formatMessage({ id: 'common.table.operation' }), render: (_: unknown, task: ModelStorageSyncTask) => <><Tooltip title={intl.formatMessage({ id: 'common.button.detail' })}><Button type="text" icon={<EyeOutlined />} onClick={() => void openDetail(task)} /></Tooltip>{cancellableStates.has(task.state) && <Tooltip title={intl.formatMessage({ id: 'resources.storage.cancelSync' })}><Button danger type="text" icon={<DeleteOutlined />} onClick={() => setSelected(task)} /></Tooltip>}</> }
     ]} />
     <Modal open={Boolean(detail) || detailLoading} centered maskClosable={false} onCancel={() => setDetail(null)} footer={null} title={intl.formatMessage({ id: 'resources.storage.syncTaskDetail' })}>
-      {detailLoading ? <Typography.Text>...</Typography.Text> : <Descriptions column={1} size="small"><Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.modelSource' })}>{detail?.source}</Descriptions.Item><Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.transferMethod' })}>{detail && transferMethod(intl, detail)}</Descriptions.Item><Descriptions.Item label="Artifact ID">{detail?.artifact_id || '-'}</Descriptions.Item></Descriptions>}
+      {detailLoading ? <Typography.Text>...</Typography.Text> : <Descriptions column={1} size="small"><Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.modelSource' })}>{detail?.source}</Descriptions.Item><Descriptions.Item label={intl.formatMessage({ id: 'common.table.status' })}>{detail?.state || '-'}</Descriptions.Item><Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.syncTask.errorCode' })}>{detail?.error_code ? intl.formatMessage({ id: `resources.storage.syncTask.error.${detail.error_code}`, defaultMessage: detail.error_code }) : '-'}</Descriptions.Item><Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.transferMethod' })}>{detail?.transfer_source ? transferMethod(intl, detail) : '-'}</Descriptions.Item><Descriptions.Item label="Artifact ID">{detail?.artifact_id || '-'}</Descriptions.Item></Descriptions>}
     </Modal>
     <ModelPreheatConfirmModal open={Boolean(selected)} title={intl.formatMessage({ id: 'resources.storage.cancelSyncConfirm' })} content={intl.formatMessage({ id: 'resources.storage.cancelSyncContent' }, { id: selected?.id || '' })} okText={intl.formatMessage({ id: 'resources.storage.cancelSync' })} danger loading={submitting} onOk={remove} onCancel={() => setSelected(null)} />
     <ModelStorageSyncBatchModal open={batchOpen} onCancel={() => setBatchOpen(false)} onTasksChanged={() => void load()} />

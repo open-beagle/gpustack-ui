@@ -9,6 +9,7 @@ import {
   queryWorkersList
 } from '../apis';
 import {
+  getModelStorageRevisionPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate,
   loadAllPaginated
@@ -36,11 +37,13 @@ const syncableModels = (models: ModelFile[]) =>
     (model) =>
       model.state === 'ready' &&
       Boolean(model.resolved_revision) &&
-      ['modelscope', 'huggingface'].includes(model.source)
+      ['model_scope', 'huggingface'].includes(model.source)
   );
 
 const modelName = (model: ModelFile) =>
   model.model_scope_model_id || model.huggingface_repo_id || model.local_path;
+
+const selectStyle = { width: 'min(420px, 100%)' };
 
 const ModelStorageSyncBatchModal: React.FC<Props> = ({
   open,
@@ -241,6 +244,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Typography.Text>{intl.formatMessage({ id: 'resources.storage.targetProfile' })}</Typography.Text>
             <Select
+              style={selectStyle}
               value={profileId}
               loading={loading}
               placeholder={intl.formatMessage({ id: 'resources.storage.targetProfile' })}
@@ -251,6 +255,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Typography.Text>{intl.formatMessage({ id: 'resources.storage.syncBatch.scope' })}</Typography.Text>
             <Select
+              style={selectStyle}
               value={scope}
               onChange={(value: ModelStorageSyncScope) => {
                 setScope(value);
@@ -265,6 +270,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
           {scope === 'single_model' && (
             <>
               <Select
+                style={selectStyle}
                 showSearch
                 optionFilterProp="label"
                 value={workerId}
@@ -276,6 +282,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
                 <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.storage.syncBatch.noSyncableModels' })} />
               ) : (
                 <Select
+                  style={selectStyle}
                   showSearch
                   optionFilterProp="label"
                   value={modelFileId}
@@ -283,13 +290,17 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
                   disabled={!workerId}
                   placeholder={intl.formatMessage({ id: 'resources.storage.syncBatch.selectModel' })}
                   onChange={setModelFileId}
-                  options={models.map((model) => ({ value: model.id, label: `${modelName(model)} (${model.resolved_revision})` }))}
+                  options={models.map((model) => ({
+                    value: model.id,
+                    label: `${modelName(model)} (${getModelStorageRevisionPresentation(model.resolved_revision || '').short})`
+                  }))}
                 />
               )}
             </>
           )}
           {scope === 'selected_workers' && (
             <Select
+              style={selectStyle}
               mode="multiple"
               showSearch
               optionFilterProp="label"

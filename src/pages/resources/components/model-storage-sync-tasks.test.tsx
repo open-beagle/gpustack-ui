@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelFile, ModelStorageSyncTaskDetail } from '../config/types';
@@ -67,9 +67,121 @@ const deferred = <T,>() => {
 };
 
 beforeEach(() => vi.clearAllMocks());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('同步任务获取方式', () => {
+  it('活动任务自动刷新并及时显示失败终态', async () => {
+    vi.useFakeTimers();
+    const pending = task({ state: 'pending', transfer_source: null });
+    const failed = task({
+      state: 'error',
+      transfer_source: null,
+      error_code: 'worker_execution_failed'
+    });
+    api.queryModelStorageSyncTasks
+      .mockResolvedValueOnce({
+        items: [pending],
+        pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+      })
+      .mockResolvedValue({
+        items: [failed],
+        pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+      });
+
+    render(<ModelStorageSyncTasks />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText('pending')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(api.queryModelStorageSyncTasks).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('error')).toBeInTheDocument();
+  });
+
+  it('忽略晚返回的旧轮询响应，终态不会回退为 pending', async () => {
+    vi.useFakeTimers();
+    const stalePolling = deferred<any>();
+    const latestRefresh = deferred<any>();
+    api.queryModelStorageSyncTasks
+      .mockResolvedValueOnce({
+        items: [task({ state: 'pending', transfer_source: null })],
+        pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+      })
+      .mockReturnValueOnce(stalePolling.promise)
+      .mockReturnValueOnce(latestRefresh.promise);
+
+    render(<ModelStorageSyncTasks />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    fireEvent.click(screen.getByText('common.button.refresh'));
+
+    latestRefresh.resolve({
+      items: [task({ state: 'error', transfer_source: null })],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await act(async () => {
+      await latestRefresh.promise;
+    });
+    stalePolling.resolve({
+      items: [task({ state: 'pending', transfer_source: null })],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await act(async () => {
+      await stalePolling.promise;
+    });
+
+    expect(screen.getByText('error')).toBeInTheDocument();
+    expect(screen.queryByText('pending')).not.toBeInTheDocument();
+  });
+
+  it('后台轮询接管手动刷新后会正常结束 loading', async () => {
+    vi.useFakeTimers();
+    const manualRefresh = deferred<any>();
+    const latestPolling = deferred<any>();
+    api.queryModelStorageSyncTasks
+      .mockResolvedValueOnce({
+        items: [task({ state: 'pending', transfer_source: null })],
+        pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+      })
+      .mockReturnValueOnce(manualRefresh.promise)
+      .mockReturnValueOnce(latestPolling.promise);
+
+    render(<ModelStorageSyncTasks />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const refreshButton = screen.getByText('common.button.refresh').closest('button');
+    fireEvent.click(refreshButton!);
+    expect(refreshButton).toHaveClass('ant-btn-loading');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    latestPolling.resolve({
+      items: [task({ state: 'error', transfer_source: null })],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await act(async () => {
+      await latestPolling.promise;
+    });
+
+    expect(refreshButton).not.toHaveClass('ant-btn-loading');
+  });
+
   it('关闭后重开时忽略旧的 Profile 和节点初始化响应', async () => {
     const user = userEvent.setup();
     const firstProfiles = deferred<any>();
@@ -121,7 +233,7 @@ describe('同步任务获取方式', () => {
     const second = deferred<Global.PageResponse<ModelFile>>();
     const model = (id: number, workerId: number, name: string): ModelFile => ({
       id,
-      source: 'modelscope',
+      source: 'model_scope',
       model_scope_model_id: name,
       model_scope_file_path: 'weights.gguf',
       huggingface_repo_id: '',
@@ -187,7 +299,7 @@ describe('同步任务获取方式', () => {
     const user = userEvent.setup();
     const model: ModelFile = {
       id: 31,
-      source: 'modelscope',
+      source: 'model_scope',
       model_scope_model_id: 'team/model-page-2',
       model_scope_file_path: 'weights.gguf',
       huggingface_repo_id: '',

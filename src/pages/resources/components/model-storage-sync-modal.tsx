@@ -1,9 +1,12 @@
 import ModalFooter from '@/components/modal-footer';
 import { useIntl } from '@umijs/max';
-import { Alert, Descriptions, Modal, Select } from 'antd';
+import { Alert, Descriptions, Modal, Select, Tooltip, Typography } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createModelStorageSyncTask } from '../apis';
-import { IdempotencyKeyLifecycle } from '../config/model-preheat';
+import {
+  getModelStorageRevisionPresentation,
+  IdempotencyKeyLifecycle
+} from '../config/model-preheat';
 import type {
   ModelFile,
   ModelPreheatS3Profile,
@@ -46,6 +49,10 @@ const ModelStorageSyncModal: React.FC<Props> = ({
   const alreadyFromDefault =
     selected?.id === model?.transfer_profile_id &&
     model?.transfer_source === 's3';
+  const revision = model?.resolved_revision || model?.requested_revision;
+  const revisionPresentation = revision
+    ? getModelStorageRevisionPresentation(revision)
+    : null;
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +127,20 @@ const ModelStorageSyncModal: React.FC<Props> = ({
           {model?.worker_id || '-'}
         </Descriptions.Item>
         <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.version' })}>
-          {model?.resolved_revision || model?.requested_revision || '-'}
+          {revisionPresentation ? (
+            <Tooltip title={revisionPresentation.full}>
+              <Typography.Text copyable={{ text: revisionPresentation.full }}>
+                {revisionPresentation.kind === 'modelscope_filelist'
+                  ? intl.formatMessage(
+                      { id: 'resources.storage.revision.modelscopeFilelist' },
+                      { fingerprint: revisionPresentation.short }
+                    )
+                  : revisionPresentation.short}
+              </Typography.Text>
+            </Tooltip>
+          ) : (
+            '-'
+          )}
         </Descriptions.Item>
         <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.fileCount' })}>
           {model?.resolved_paths?.length || 0}

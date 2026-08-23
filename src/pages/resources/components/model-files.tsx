@@ -67,7 +67,10 @@ import {
   ModelfileStateMapValue,
   WorkerStatusMap
 } from '../config';
-import { getModelStorageTransferPresentation } from '../config/model-preheat';
+import {
+  getModelFileSyncActionState,
+  getModelStorageTransferPresentation
+} from '../config/model-preheat';
 import {
   ModelFile as ListItem,
   ModelPreheatS3Profile,
@@ -601,33 +604,43 @@ const LocalModelFiles = () => {
         showTitle: false
       },
       render: (text: string, record: ListItem) => {
-        const modelInfo = getModelInfo(record);
-        const { repo_id, source } = modelInfo;
+        const { source } = getModelInfo(record);
         const transfer = getModelStorageTransferPresentation(
           record.transfer_source || null
         );
+        const transferText = record.transfer_source
+          ? intl.formatMessage(
+              { id: transfer.messageId },
+              {
+                worker: transfer.includeWorker
+                  ? record.source_worker_name ||
+                    `Worker #${record.source_worker_id || '-'}`
+                  : '',
+                profile: transfer.includeProfile
+                  ? record.transfer_profile_name ||
+                    `Profile #${record.transfer_profile_id || '-'}`
+                  : ''
+              }
+            )
+          : null;
         return (
           <TextWrapper style={{ paddingRight: 8, display: 'block' }}>
-            <div>
-              <AutoTooltip ghost title={source}>
-                {source}
-              </AutoTooltip>
-            </div>
-            {record.transfer_source && (
-              <div style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }}>
-                {intl.formatMessage(
-                  { id: transfer.messageId },
-                  {
-                    worker: transfer.includeWorker
-                      ? record.source_worker_name || `Worker #${record.source_worker_id || '-'}`
-                      : '',
-                    profile: transfer.includeProfile
-                      ? record.transfer_profile_name || `Profile #${record.transfer_profile_id || '-'}`
-                      : ''
-                  }
-                )}
-              </div>
-            )}
+            <AutoTooltip
+              ghost
+              showTitle={Boolean(transferText)}
+              title={
+                transferText ? (
+                  <div>
+                    <div>{source}</div>
+                    <div>{transferText}</div>
+                  </div>
+                ) : (
+                  source
+                )
+              }
+            >
+              {source}
+            </AutoTooltip>
           </TextWrapper>
         );
       }
@@ -700,36 +713,46 @@ const LocalModelFiles = () => {
       dataIndex: 'operation',
       width: 180,
       render: (text: string, record: ListItem) => {
-        const supportsSync = record.state === ModelfileStateMap.Ready &&
-          Boolean(record.resolved_revision) &&
-          [modelSourceMap.modelscope_value, modelSourceMap.huggingface_value].includes(record.source);
-        const alreadyFromDefault =
-          ['s3', 'peer_via_s3'].includes(record.transfer_source || '') &&
-          record.transfer_profile_id === defaultSyncProfileId;
-        return <>
-          {supportsSync && (
-            <Tooltip
-              title={
-                alreadyFromDefault
-                  ? intl.formatMessage({ id: 'resources.storage.sync.alreadyFromDefault' })
-                  : undefined
-              }
-            >
+        const syncAction = getModelFileSyncActionState(
+          record,
+          defaultSyncProfileId
+        );
+        const syncTooltip =
+          syncAction.reason === 'missing_revision'
+            ? intl.formatMessage({
+                id: 'resources.storage.sync.missingRevision'
+              })
+            : syncAction.reason === 'already_from_default'
+              ? intl.formatMessage({
+                  id: 'resources.storage.sync.alreadyFromDefault'
+                })
+              : intl.formatMessage({ id: 'resources.storage.sync' });
+        return (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              whiteSpace: 'nowrap'
+            }}
+          >
+          {syncAction.visible && (
+            <Tooltip title={syncTooltip}>
               <Button
-                type="link"
+                type="text"
                 icon={<SyncOutlined />}
-                disabled={alreadyFromDefault}
+                aria-label={intl.formatMessage({ id: 'resources.storage.sync' })}
+                disabled={syncAction.disabled}
                 onClick={() => void openSync(record)}
-              >
-                {intl.formatMessage({ id: 'resources.storage.sync' })}
-              </Button>
+              />
             </Tooltip>
           )}
           <DropdownButtons
             items={setActionList(record)}
             onSelect={(val) => handleSelect(val, record)}
           ></DropdownButtons>
-        </>;
+          </div>
+        );
       }
     }
   ];

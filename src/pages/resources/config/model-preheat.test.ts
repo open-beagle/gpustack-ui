@@ -9,6 +9,8 @@ import {
   buildModelPreheatPreview,
   buildModelPreheatS3ProfilePayload,
   buildSystemManagedModelPreheatS3ProfilePayload,
+  getModelFileSyncActionState,
+  getModelStorageRevisionPresentation,
   getModelPreheatTaskActions,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
@@ -116,6 +118,68 @@ describe('S3 配置删除文案', () => {
     for (const key of contentKeys) {
       expect(resources[key]).toContain('{name}');
     }
+  });
+});
+
+describe('节点模型同步入口', () => {
+  it('Ready Hub 模型始终展示入口，缺少可信 revision 时明确禁用', () => {
+    const base = {
+      state: 'ready',
+      source: 'model_scope',
+      resolved_revision: 'commit-1',
+      transfer_source: null,
+      transfer_profile_id: null
+    };
+
+    expect(getModelFileSyncActionState(base, 3)).toEqual({
+      visible: true,
+      disabled: false,
+      reason: null
+    });
+    expect(
+      getModelFileSyncActionState({ ...base, resolved_revision: null }, 3)
+    ).toEqual({
+      visible: true,
+      disabled: true,
+      reason: 'missing_revision'
+    });
+    expect(
+      getModelFileSyncActionState(
+        {
+          ...base,
+          transfer_source: 'peer_via_s3',
+          transfer_profile_id: 3
+        },
+        3
+      )
+    ).toEqual({
+      visible: true,
+      disabled: true,
+      reason: 'already_from_default'
+    });
+    expect(
+      getModelFileSyncActionState({ ...base, source: 'local_path' }, 3)
+    ).toEqual({
+      visible: false,
+      disabled: true,
+      reason: 'unsupported'
+    });
+  });
+
+  it('ModelScope 文件清单指纹只展示可读短值并保留完整值', () => {
+    const revision =
+      'modelscope-filelist-v1-d0f0cb5439088a905edc0cfde4676847e2b068daff9de4150c892891e797b03b';
+
+    expect(getModelStorageRevisionPresentation(revision)).toEqual({
+      full: revision,
+      short: 'd0f0cb543908',
+      kind: 'modelscope_filelist'
+    });
+    expect(getModelStorageRevisionPresentation('abc123')).toEqual({
+      full: 'abc123',
+      short: 'abc123',
+      kind: 'revision'
+    });
   });
 });
 
