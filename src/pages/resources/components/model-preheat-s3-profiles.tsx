@@ -3,6 +3,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
@@ -29,7 +30,7 @@ import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatConnectivity from './model-preheat-connectivity';
 import ModelPreheatS3ProfileModal from './model-preheat-s3-profile-modal';
 
-type ConfirmAction = 'delete' | 'check' | 'default';
+type ConfirmAction = 'delete' | 'check' | 'default' | 'maintenance' | 'restore';
 
 const connectivityColors: Record<string, string> = {
   available: 'success',
@@ -40,6 +41,9 @@ const connectivityColors: Record<string, string> = {
   checking: 'processing',
   stale: 'warning'
 };
+
+const isActiveProfile = (profile: ModelPreheatS3Profile) =>
+  profile.lifecycle_state === 'active';
 
 const ProfileNameCell = styled.div`
   display: grid;
@@ -255,6 +259,16 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         onProfilesChanged?.();
         return;
       }
+      if (confirm.action === 'maintenance' || confirm.action === 'restore') {
+        await updateModelPreheatS3Profile(confirm.profile.id, {
+          lifecycle_state: confirm.action === 'maintenance' ? 'maintenance' : 'active'
+        });
+        message.success(intl.formatMessage({ id: 'common.message.success' }));
+        setConfirm(null);
+        await loadProfiles();
+        onProfilesChanged?.();
+        return;
+      }
       const result = await createModelPreheatConnectivityCheck(
         confirm.profile.id,
         connectivityKeys.current.current()
@@ -285,15 +299,22 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           <ProfileNameText className="model-preheat-profile-name-text">
             {value}
           </ProfileNameText>
-          {(record.system_managed || record.is_default) && (
+          {(record.system_managed || (isActiveProfile(record) && record.is_default) || !isActiveProfile(record)) && (
             <ProfileNameTags className="model-preheat-profile-name-tags">
               {record.system_managed && (
                 <Tag>{intl.formatMessage({ id: 'resources.storage.systemProfile' })}</Tag>
               )}
-              {record.is_default && (
+              {isActiveProfile(record) && record.is_default && (
                 <Tag color="blue">
                   {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
                 </Tag>
+              )}
+              {!isActiveProfile(record) && (
+                <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.maintenanceHint' })}>
+                  <Tag color="orange">
+                    {intl.formatMessage({ id: 'resources.preheat.profile.maintenance' })} <QuestionCircleOutlined />
+                  </Tag>
+                </Tooltip>
               )}
             </ProfileNameTags>
           )}
@@ -313,14 +334,20 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.credential' }),
       dataIndex: 'credential_configured',
-      render: (value: boolean) => (
-        <Tag color={value ? 'success' : 'error'}>
-          {intl.formatMessage({
-            id: value
-              ? 'resources.preheat.state.configured'
-              : 'resources.preheat.state.unconfigured'
-          })}
-        </Tag>
+      render: (value: boolean, record: ModelPreheatS3Profile) => (
+        <Tooltip title={!value ? intl.formatMessage({
+          id: record.system_managed
+            ? 'resources.preheat.profile.systemCredentialUnavailableHint'
+            : 'resources.preheat.profile.credentialUnavailableHint'
+        }) : undefined}>
+          <Tag color={value ? 'success' : 'error'}>
+            {intl.formatMessage({
+              id: value
+                ? 'resources.preheat.state.configured'
+                : 'resources.preheat.state.unavailable'
+            })}
+          </Tag>
+        </Tooltip>
       )
     },
     {
@@ -328,10 +355,16 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         id: 'resources.preheat.connectivity.status'
       }),
       dataIndex: 'connectivity_state',
-      render: (value: string) => (
-        <Tag color={connectivityColors[value]}>
-          {intl.formatMessage({ id: `resources.preheat.state.${value}` })}
-        </Tag>
+      render: (value: string, record: ModelPreheatS3Profile) => (
+        <Tooltip title={value === 'unavailable' ? intl.formatMessage({
+          id: record.system_managed
+            ? 'resources.preheat.profile.systemConnectivityUnavailableHint'
+            : 'resources.preheat.profile.connectivityUnavailableHint'
+        }) : undefined}>
+          <Tag color={connectivityColors[value]}>
+            {intl.formatMessage({ id: `resources.preheat.state.${value}` })}
+          </Tag>
+        </Tooltip>
       )
     },
     {
@@ -371,32 +404,34 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
               onClick={() => openConnectivity(record)}
             />
           </Tooltip>
-          <Tooltip
-            title={intl.formatMessage({
-              id: 'resources.storage.checkWorkers'
-            })}
-          >
-            <Button
-              type="text"
-              icon={<ReloadOutlined />}
-              onClick={() => openConfirm('check', record)}
-            />
+          <Tooltip title={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}>
+            <Button type="text" icon={<ReloadOutlined />} onClick={() => openConfirm('check', record)} />
           </Tooltip>
-          {!record.is_default && (
+          {isActiveProfile(record) && !record.is_default && (
             <Tooltip title={intl.formatMessage({ id: 'resources.storage.setDefault' })}>
               <Button type="text" onClick={() => openConfirm('default', record)}>
                 {intl.formatMessage({ id: 'resources.storage.setDefault' })}
               </Button>
             </Tooltip>
           )}
-          <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
-            <Button
-              danger
-              type="text"
-              icon={<DeleteOutlined />}
-              onClick={() => openConfirm('delete', record)}
-            />
-          </Tooltip>
+          {isActiveProfile(record) ? (
+            <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.maintenanceActionHint' })}>
+              <Button type="text" onClick={() => openConfirm('maintenance', record)}>
+                {intl.formatMessage({ id: 'resources.preheat.profile.maintenanceAction' })}
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.restoreActionHint' })}>
+              <Button type="text" onClick={() => openConfirm('restore', record)}>
+                {intl.formatMessage({ id: 'resources.preheat.profile.restoreAction' })}
+              </Button>
+            </Tooltip>
+          )}
+          {!record.ever_used_at && (
+            <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
+              <Button danger type="text" icon={<DeleteOutlined />} onClick={() => openConfirm('delete', record)} />
+            </Tooltip>
+          )}
         </Space>
       )
     }
@@ -469,7 +504,11 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
               ? 'resources.preheat.profile.deleteConfirm'
               : confirm?.action === 'default'
                 ? 'resources.storage.setDefaultConfirm'
-                : 'resources.preheat.connectivity.recheckConfirm'
+                : confirm?.action === 'maintenance'
+                  ? 'resources.preheat.profile.maintenanceConfirm'
+                  : confirm?.action === 'restore'
+                    ? 'resources.preheat.profile.restoreConfirm'
+                    : 'resources.preheat.connectivity.recheckConfirm'
         })}
         content={intl.formatMessage(
           {
@@ -478,7 +517,11 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 ? deleteContentId(confirm.profile)
                 : confirm?.action === 'default'
                   ? 'resources.storage.setDefaultContent'
-                  : 'resources.preheat.connectivity.recheckContent'
+                  : confirm?.action === 'maintenance'
+                    ? 'resources.preheat.profile.maintenanceContent'
+                    : confirm?.action === 'restore'
+                      ? 'resources.preheat.profile.restoreContent'
+                      : 'resources.preheat.connectivity.recheckContent'
           },
           { name: confirm?.profile.name || '' }
         )}
@@ -488,7 +531,11 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
               ? 'common.button.delete'
               : confirm?.action === 'default'
                 ? 'resources.storage.setDefault'
-                : 'resources.storage.checkWorkers'
+                : confirm?.action === 'maintenance'
+                  ? 'resources.preheat.profile.maintenanceAction'
+                  : confirm?.action === 'restore'
+                    ? 'resources.preheat.profile.restoreAction'
+                    : 'resources.storage.checkWorkers'
         })}
         danger={confirm?.action === 'delete'}
         loading={confirmLoading}

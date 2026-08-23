@@ -17,7 +17,7 @@ vi.mock('@umijs/max', () => ({ useIntl: () => ({ formatMessage: ({ id }: { id: s
 vi.mock('../apis', async () => ({ ...(await vi.importActual('../apis')), ...api }));
 
 const profile: ModelPreheatS3Profile = {
-  id: 3, name: 'center-cache', endpoint: 'https://s3.example.com', bucket: 'models', prefix: '', tls_enabled: true, tls_verify: true, use_virtual_hosted_style: true, credential_configured: true, is_default: true, config_version: 1, connectivity_state: 'available', last_connectivity_check_id: null, last_connectivity_checked_at: null, created_at: '', updated_at: ''
+  id: 3, name: 'center-cache', endpoint: 'https://s3.example.com', bucket: 'models', prefix: '', tls_enabled: true, tls_verify: true, use_virtual_hosted_style: true, credential_configured: true, lifecycle_state: 'active', ever_used_at: null, is_default: true, config_version: 1, connectivity_state: 'available', last_connectivity_check_id: null, last_connectivity_checked_at: null, created_at: '', updated_at: ''
 };
 const systemProfile: ModelPreheatS3Profile = {
   ...profile, id: 4, name: 'system-cache', description: '由系统下发', endpoint: 'https://system-s3.example.com', bucket: 'system-models', prefix: 'managed', region: 'cn-north-1', tls_enabled: true, tls_verify: true, use_virtual_hosted_style: false, source_fallback_enabled: true, default_slot: 'global', system_managed: true
@@ -48,6 +48,17 @@ describe('预热组件回归', () => {
     await user.click(screen.getByRole('button', { name: 'common.button.save' }));
     await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalled());
     expect(api.updateModelPreheatS3Profile.mock.calls[0][1]).not.toMatchObject({ access_key: expect.anything(), secret_key: expect.anything() });
+  });
+
+  it('手工 Profile 不显示 Prefix，编辑保存时不清空既有 Prefix', async () => {
+    const user = userEvent.setup();
+    const legacyProfile = { ...profile, prefix: 'legacy-prefix' };
+    api.updateModelPreheatS3Profile.mockResolvedValue(legacyProfile);
+    render(<ModelPreheatS3ProfileModal open record={legacyProfile} onCancel={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.queryByLabelText('resources.preheat.profile.prefix')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+    await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalled());
+    expect(api.updateModelPreheatS3Profile.mock.calls[0][1]).not.toHaveProperty('prefix');
   });
 
   it('系统管理 Profile 可从列表编辑，仅允许修改四个开关并使用精简 PATCH 载荷', async () => {
@@ -132,6 +143,31 @@ describe('预热组件回归', () => {
     await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalledWith(target.id, { default_slot: 'global' }));
     await waitFor(() => expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2));
     expect(onProfilesChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('维护和恢复通过居中确认切换生命周期，已使用配置不显示删除或默认入口', async () => {
+    const user = userEvent.setup();
+    const used = { ...profile, id: 25, name: 'used-cache', is_default: false, ever_used_at: '2026-08-23T00:00:00Z' };
+    api.queryModelPreheatS3Profiles.mockResolvedValue({ items: [used], pagination: { page: 1, perPage: 10, total: 1, totalPage: 1 } });
+    api.updateModelPreheatS3Profile.mockResolvedValue({ ...used, lifecycle_state: 'maintenance' });
+    render(<ModelPreheatS3Profiles />);
+    const row = await screen.findByText(used.name).then((cell) => cell.closest('tr')!);
+    expect(row.querySelector('.anticon-delete')).toBeNull();
+    await user.click(within(row).getByRole('button', { name: 'resources.preheat.profile.maintenanceAction' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.closest('.ant-modal-wrap')).toHaveClass('ant-modal-centered');
+    await user.click(within(dialog).getByRole('button', { name: 'resources.preheat.profile.maintenanceAction' }));
+    await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalledWith(25, { lifecycle_state: 'maintenance' }));
+
+    cleanup();
+    api.queryModelPreheatS3Profiles.mockResolvedValue({ items: [{ ...used, lifecycle_state: 'maintenance' as const }], pagination: { page: 1, perPage: 10, total: 1, totalPage: 1 } });
+    render(<ModelPreheatS3Profiles />);
+    const maintenanceRow = await screen.findByText(used.name).then((cell) => cell.closest('tr')!);
+    expect(within(maintenanceRow).queryByRole('button', { name: 'resources.storage.setDefault' })).toBeNull();
+    expect(maintenanceRow.querySelector('.anticon-reload')).not.toBeNull();
+    await user.click(within(maintenanceRow).getByRole('button', { name: 'resources.preheat.profile.restoreAction' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'resources.preheat.profile.restoreAction' }));
+    await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalledWith(25, { lifecycle_state: 'active' }));
   });
 
   it.each([

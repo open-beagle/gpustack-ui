@@ -396,7 +396,6 @@ export function buildModelPreheatS3ProfilePayload(
     description: values.description?.trim() || null,
     endpoint: values.endpoint.trim(),
     bucket: values.bucket.trim(),
-    prefix: values.prefix?.trim() || '',
     tls_enabled: values.tls_enabled ?? true,
     tls_verify: values.tls_verify ?? true,
     region: values.region?.trim() || '',
@@ -404,6 +403,10 @@ export function buildModelPreheatS3ProfilePayload(
     source_fallback_enabled: values.source_fallback_enabled ?? true,
     default_slot: values.default_slot ?? null
   };
+  if (!editing) {
+    // 手工 Profile 新建时不支持对象前缀。
+    payload.prefix = '';
+  }
   const accessKey = values.access_key?.trim();
   const secretKey = values.secret_key?.trim();
   if (!editing || accessKey) {

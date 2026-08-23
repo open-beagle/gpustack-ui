@@ -21,6 +21,9 @@ interface Props {
 const modelName = (model: ModelFile) =>
   model.model_scope_model_id || model.huggingface_repo_id || model.local_path;
 
+const activeProfiles = (profiles: ModelPreheatS3Profile[]) =>
+  profiles.filter((profile) => profile.lifecycle_state === 'active');
+
 const ModelStorageSyncModal: React.FC<Props> = ({
   open,
   model,
@@ -33,14 +36,15 @@ const ModelStorageSyncModal: React.FC<Props> = ({
   const [profileId, setProfileId] = useState<number>();
   const [loading, setLoading] = useState(false);
   const selected = useMemo(
-    () => profiles.find((profile) => profile.id === profileId),
+    () => activeProfiles(profiles).find((profile) => profile.id === profileId),
     [profileId, profiles]
   );
 
   useEffect(() => {
     if (!open) return;
     key.current.start();
-    setProfileId(profiles.find((profile) => profile.is_default)?.id || profiles[0]?.id);
+    const selectableProfiles = activeProfiles(profiles);
+    setProfileId(selectableProfiles.find((profile) => profile.is_default)?.id || selectableProfiles[0]?.id);
   }, [open, profiles]);
 
   const close = () => {
@@ -107,7 +111,7 @@ const ModelStorageSyncModal: React.FC<Props> = ({
             value={profileId}
             disabled={loading}
             onChange={setProfileId}
-            options={profiles.map((profile) => ({
+            options={activeProfiles(profiles).map((profile) => ({
               value: profile.id,
               label: profile.name
             }))}

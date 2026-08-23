@@ -476,7 +476,7 @@ const LocalModelFiles = () => {
         });
       } else if (val === 'sync') {
         const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
-        setProfiles(result.items);
+        setProfiles(result.items.filter((profile) => profile.lifecycle_state === 'active'));
         setSyncRecord(record);
       }
     } catch (error) {

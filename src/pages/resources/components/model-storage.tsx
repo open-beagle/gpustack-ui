@@ -23,8 +23,9 @@ import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
 const ModelStorage: React.FC = () => {
   const intl = useIntl();
   const connectivityKey = useRef(new IdempotencyKeyLifecycle());
-  const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
-  const [profileId, setProfileId] = useState<number>();
+  const [allProfiles, setAllProfiles] = useState<ModelPreheatS3Profile[]>([]);
+  const [artifactProfileId, setArtifactProfileId] = useState<number>();
+  const [connectivityProfileId, setConnectivityProfileId] = useState<number>();
   const [artifacts, setArtifacts] = useState<ModelStorageArtifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,12 +34,28 @@ const ModelStorage: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [connectivityOpen, setConnectivityOpen] = useState(false);
   const [connectivity, setConnectivity] = useState<ModelPreheatConnectivityCheck | null>(null);
-  const selected = profiles.find((profile) => profile.id === profileId);
+  const activeProfiles = allProfiles.filter(
+    (profile) => profile.lifecycle_state === 'active'
+  );
+  const selectedArtifact = activeProfiles.find(
+    (profile) => profile.id === artifactProfileId
+  );
+  const selectedConnectivity = allProfiles.find(
+    (profile) => profile.id === connectivityProfileId
+  );
 
   const loadProfiles = useCallback(async () => {
     const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
-    setProfiles(result.items);
-    setProfileId((current) =>
+    const activeProfiles = result.items.filter(
+      (profile) => profile.lifecycle_state === 'active'
+    );
+    setAllProfiles(result.items);
+    setArtifactProfileId((current) =>
+      current && activeProfiles.some((item) => item.id === current)
+        ? current
+        : activeProfiles.find((item) => item.is_default)?.id || activeProfiles[0]?.id
+    );
+    setConnectivityProfileId((current) =>
       current && result.items.some((item) => item.id === current)
         ? current
         : result.items.find((item) => item.is_default)?.id || result.items[0]?.id
@@ -46,19 +63,19 @@ const ModelStorage: React.FC = () => {
   }, []);
 
   const loadArtifacts = useCallback(async () => {
-    if (!profileId) return setArtifacts([]);
+    if (!artifactProfileId) return setArtifacts([]);
     setLoading(true);
-    try { setArtifacts(await queryModelStorageArtifacts(profileId)); } finally { setLoading(false); }
-  }, [profileId]);
+    try { setArtifacts(await queryModelStorageArtifacts(artifactProfileId)); } finally { setLoading(false); }
+  }, [artifactProfileId]);
 
   useEffect(() => { void loadProfiles().catch(() => undefined); }, [loadProfiles]);
   useEffect(() => { void loadArtifacts().catch(() => undefined); }, [loadArtifacts]);
 
   const refresh = async () => {
-    if (!profileId) return;
+    if (!artifactProfileId) return;
     setRefreshing(true);
     try {
-      await refreshModelStorageArtifacts(profileId);
+      await refreshModelStorageArtifacts(artifactProfileId);
       setConfirmRefresh(false);
       await loadArtifacts();
       message.success(intl.formatMessage({ id: 'resources.storage.refreshCompleted' }));
@@ -66,10 +83,10 @@ const ModelStorage: React.FC = () => {
   };
 
   const runCheck = async () => {
-    if (!selected) return;
+    if (!selectedConnectivity) return;
     setChecking(true);
     try {
-      const check = await createModelPreheatConnectivityCheck(selected.id, connectivityKey.current.current());
+      const check = await createModelPreheatConnectivityCheck(selectedConnectivity.id, connectivityKey.current.current());
       connectivityKey.current.complete();
       setConfirmCheck(false);
       setConnectivity(check);
@@ -79,18 +96,18 @@ const ModelStorage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!connectivityOpen || !selected?.last_connectivity_check_id) return;
+    if (!connectivityOpen || !selectedConnectivity?.last_connectivity_check_id) return;
     let active = true;
-    const checkId = connectivity?.id || selected.last_connectivity_check_id;
+    const checkId = connectivity?.id || selectedConnectivity.last_connectivity_check_id;
     const poll = async () => {
-      const check = await queryModelPreheatConnectivityCheck(selected.id, checkId);
+      const check = await queryModelPreheatConnectivityCheck(selectedConnectivity.id, checkId);
       if (!active) return;
       setConnectivity(check);
       if (['pending', 'running'].includes(check.state)) window.setTimeout(() => void poll(), 2000);
     };
     void poll().catch(() => undefined);
     return () => { active = false; };
-  }, [connectivity?.id, connectivityOpen, selected?.id, selected?.last_connectivity_check_id]);
+  }, [connectivity?.id, connectivityOpen, selectedConnectivity?.id, selectedConnectivity?.last_connectivity_check_id]);
 
   return <>
     <Alert type="info" showIcon style={{ marginBottom: 16 }} message={intl.formatMessage({ id: 'resources.storage.description' })} />
@@ -98,8 +115,8 @@ const ModelStorage: React.FC = () => {
       { key: 'profiles', label: intl.formatMessage({ id: 'resources.storage.profiles' }), children: <ModelPreheatS3Profiles onProfilesChanged={() => void loadProfiles()} /> },
       { key: 'artifacts', label: intl.formatMessage({ id: 'resources.storage.artifacts' }), children: <>
         <Space style={{ marginBottom: 16 }} wrap>
-          <Select value={profileId} onChange={setProfileId} style={{ minWidth: 220 }} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
-          <Button icon={<ReloadOutlined />} onClick={() => setConfirmRefresh(true)} disabled={!profileId || refreshing}>{intl.formatMessage({ id: 'resources.storage.refresh' })}</Button>
+          <Select value={artifactProfileId} onChange={setArtifactProfileId} style={{ minWidth: 220 }} options={activeProfiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
+          <Button icon={<ReloadOutlined />} onClick={() => setConfirmRefresh(true)} disabled={!selectedArtifact || refreshing}>{intl.formatMessage({ id: 'resources.storage.refresh' })}</Button>
           {refreshing && <Spin size="small" />}
         </Space>
         <Table rowKey="artifact_id" loading={loading} dataSource={artifacts} scroll={{ x: 860 }} columns={[
@@ -111,13 +128,13 @@ const ModelStorage: React.FC = () => {
         ]} />
       </> },
       { key: 'connectivity', label: intl.formatMessage({ id: 'resources.storage.connectivity' }), children: <>
-        <Select value={profileId} onChange={setProfileId} style={{ minWidth: 220, marginBottom: 16 }} options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
-        <Button onClick={() => { connectivityKey.current.start(); setConfirmCheck(true); }} disabled={!selected}>{intl.formatMessage({ id: 'resources.storage.checkWorkers' })}</Button>
-        <ModelPreheatConnectivity open={connectivityOpen} profile={selected} check={connectivity} onCancel={() => setConnectivityOpen(false)} />
+        <Select value={connectivityProfileId} onChange={setConnectivityProfileId} style={{ minWidth: 220, marginBottom: 16 }} options={allProfiles.map((profile) => ({ value: profile.id, label: profile.name }))} />
+        <Button onClick={() => { connectivityKey.current.start(); setConfirmCheck(true); }} disabled={!selectedConnectivity}>{intl.formatMessage({ id: 'resources.storage.checkWorkers' })}</Button>
+        <ModelPreheatConnectivity open={connectivityOpen} profile={selectedConnectivity} check={connectivity} onCancel={() => setConnectivityOpen(false)} />
       </> }
     ]} />
     <ModelPreheatConfirmModal open={confirmRefresh} title={intl.formatMessage({ id: 'resources.storage.refreshConfirm' })} content={intl.formatMessage({ id: 'resources.storage.refreshContent' })} okText={intl.formatMessage({ id: 'resources.storage.refresh' })} loading={refreshing} onOk={refresh} onCancel={() => setConfirmRefresh(false)} />
-    <ModelPreheatConfirmModal open={confirmCheck} title={intl.formatMessage({ id: 'resources.storage.checkWorkersConfirm' })} content={intl.formatMessage({ id: 'resources.storage.checkWorkersContent' }, { name: selected?.name || '' })} okText={intl.formatMessage({ id: 'resources.storage.checkWorkers' })} loading={checking} onOk={runCheck} onCancel={() => { connectivityKey.current.abandon(); setConfirmCheck(false); }} />
+    <ModelPreheatConfirmModal open={confirmCheck} title={intl.formatMessage({ id: 'resources.storage.checkWorkersConfirm' })} content={intl.formatMessage({ id: 'resources.storage.checkWorkersContent' }, { name: selectedConnectivity?.name || '' })} okText={intl.formatMessage({ id: 'resources.storage.checkWorkers' })} loading={checking} onOk={runCheck} onCancel={() => { connectivityKey.current.abandon(); setConfirmCheck(false); }} />
   </>;
 };
 

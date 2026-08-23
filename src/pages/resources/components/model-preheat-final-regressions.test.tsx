@@ -60,6 +60,8 @@ const profile: ModelPreheatS3Profile = {
   use_virtual_hosted_style: false,
   is_default: true,
   credential_configured: true,
+  lifecycle_state: 'active',
+  ever_used_at: null,
   config_version: 2,
   connectivity_state: 'available',
   last_connectivity_check_id: 22,
@@ -340,6 +342,19 @@ describe('首次依赖加载失败恢复', () => {
     await waitFor(() =>
       expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2)
     );
+  });
+});
+
+describe('新任务 Profile 选择', () => {
+  it('预热弹窗只展示 active Profile，并从 active 中选择默认项', async () => {
+    const user = userEvent.setup();
+    const maintenance = { ...profile, id: 6, name: 'maintenance-profile', lifecycle_state: 'maintenance' as const, is_default: true };
+    api.queryModelPreheatS3Profiles.mockResolvedValueOnce(page([maintenance, profile]));
+    render(<ModelPreheatModal open onCancel={vi.fn()} onCreated={vi.fn()} />);
+    const profileSelect = (await screen.findByText('resources.preheat.profile.title')).closest('.ant-form-item')!.querySelector('[role="combobox"]')!;
+    await user.click(profileSelect);
+    expect(await screen.findByRole('option', { name: profile.name })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: maintenance.name })).not.toBeInTheDocument();
   });
 });
 

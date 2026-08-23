@@ -21,7 +21,7 @@ vi.mock('@umijs/max', () => ({ useIntl: () => ({ formatMessage: ({ id }: { id: s
 vi.mock('../apis', async () => ({ ...(await vi.importActual('../apis')), ...api }));
 
 const model: ModelFile = { id: 7, source: 'modelscope', model_scope_model_id: 'team/model-a', model_scope_file_path: 'weights/model.gguf', huggingface_repo_id: '', huggingface_filename: '', ollama_library_model_name: '', local_path: '', local_dir: '', worker_id: 2, size: 1024, download_progress: 100, resolved_paths: ['/models/model.gguf'], state: 'ready', state_message: '', resolved_revision: 'abc123', created_at: '', updated_at: '' };
-const profile: ModelPreheatS3Profile = { id: 3, name: '默认模型库', endpoint: 'https://s3.example.com', bucket: 'models', prefix: '', tls_enabled: true, tls_verify: true, use_virtual_hosted_style: true, credential_configured: true, provisioning_source: 'manual', provisioning_key: null, system_managed: false, default_slot: 'global', source_fallback_enabled: true, is_default: true, config_version: 1, connectivity_state: 'available', last_connectivity_check_id: 21, last_connectivity_checked_at: null, created_at: '', updated_at: '' };
+const profile: ModelPreheatS3Profile = { id: 3, name: '默认模型库', endpoint: 'https://s3.example.com', bucket: 'models', prefix: '', tls_enabled: true, tls_verify: true, use_virtual_hosted_style: true, credential_configured: true, provisioning_source: 'manual', provisioning_key: null, system_managed: false, lifecycle_state: 'active', ever_used_at: null, default_slot: 'global', source_fallback_enabled: true, is_default: true, config_version: 1, connectivity_state: 'available', last_connectivity_check_id: 21, last_connectivity_checked_at: null, created_at: '', updated_at: '' };
 const page = { items: [profile], pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 } };
 
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; };
@@ -47,6 +47,28 @@ describe('统一模型存储交互', () => {
     expect(within(dialog).getByRole('button', { name: 'common.button.cancel' })).toBeDisabled();
     expect(within(dialog).queryByRole('button', { name: 'Close' })).toBeNull();
     request.resolve({ id: 1 });
+  });
+
+  it('同步和库存选择器只展示 active Profile，连通性管理保留维护 Profile', async () => {
+    const user = userEvent.setup();
+    const maintenance = { ...profile, id: 8, name: '维护配置', lifecycle_state: 'maintenance' as const, is_default: true };
+    render(<ModelStorageSyncModal open model={model} profiles={[maintenance, profile]} onCancel={vi.fn()} onCreated={vi.fn()} />);
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('combobox'));
+    expect(await screen.findByRole('option', { name: profile.name })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: maintenance.name })).not.toBeInTheDocument();
+
+    cleanup();
+    api.queryModelPreheatS3Profiles.mockResolvedValue({ ...page, items: [maintenance, profile], pagination: { ...page.pagination, total: 2 } });
+    render(<ModelStorage />);
+    await user.click(await screen.findByText('resources.storage.artifacts'));
+    await user.click(screen.getByRole('combobox'));
+    expect(await screen.findByRole('option', { name: profile.name })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: maintenance.name })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('resources.storage.connectivity'));
+    await user.click(screen.getByRole('combobox'));
+    expect(await screen.findByRole('option', { name: maintenance.name })).toBeInTheDocument();
   });
 
   it('编辑态测试连接要求重新输入凭据，并使用后端严格请求字段', async () => {

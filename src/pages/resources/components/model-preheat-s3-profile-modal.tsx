@@ -94,7 +94,11 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     return {
       endpoint: values.endpoint.trim(),
       bucket: values.bucket.trim(),
-      prefix: values.prefix?.trim() || '',
+      prefix: systemManaged
+        ? values.prefix?.trim() || ''
+        : editing
+          ? record?.prefix || ''
+          : '',
       access_key: values.access_key.trim(),
       secret_key: values.secret_key.trim(),
       tls_enabled: values.tls_enabled ?? true,
@@ -200,16 +204,18 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               <Input disabled={systemManaged} />
             </Form.Item>
           </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="prefix"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.prefix'
-              })}
-            >
-              <Input disabled={systemManaged} />
-            </Form.Item>
-          </Col>
+          {systemManaged && (
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="prefix"
+                label={intl.formatMessage({
+                  id: 'resources.preheat.profile.prefix'
+                })}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>

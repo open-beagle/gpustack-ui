@@ -102,15 +102,18 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
           const readyWorkerIds = nextWorkers
             .filter((worker) => worker.state === 'ready')
             .map((worker) => worker.id);
+          const activeProfileItems = profileItems.filter(
+            (item) => item.lifecycle_state === 'active'
+          );
           const selectedProfile =
-            profileItems.find((item) => item.is_default) || profileItems[0];
+            activeProfileItems.find((item) => item.is_default) || activeProfileItems[0];
           const values = {
             ...defaultValues,
             target_worker_ids: readyWorkerIds,
             s3_profile_id: selectedProfile?.id || 0
           };
           setWorkers(nextWorkers);
-          setProfiles(profileItems);
+          setProfiles(activeProfileItems);
           setDraft(values);
           form.setFieldsValue(values);
         },
@@ -179,9 +182,9 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
           (snapshot) => {
             currentSnapshot = snapshot;
             setProfiles((current) =>
-              current.map((item) =>
-                item.id === snapshot.profile.id ? snapshot.profile : item
-              )
+              current
+                .map((item) => item.id === snapshot.profile.id ? snapshot.profile : item)
+                .filter((item) => item.lifecycle_state === 'active')
             );
             setConnectivity(snapshot.check);
           },

@@ -201,9 +201,12 @@ export interface ModelPreheatS3ProfileBase {
   default_slot?: string | null;
 }
 
+export type ModelPreheatS3ProfileLifecycleState = 'active' | 'maintenance';
+
 export interface ModelPreheatS3ProfileWrite extends ModelPreheatS3ProfileBase {
   access_key?: string;
   secret_key?: string;
+  lifecycle_state?: ModelPreheatS3ProfileLifecycleState;
 }
 
 export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
@@ -212,6 +215,8 @@ export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
   provisioning_source?: 'manual' | 'worker_local_s3';
   provisioning_key?: string | null;
   system_managed?: boolean;
+  lifecycle_state: ModelPreheatS3ProfileLifecycleState;
+  ever_used_at: string | null;
   default_slot?: string | null;
   source_fallback_enabled?: boolean;
   is_default: boolean;

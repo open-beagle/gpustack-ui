@@ -23,7 +23,7 @@ import type {
 } from './types';
 
 const profile: ModelPreheatS3Profile = {
-  id: 3, name: 'center-cache', endpoint: 'https://s3.example.com', bucket: 'models', prefix: 'team-a', tls_enabled: true, tls_verify: true, region: 'cn-north-1', use_virtual_hosted_style: false, is_default: true, credential_configured: true, config_version: 2, connectivity_state: 'available', last_connectivity_check_id: 21, last_connectivity_checked_at: '', created_at: '', updated_at: ''
+  id: 3, name: 'center-cache', endpoint: 'https://s3.example.com', bucket: 'models', prefix: 'team-a', tls_enabled: true, tls_verify: true, region: 'cn-north-1', use_virtual_hosted_style: false, is_default: true, credential_configured: true, lifecycle_state: 'active', ever_used_at: null, config_version: 2, connectivity_state: 'available', last_connectivity_check_id: 21, last_connectivity_checked_at: '', created_at: '', updated_at: ''
 };
 const workers: ModelPreheatWorker[] = [
   { id: 12, worker_uuid: 'worker-a', name: 'a100-58', state: 'ready', status: { gpu_devices: [{ name: ' NVIDIA A100 ' }] } },
@@ -54,6 +54,11 @@ describe('预热配置逻辑', () => {
 
   it('编辑 Profile 不回传空凭据', () => {
     expect(buildModelPreheatS3ProfilePayload({ ...profile, access_key: ' ', secret_key: '' }, true)).not.toMatchObject({ access_key: expect.anything(), secret_key: expect.anything() });
+  });
+
+  it('手工 Profile 仅创建时提交空 Prefix，编辑保留后端已有 Prefix', () => {
+    expect(buildModelPreheatS3ProfilePayload({ ...profile, prefix: 'legacy', access_key: 'access', secret_key: 'secret' }, false).prefix).toBe('');
+    expect(buildModelPreheatS3ProfilePayload({ ...profile, prefix: 'legacy' }, true)).not.toHaveProperty('prefix');
   });
 
   it('系统管理 Profile 的更新载荷只包含允许调整的开关', () => {
