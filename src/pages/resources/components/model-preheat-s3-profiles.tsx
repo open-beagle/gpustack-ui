@@ -324,16 +324,19 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.endpoint' }),
       dataIndex: 'endpoint',
+      width: 220,
       ellipsis: true
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.bucket' }),
       dataIndex: 'bucket',
+      width: 160,
       ellipsis: true
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.credential' }),
       dataIndex: 'credential_configured',
+      width: 120,
       render: (value: boolean, record: ModelPreheatS3Profile) => (
         <Tooltip title={!value ? intl.formatMessage({
           id: record.system_managed
@@ -355,6 +358,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         id: 'resources.preheat.connectivity.status'
       }),
       dataIndex: 'connectivity_state',
+      width: 130,
       render: (value: string, record: ModelPreheatS3Profile) => (
         <Tooltip title={value === 'unavailable' ? intl.formatMessage({
           id: record.system_managed
@@ -379,7 +383,8 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     {
       title: intl.formatMessage({ id: 'common.table.operation' }),
       key: 'operation',
-      width: 180,
+      width: 220,
+      fixed: 'right' as const,
       render: (_: unknown, record: ModelPreheatS3Profile) => (
         <Space size={4}>
           <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
@@ -471,7 +476,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         columns={columns}
         dataSource={profiles}
         loading={loading}
-        scroll={{ x: 980 }}
+        scroll={{ x: 1240 }}
         pagination={{
           current: page,
           pageSize,

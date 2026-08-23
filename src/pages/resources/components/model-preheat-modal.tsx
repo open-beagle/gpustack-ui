@@ -23,6 +23,7 @@ import React, {
   useState
 } from 'react';
 import {
+  createModelPreheatConnectivityCheck,
   createModelPreheatTask,
   queryModelPreheatConnectivityCheck,
   queryModelPreheatS3Profile,
@@ -45,6 +46,7 @@ import type {
   ModelPreheatTask,
   ModelPreheatWorker
 } from '../config/types';
+import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 
 interface Props {
   open: boolean;
@@ -70,6 +72,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
   const intl = useIntl();
   const [form] = Form.useForm<ModelPreheatCreate>();
   const idempotency = useRef(new IdempotencyKeyLifecycle());
+  const connectivityIdempotency = useRef(new IdempotencyKeyLifecycle());
   const dependencyRequests = useRef(new LatestRequestGate());
   const snapshotRequests = useRef(new LatestRequestGate());
   const [workers, setWorkers] = useState<ModelPreheatWorker[]>([]);
@@ -82,6 +85,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
   const [checkLoading, setCheckLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [snapshotRevision, setSnapshotRevision] = useState(0);
+  const [confirmCheck, setConfirmCheck] = useState(false);
 
   const loadDependencies = useCallback(async () => {
     setDataLoading(true);
@@ -130,6 +134,7 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
       return;
     }
     idempotency.current.start();
+    connectivityIdempotency.current.abandon();
     setWorkers([]);
     setProfiles([]);
     setDraft(defaultValues);
@@ -265,12 +270,27 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
     }
   };
 
-  const workerOptions = workers.map((worker) => ({
+  const runConnectivityCheck = async () => {
+    if (!selectedProfile || checkLoading) return;
+    setCheckLoading(true);
+    try {
+      await createModelPreheatConnectivityCheck(
+        selectedProfile.id,
+        connectivityIdempotency.current.start()
+      );
+      setConfirmCheck(false);
+      setSnapshotRevision((current) => current + 1);
+    } finally {
+      setCheckLoading(false);
+    }
+  };
+
+  const readyWorkers = workers.filter((worker) => worker.state === 'ready');
+  const workerOptions = readyWorkers.map((worker) => ({
     label: `${worker.name} (${intl.formatMessage({
       id: `resources.preheat.state.${worker.state}`
     })})`,
-    value: worker.id,
-    disabled: worker.state !== 'ready'
+    value: worker.id
   }));
 
   const previewColumns = [
@@ -515,6 +535,22 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
       </Form>
 
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        {!readyWorkers.length ? (
+          <Alert
+            type="info"
+            showIcon
+            message={intl.formatMessage({ id: 'resources.preheat.noReadyWorkers' })}
+          />
+        ) : (
+          <Button
+            icon={<ReloadOutlined />}
+            loading={checkLoading}
+            disabled={!selectedProfile || submitting}
+            onClick={() => setConfirmCheck(true)}
+          >
+            {intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
+          </Button>
+        )}
         {preview.singleWorker && (
           <Alert
             type="info"
@@ -544,6 +580,21 @@ const ModelPreheatModal: React.FC<Props> = ({ open, onCancel, onCreated }) => {
           pagination={false}
         />
       </Space>
+      <ModelPreheatConfirmModal
+        open={confirmCheck}
+        title={intl.formatMessage({ id: 'resources.storage.checkWorkersConfirm' })}
+        content={intl.formatMessage(
+          { id: 'resources.storage.checkWorkersContent' },
+          { name: selectedProfile?.name || '' }
+        )}
+        okText={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
+        loading={checkLoading}
+        onOk={runConnectivityCheck}
+        onCancel={() => {
+          connectivityIdempotency.current.abandon();
+          setConfirmCheck(false);
+        }}
+      />
     </ScrollerModal>
   );
 };

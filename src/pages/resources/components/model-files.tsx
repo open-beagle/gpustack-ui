@@ -25,12 +25,14 @@ import {
   CheckCircleFilled,
   CopyOutlined,
   InfoCircleOutlined,
-  QuestionCircleOutlined
+  QuestionCircleOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
   ConfigProvider,
+  Button,
   Descriptions,
   Empty,
   Table,
@@ -65,6 +67,7 @@ import {
   ModelfileStateMapValue,
   WorkerStatusMap
 } from '../config';
+import { getModelStorageTransferPresentation } from '../config/model-preheat';
 import {
   ModelFile as ListItem,
   ModelPreheatS3Profile,
@@ -366,6 +369,10 @@ const LocalModelFiles = () => {
   });
   const [syncRecord, setSyncRecord] = useState<ListItem | null>(null);
   const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
+  const defaultSyncProfileId = useMemo(
+    () => profiles.find((profile) => profile.is_default)?.id,
+    [profiles]
+  );
 
   useEffect(() => {
     const fetchWorkerList = async () => {
@@ -388,6 +395,16 @@ const LocalModelFiles = () => {
       }
     };
     fetchWorkerList();
+  }, []);
+
+  useEffect(() => {
+    void queryModelPreheatS3Profiles({ page: 1, perPage: 100 })
+      .then((result) => {
+        setProfiles(
+          result.items.filter((profile) => profile.lifecycle_state === 'active')
+        );
+      })
+      .catch(() => undefined);
   }, []);
 
   const extractFileName = (name: string) => {
@@ -474,14 +491,16 @@ const LocalModelFiles = () => {
           isGGUF: initialValues.isGGUF,
           show: true
         });
-      } else if (val === 'sync') {
-        const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
-        setProfiles(result.items.filter((profile) => profile.lifecycle_state === 'active'));
-        setSyncRecord(record);
       }
     } catch (error) {
       // console.log('error', error);
     }
+  };
+
+  const openSync = async (record: ListItem) => {
+    const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
+    setProfiles(result.items.filter((profile) => profile.lifecycle_state === 'active'));
+    setSyncRecord(record);
   };
 
   const renderEmpty = (type?: string) => {
@@ -537,12 +556,7 @@ const LocalModelFiles = () => {
       }
       return ['retry', 'delete'].includes(item.key);
     });
-    const supportsSync = record.state === ModelfileStateMap.Ready &&
-      Boolean(record.resolved_revision) &&
-      [modelSourceMap.modelscope_value, modelSourceMap.huggingface_value].includes(record.source);
-    return supportsSync
-      ? [...actions.slice(0, 1), { key: 'sync', label: 'resources.storage.sync' }, ...actions.slice(1)]
-      : actions;
+    return actions;
   };
 
   const handleDeployModalCancel = () => {
@@ -589,11 +603,31 @@ const LocalModelFiles = () => {
       render: (text: string, record: ListItem) => {
         const modelInfo = getModelInfo(record);
         const { repo_id, source } = modelInfo;
+        const transfer = getModelStorageTransferPresentation(
+          record.transfer_source || null
+        );
         return (
-          <TextWrapper style={{ paddingRight: 8 }}>
-            <AutoTooltip ghost title={source}>
-              {source}
-            </AutoTooltip>
+          <TextWrapper style={{ paddingRight: 8, display: 'block' }}>
+            <div>
+              <AutoTooltip ghost title={source}>
+                {source}
+              </AutoTooltip>
+            </div>
+            {record.transfer_source && (
+              <div style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }}>
+                {intl.formatMessage(
+                  { id: transfer.messageId },
+                  {
+                    worker: transfer.includeWorker
+                      ? record.source_worker_name || `Worker #${record.source_worker_id || '-'}`
+                      : '',
+                    profile: transfer.includeProfile
+                      ? record.transfer_profile_name || `Profile #${record.transfer_profile_id || '-'}`
+                      : ''
+                  }
+                )}
+              </div>
+            )}
           </TextWrapper>
         );
       }
@@ -664,13 +698,39 @@ const LocalModelFiles = () => {
     {
       title: intl.formatMessage({ id: 'common.table.operation' }),
       dataIndex: 'operation',
-      width: 120,
-      render: (text: string, record: ListItem) => (
-        <DropdownButtons
-          items={setActionList(record)}
-          onSelect={(val) => handleSelect(val, record)}
-        ></DropdownButtons>
-      )
+      width: 180,
+      render: (text: string, record: ListItem) => {
+        const supportsSync = record.state === ModelfileStateMap.Ready &&
+          Boolean(record.resolved_revision) &&
+          [modelSourceMap.modelscope_value, modelSourceMap.huggingface_value].includes(record.source);
+        const alreadyFromDefault =
+          ['s3', 'peer_via_s3'].includes(record.transfer_source || '') &&
+          record.transfer_profile_id === defaultSyncProfileId;
+        return <>
+          {supportsSync && (
+            <Tooltip
+              title={
+                alreadyFromDefault
+                  ? intl.formatMessage({ id: 'resources.storage.sync.alreadyFromDefault' })
+                  : undefined
+              }
+            >
+              <Button
+                type="link"
+                icon={<SyncOutlined />}
+                disabled={alreadyFromDefault}
+                onClick={() => void openSync(record)}
+              >
+                {intl.formatMessage({ id: 'resources.storage.sync' })}
+              </Button>
+            </Tooltip>
+          )}
+          <DropdownButtons
+            items={setActionList(record)}
+            onSelect={(val) => handleSelect(val, record)}
+          ></DropdownButtons>
+        </>;
+      }
     }
   ];
 

@@ -5,6 +5,7 @@ import Inner from './inner';
 
 interface LabelSelectorProps {
   labels: Record<string, any>;
+  labelOptions?: Record<string, string[]>;
   label?: string;
   btnText?: string;
   description?: React.ReactNode;
@@ -15,6 +16,7 @@ interface LabelSelectorProps {
 
 const LabelSelector: React.FC<LabelSelectorProps> = ({
   labels,
+  labelOptions,
   onChange,
   onBlur,
   onDelete,
@@ -87,6 +89,7 @@ const LabelSelector: React.FC<LabelSelectorProps> = ({
         description ?? intl.formatMessage({ id: 'models.form.keyvalue.paste' })
       }
       labels={labelsData}
+      labelOptions={labelOptions}
       labelList={labelList}
       onChange={handleLabelsChange}
       onLabelListChange={handleLabelListChange}

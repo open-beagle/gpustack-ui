@@ -7,6 +7,7 @@ import SealSelect from '@/components/seal-form/seal-select';
 import TooltipList from '@/components/tooltip-list';
 import { PageActionType } from '@/config/types';
 import useAppUtils from '@/hooks/use-app-utils';
+import { queryWorkersList } from '@/pages/resources/apis';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
@@ -19,7 +20,7 @@ import {
 } from 'antd';
 import { CheckboxChangeEvent } from 'antd/es/checkbox';
 import _ from 'lodash';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   backendLabelMap,
   backendOptionsMap,
@@ -35,6 +36,7 @@ import mindieConfig from '../config/mindie-config';
 import { FormData } from '../config/types';
 import vllmConfig, { vllmOmniConfig } from '../config/vllm-config';
 import voxBoxConfig from '../config/vox-config';
+import { loadWorkerLabelOptions } from '../config/worker-label-options';
 import dataformStyles from '../style/data-form.less';
 import GPUCard from './gpu-card';
 
@@ -108,6 +110,26 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
   const gpuSelectorIds = Form.useWatch(['gpu_selector', 'gpu_ids'], form);
   const worker_selector = Form.useWatch('worker_selector', form);
   const { onValuesChange } = useFormContext();
+  const [workerLabelOptions, setWorkerLabelOptions] = useState<
+    Record<string, string[]>
+  >({});
+
+  useEffect(() => {
+    let active = true;
+    loadWorkerLabelOptions((page, perPage) =>
+      queryWorkersList({ page, perPage })
+    )
+      .then((options) => {
+        if (!active) return;
+        setWorkerLabelOptions(options);
+      })
+      .catch(() => {
+        if (active) setWorkerLabelOptions({});
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const paramsConfig = useMemo(() => {
     if (backend === backendOptionsMap.llamaCpp) {
@@ -284,6 +306,7 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
                   id: 'resources.form.workerSelector'
                 })}
                 labels={wokerSelector}
+                labelOptions={workerLabelOptions}
                 onChange={handleWorkerLabelsChange}
                 onBlur={handleSelectorOnBlur}
                 onDelete={handleDeleteWorkerSelector}

@@ -7,6 +7,7 @@ import LabelItem from './label-item';
 import Wrapper from './wrapper';
 interface LabelSelectorProps {
   labels: Record<string, any>;
+  labelOptions?: Record<string, string[]>;
   label?: string;
   btnText?: string;
   labelList: Array<{ key: string; value: string }>;
@@ -20,6 +21,7 @@ interface LabelSelectorProps {
 
 const Inner: React.FC<LabelSelectorProps> = ({
   labels,
+  labelOptions,
   labelList,
   onChange,
   onLabelListChange,
@@ -82,6 +84,7 @@ const Inner: React.FC<LabelSelectorProps> = ({
             <LabelItem
               key={index}
               label={item}
+              labelOptions={labelOptions}
               seperator=":"
               labelList={labelList}
               onDelete={() => handleOnDelete(index)}

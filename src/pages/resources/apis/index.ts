@@ -13,6 +13,8 @@ import {
   ModelStorageCapabilities,
   ModelStorageConnectionTest,
   ModelStorageConnectionTestRequest,
+  ModelStorageSyncBatchCreate,
+  ModelStorageSyncBatchResult,
   ModelStorageSyncTaskDetail,
   ModelStorageSyncTask
 } from '../config/types';
@@ -165,6 +167,17 @@ export async function createModelStorageSyncTask(
   idempotencyKey: string
 ) {
   return request<ModelStorageSyncTask>(MODEL_STORAGE_SYNC_TASKS_API, {
+    method: 'POST',
+    data,
+    headers: { 'Idempotency-Key': idempotencyKey }
+  });
+}
+
+export async function createModelStorageSyncBatch(
+  data: ModelStorageSyncBatchCreate,
+  idempotencyKey: string
+) {
+  return request<ModelStorageSyncBatchResult>('/model-storage-sync-batches', {
     method: 'POST',
     data,
     headers: { 'Idempotency-Key': idempotencyKey }

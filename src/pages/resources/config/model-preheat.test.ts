@@ -76,11 +76,11 @@ describe('预热配置逻辑', () => {
     expect(preview.canSubmit).toBe(true);
   });
 
-  it('Profile 标记为过期时不复用旧连通性矩阵', () => {
+  it('当前版本的成功检测结果不被旧 Profile 状态阻断', () => {
     expect(
       buildModelPreheatPreview(values, workers, { ...profile, connectivity_state: 'stale' }, check)
         .blockingReasons
-    ).toEqual([{ code: 'profile_connectivity_stale' }]);
+    ).toEqual([]);
   });
 
   it('Worker 重注册后不复用旧 Worker ID 的连通性结果', () => {
@@ -182,12 +182,12 @@ describe('预热前新鲜快照', () => {
     expect(shouldPollModelPreheatConnectivity(snapshot.profile, snapshot.check)).toBe(true);
   });
 
-  it('提交前重新加载 Worker 和连通性，阻断过期 Profile', async () => {
+  it('提交前重新加载 Worker 和连通性，允许当前版本的成功检测', async () => {
     const lifecycle = new IdempotencyKeyLifecycle(() => 'unused');
     lifecycle.start();
     const result = await submitModelPreheatWithFreshSnapshot({ values, workers, idempotency: lifecycle, loadWorkers: async () => workers, loadSnapshot: async () => ({ profile: { ...profile, connectivity_state: 'stale' }, check }), createTask: async () => 'unexpected' });
-    expect(result.submitted).toBe(false);
-    expect(result.preview.blockingReasons).toEqual([{ code: 'profile_connectivity_stale' }]);
+    expect(result.submitted).toBe(true);
+    expect(result.preview.blockingReasons).toEqual([]);
   });
 
   it('提交前按 Profile 最新检测指针读取连通性结果', async () => {

@@ -284,12 +284,16 @@ export function buildModelPreheatPreview(
 
   if (!profile || profile.id !== values.s3_profile_id) {
     blockingReasons.push({ code: 'profile_required' });
-  } else if (profile.connectivity_state === 'stale') {
-    blockingReasons.push({ code: 'profile_connectivity_stale' });
   } else if (!check || check.profile_id !== profile.id) {
     blockingReasons.push({ code: 'connectivity_check_required' });
   } else if (check.profile_config_version !== profile.config_version) {
     blockingReasons.push({ code: 'connectivity_config_stale' });
+  } else if (
+    profile.connectivity_state === 'stale' &&
+    !['available', 'partial'].includes(check.state)
+  ) {
+    // 当前版本的成功检测结果可直接使用，不能被旧的 Profile 汇总状态阻断。
+    blockingReasons.push({ code: 'profile_connectivity_stale' });
   } else {
     const connectivityByIdentity = new Map(
       check.workers.map((worker) => [

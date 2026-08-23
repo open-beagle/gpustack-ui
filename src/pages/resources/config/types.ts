@@ -115,6 +115,11 @@ export interface ModelFile {
   state_message: string;
   requested_revision?: string | null;
   resolved_revision?: string | null;
+  transfer_source?: ModelStorageTransferSource | null;
+  transfer_profile_id?: number | null;
+  transfer_profile_name?: string | null;
+  source_worker_id?: number | null;
+  source_worker_name?: string | null;
   id: number;
   created_at: string;
   updated_at: string;
@@ -310,6 +315,33 @@ export interface ModelStorageSyncTaskDetail extends ModelStorageSyncTask {
   request_digest: string;
   artifact_id: string | null;
   source_worker_name: string | null;
+}
+
+export type ModelStorageSyncScope =
+  | 'single_model'
+  | 'selected_workers'
+  | 'all_ready_workers';
+
+export interface ModelStorageSyncBatchCreate {
+  profile_id: number;
+  scope: ModelStorageSyncScope;
+  model_file_id?: number;
+  worker_ids?: number[];
+}
+
+export interface ModelStorageSyncBatchItem {
+  model_file_id: number | null;
+  worker_id: number | null;
+  task_id: number | null;
+  reason: string | null;
+}
+
+export interface ModelStorageSyncBatchResult {
+  scope: ModelStorageSyncScope;
+  planned: number;
+  created: ModelStorageSyncBatchItem[];
+  skipped: ModelStorageSyncBatchItem[];
+  failed: ModelStorageSyncBatchItem[];
 }
 
 export interface ModelPreheatConnectivityWorker {

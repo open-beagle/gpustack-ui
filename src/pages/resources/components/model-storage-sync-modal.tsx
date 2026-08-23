@@ -1,6 +1,6 @@
 import ModalFooter from '@/components/modal-footer';
 import { useIntl } from '@umijs/max';
-import { Descriptions, Modal, Select } from 'antd';
+import { Alert, Descriptions, Modal, Select } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createModelStorageSyncTask } from '../apis';
 import { IdempotencyKeyLifecycle } from '../config/model-preheat';
@@ -39,12 +39,19 @@ const ModelStorageSyncModal: React.FC<Props> = ({
     () => activeProfiles(profiles).find((profile) => profile.id === profileId),
     [profileId, profiles]
   );
+  const defaultProfile = useMemo(
+    () => activeProfiles(profiles).find((profile) => profile.is_default),
+    [profiles]
+  );
+  const alreadyFromDefault =
+    selected?.id === model?.transfer_profile_id &&
+    model?.transfer_source === 's3';
 
   useEffect(() => {
     if (!open) return;
     key.current.start();
     const selectableProfiles = activeProfiles(profiles);
-    setProfileId(selectableProfiles.find((profile) => profile.is_default)?.id || selectableProfiles[0]?.id);
+    setProfileId(selectableProfiles.find((profile) => profile.is_default)?.id);
   }, [open, profiles]);
 
   const close = () => {
@@ -84,11 +91,27 @@ const ModelStorageSyncModal: React.FC<Props> = ({
           onCancel={close}
           okText={intl.formatMessage({ id: 'resources.storage.sync.submit' })}
           loading={loading}
-          okBtnProps={{ disabled: loading || !selected }}
+          okBtnProps={{ disabled: loading || !selected || alreadyFromDefault }}
           cancelBtnProps={{ disabled: loading }}
         />
       }
     >
+      {!defaultProfile && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={intl.formatMessage({ id: 'resources.storage.sync.noDefault' })}
+        />
+      )}
+      {alreadyFromDefault && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={intl.formatMessage({ id: 'resources.storage.sync.alreadyFromDefault' })}
+        />
+      )}
       <Descriptions column={1} size="small">
         <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.model' })}>
           {model ? modelName(model) : '-'}

@@ -1,11 +1,17 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ModelStorageSyncTaskDetail } from '../config/types';
+import type { ModelFile, ModelStorageSyncTaskDetail } from '../config/types';
+import ModelStorageSyncBatchModal from './model-storage-sync-batch-modal';
 import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
 const api = vi.hoisted(() => ({
+  createModelStorageSyncBatch: vi.fn(),
+  queryModelFilesList: vi.fn(),
+  queryModelPreheatS3Profiles: vi.fn(),
   queryModelStorageSyncTask: vi.fn(),
-  queryModelStorageSyncTasks: vi.fn()
+  queryModelStorageSyncTasks: vi.fn(),
+  queryWorkersList: vi.fn()
 }));
 
 vi.mock('@umijs/max', () => ({
@@ -52,10 +58,204 @@ const task = (
   ...overrides
 });
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
+
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe('同步任务获取方式', () => {
+  it('关闭后重开时忽略旧的 Profile 和节点初始化响应', async () => {
+    const user = userEvent.setup();
+    const firstProfiles = deferred<any>();
+    const firstWorkers = deferred<any>();
+    const secondProfiles = deferred<any>();
+    const secondWorkers = deferred<any>();
+    api.queryModelPreheatS3Profiles
+      .mockReturnValueOnce(firstProfiles.promise)
+      .mockReturnValueOnce(secondProfiles.promise);
+    api.queryWorkersList
+      .mockReturnValueOnce(firstWorkers.promise)
+      .mockReturnValueOnce(secondWorkers.promise);
+
+    const { rerender } = render(
+      <ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />
+    );
+    await waitFor(() => expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(1));
+    rerender(<ModelStorageSyncBatchModal open={false} onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
+    rerender(<ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
+    await waitFor(() => expect(api.queryModelPreheatS3Profiles).toHaveBeenCalledTimes(2));
+    secondProfiles.resolve({
+      items: [{ id: 8, name: 'profile-new', lifecycle_state: 'active', is_default: true }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    secondWorkers.resolve({
+      items: [{ id: 18, name: 'worker-new', state: 'ready' }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('profile-new')).toBeInTheDocument();
+    firstProfiles.resolve({
+      items: [{ id: 3, name: 'profile-old', lifecycle_state: 'active', is_default: true }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    firstWorkers.resolve({
+      items: [{ id: 12, name: 'worker-old', state: 'ready' }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await firstProfiles.promise;
+    await firstWorkers.promise;
+    await user.click(within(dialog).getAllByRole('combobox')[0]);
+    expect((await screen.findAllByText('profile-new')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('profile-old')).not.toBeInTheDocument();
+  });
+
+  it('节点切换后忽略旧模型列表响应，避免跨节点提交', async () => {
+    const user = userEvent.setup();
+    const first = deferred<Global.PageResponse<ModelFile>>();
+    const second = deferred<Global.PageResponse<ModelFile>>();
+    const model = (id: number, workerId: number, name: string): ModelFile => ({
+      id,
+      source: 'modelscope',
+      model_scope_model_id: name,
+      model_scope_file_path: 'weights.gguf',
+      huggingface_repo_id: '',
+      huggingface_filename: '',
+      ollama_library_model_name: '',
+      local_path: '',
+      local_dir: '',
+      worker_id: workerId,
+      size: 1024,
+      download_progress: 100,
+      resolved_paths: ['weights.gguf'],
+      state: 'ready',
+      state_message: '',
+      resolved_revision: 'revision',
+      created_at: '',
+      updated_at: ''
+    });
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      items: [{ id: 3, name: 'default-s3', lifecycle_state: 'active', is_default: true }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryWorkersList.mockResolvedValue({
+      items: [
+        { id: 12, name: 'worker-a', state: 'ready' },
+        { id: 18, name: 'worker-b', state: 'ready' }
+      ],
+      pagination: { page: 1, perPage: 100, total: 2, totalPage: 1 }
+    });
+    api.queryModelFilesList.mockImplementation(({ worker_id }: { worker_id: number }) =>
+      worker_id === 12 ? first.promise : second.promise
+    );
+    api.createModelStorageSyncBatch.mockResolvedValue({
+      scope: 'single_model', planned: 1, created: [], skipped: [], failed: []
+    });
+
+    render(<ModelStorageSyncBatchModal open onCancel={vi.fn()} onTasksChanged={vi.fn()} />);
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getAllByRole('combobox')[2]);
+    await user.click(await screen.findByText('worker-a'));
+    await user.click(within(dialog).getAllByRole('combobox')[2]);
+    await user.click(await screen.findByText('worker-b'));
+    second.resolve({
+      items: [model(18, 18, 'model-b')],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await waitFor(() => expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 1, perPage: 100, worker_id: 18 }));
+    first.resolve({
+      items: [model(12, 12, 'model-a')],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    await user.click(within(dialog).getAllByRole('combobox')[3]);
+    expect(await screen.findByText('model-b (revision)')).toBeInTheDocument();
+    expect(screen.queryByText('model-a (revision)')).not.toBeInTheDocument();
+    await user.click(screen.getByText('model-b (revision)'));
+    await user.click(within(dialog).getByRole('button', { name: 'resources.storage.sync.submit' }));
+    await waitFor(() => expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+      { profile_id: 3, scope: 'single_model', model_file_id: 18 },
+      expect.any(String)
+    ));
+  });
+
+  it('批量创建会加载后续页面的节点和模型，并在刷新列表后保留结果页', async () => {
+    const user = userEvent.setup();
+    const model: ModelFile = {
+      id: 31,
+      source: 'modelscope',
+      model_scope_model_id: 'team/model-page-2',
+      model_scope_file_path: 'weights.gguf',
+      huggingface_repo_id: '',
+      huggingface_filename: '',
+      ollama_library_model_name: '',
+      local_path: '',
+      local_dir: '',
+      worker_id: 22,
+      size: 1024,
+      download_progress: 100,
+      resolved_paths: ['weights.gguf'],
+      state: 'ready',
+      state_message: '',
+      resolved_revision: 'revision-2',
+      created_at: '',
+      updated_at: ''
+    };
+    api.queryModelStorageSyncTasks.mockResolvedValue({
+      items: [],
+      pagination: { page: 1, perPage: 100, total: 0, totalPage: 1 }
+    });
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      items: [{ id: 3, name: 'default-s3', lifecycle_state: 'active', is_default: true }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryWorkersList.mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve({
+        items: page === 2 ? [{ id: 22, name: 'worker-page-2', state: 'ready' }] : [],
+        pagination: { page, perPage: 100, total: 101, totalPage: 2 }
+      })
+    );
+    api.queryModelFilesList.mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve({
+        items: page === 2 ? [model] : [],
+        pagination: { page, perPage: 100, total: 101, totalPage: 2 }
+      })
+    );
+    api.createModelStorageSyncBatch.mockResolvedValue({
+      scope: 'single_model',
+      planned: 1,
+      created: [{ model_file_id: 31, worker_id: 22, task_id: 9, reason: null }],
+      skipped: [],
+      failed: []
+    });
+
+    render(<ModelStorageSyncTasks />);
+    await user.click(
+      (await screen.findByText('resources.storage.syncBatch.create')).closest(
+        'button'
+      )!
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getAllByRole('combobox')[2]);
+    await user.click(await screen.findByText('worker-page-2'));
+    await waitFor(() => expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 2, perPage: 100, worker_id: 22 }));
+    await user.click(within(dialog).getAllByRole('combobox')[3]);
+    await user.click(await screen.findByText('team/model-page-2 (revision-2)'));
+    await user.click(within(dialog).getByRole('button', { name: 'resources.storage.sync.submit' }));
+
+    await waitFor(() => expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+      { profile_id: 3, scope: 'single_model', model_file_id: 31 },
+      expect.any(String)
+    ));
+    expect(await within(dialog).findByText('resources.storage.syncBatch.result')).toBeInTheDocument();
+    expect(api.queryWorkersList).toHaveBeenCalledWith({ page: 2, perPage: 100 });
+    expect(api.queryModelFilesList).toHaveBeenCalledWith({ page: 2, perPage: 100, worker_id: 22 });
+  });
+
   it('s3 详情只展示 S3 Profile，不拼接来源节点', async () => {
     const detail = task();
     api.queryModelStorageSyncTasks.mockResolvedValue({

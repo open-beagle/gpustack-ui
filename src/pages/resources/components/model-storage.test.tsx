@@ -36,6 +36,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('统一模型存储交互', () => {
+  it('没有默认 S3 配置时禁止创建同步任务', async () => {
+    const maintenance = {
+      ...profile,
+      lifecycle_state: 'maintenance' as const,
+      is_default: true
+    };
+    render(
+      <ModelStorageSyncModal
+        open
+        model={model}
+        profiles={[maintenance]}
+        onCancel={vi.fn()}
+        onCreated={vi.fn()}
+      />
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.sync.noDefault')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    ).toBeDisabled();
+  });
+
   it('同步确认提交使用稳定 Idempotency-Key，提交中锁定关闭与取消', async () => {
     const user = userEvent.setup();
     const request = deferred<any>();
