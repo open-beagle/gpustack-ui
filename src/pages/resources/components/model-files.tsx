@@ -624,7 +624,7 @@ const LocalModelFiles = () => {
             )
           : null;
         return (
-          <TextWrapper style={{ paddingRight: 8, display: 'block' }}>
+          <TextWrapper style={{ paddingRight: 8 }}>
             <AutoTooltip
               ghost
               showTitle={Boolean(transferText)}
