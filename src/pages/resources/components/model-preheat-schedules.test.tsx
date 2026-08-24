@@ -13,7 +13,10 @@ import ModelPreheatPolicies from './model-preheat-policies';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 
 const api = vi.hoisted(() => ({
+  createModelPreheatConnectivityCheck: vi.fn(),
   createModelPreheatSchedule: vi.fn(),
+  queryModelPreheatConnectivityCheck: vi.fn(),
+  queryModelPreheatS3Profile: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
   queryModelPreheatSchedules: vi.fn(),
@@ -96,12 +99,33 @@ beforeEach(() => {
         id: 3,
         name: 'center-cache',
         lifecycle_state: 'active',
-        is_default: true
+        is_default: true,
+        config_version: 1,
+        last_connectivity_check_id: 21
       }
     ])
   );
+  api.queryModelPreheatS3Profile.mockResolvedValue({
+    id: 3,
+    name: 'center-cache',
+    lifecycle_state: 'active',
+    config_version: 1,
+    last_connectivity_check_id: 21
+  });
+  api.queryModelPreheatConnectivityCheck.mockResolvedValue({
+    profile_id: 3,
+    profile_config_version: 1,
+    workers: [],
+    finished_at: new Date().toISOString()
+  });
   api.queryWorkersList.mockResolvedValue(
-    page([{ id: 12, worker_uuid: 'worker-a', name: 'worker-a', state: 'ready' }])
+    page([{
+      id: 12,
+      worker_uuid: 'worker-a',
+      name: 'worker-a',
+      state: 'ready',
+      model_storage_protocol_version: 1
+    }])
   );
   api.createModelPreheatSchedule.mockResolvedValue(schedule(1, 'manual'));
   api.runModelPreheatScheduleNow.mockResolvedValue({ id: 9 });
@@ -111,6 +135,30 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('预热策略触发方式', () => {
+  it('S3-only 策略隐藏目标节点控件，并支持 Ollama 来源', async () => {
+    render(
+      <ModelPreheatScheduleModal
+        open
+        initialValues={{
+          name: 'ollama-s3-only',
+          source: 'ollama_library',
+          model_id: 'qwen3:32b',
+          delivery_mode: 's3_only'
+        }}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('resources.preheat.targetScope')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('resources.preheat.targetWorkers')
+    ).not.toBeInTheDocument();
+  });
+
   it('手动策略不要求 Cron，并以 null 提交 cron_expression', async () => {
     const user = userEvent.setup();
     render(
@@ -137,6 +185,9 @@ describe('预热策略触发方式', () => {
     await user.click(
       screen.getByRole('button', { name: 'common.button.save' })
     );
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'common.button.save' })).at(-1)!
+    );
 
     await waitFor(() =>
       expect(api.createModelPreheatSchedule).toHaveBeenCalledWith(
@@ -162,10 +213,19 @@ describe('预热策略触发方式', () => {
       />
     );
 
+    const advanced = await screen.findByText('resources.form.advanced');
+    expect(advanced.closest('.ant-collapse-header')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    await user.click(advanced);
     const revision = await screen.findByLabelText('resources.preheat.revision');
     await user.clear(revision);
     await user.click(
       screen.getByRole('button', { name: 'common.button.save' })
+    );
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'common.button.save' })).at(-1)!
     );
 
     await waitFor(() =>
@@ -173,6 +233,133 @@ describe('预热策略触发方式', () => {
         3,
         expect.objectContaining({ revision: null })
       )
+    );
+  });
+
+  it.each(['s3_and_workers', 's3_only'] as const)(
+    '%s 在当前连通性检查明确失败时持久化 override',
+    async (deliveryMode) => {
+      const user = userEvent.setup();
+      api.queryModelPreheatConnectivityCheck.mockResolvedValueOnce({
+        profile_id: 3,
+        profile_config_version: 1,
+        finished_at: new Date().toISOString(),
+        workers: [
+          {
+            worker_uuid: 'worker-a',
+            worker_id: 12,
+            worker_name: 'worker-a',
+            state: 'error'
+          }
+        ]
+      });
+      render(
+        <ModelPreheatScheduleModal
+          open
+          initialValues={{
+            name: `${deliveryMode}-override`,
+            source: 'modelscope',
+            model_id: 'Qwen/Test',
+            delivery_mode: deliveryMode
+          }}
+          onCancel={vi.fn()}
+          onSaved={vi.fn()}
+        />
+      );
+
+      await screen.findByRole('dialog');
+      await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+      await user.click(
+        (await screen.findAllByRole('button', {
+          name: 'resources.preheat.connectivity.createAnyway'
+        })).at(-1)!
+      );
+
+      await waitFor(() =>
+        expect(api.createModelPreheatSchedule).toHaveBeenCalledWith(
+          expect.objectContaining({
+            delivery_mode: deliveryMode,
+            connectivity_failure_override: true
+          })
+        )
+      );
+    }
+  );
+
+  it('Schedule 重检失败后同轮复用幂等键，保存成功并重新打开后使用新键', async () => {
+    const user = userEvent.setup();
+    api.queryModelPreheatConnectivityCheck.mockResolvedValue({
+      profile_id: 3,
+      profile_config_version: 1,
+      finished_at: new Date().toISOString(),
+      workers: [
+        {
+          worker_uuid: 'worker-a',
+          worker_id: 12,
+          worker_name: 'worker-a',
+          state: 'error'
+        }
+      ]
+    });
+    api.createModelPreheatConnectivityCheck
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce({ id: 22 });
+    const onSaved = vi.fn();
+    const initialValues = {
+      name: 'retry-check',
+      source: 'modelscope' as const,
+      model_id: 'Qwen/Test'
+    };
+    const modal = (open: boolean) => (
+      <ModelPreheatScheduleModal
+        open={open}
+        initialValues={initialValues}
+        onCancel={vi.fn()}
+        onSaved={onSaved}
+      />
+    );
+    const { rerender } = render(modal(true));
+
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+    const recheck = (await screen.findAllByRole('button', {
+      name: 'resources.preheat.connectivity.recheck'
+    })).at(-1)!;
+    await user.click(recheck);
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledTimes(1)
+    );
+    await user.click(recheck);
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledTimes(2)
+    );
+    expect(api.createModelPreheatConnectivityCheck.mock.calls[0][1]).toBe(
+      api.createModelPreheatConnectivityCheck.mock.calls[1][1]
+    );
+
+    await user.click(
+      (await screen.findAllByRole('button', {
+        name: 'resources.preheat.connectivity.createAnyway'
+      })).at(-1)!
+    );
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+
+    rerender(modal(false));
+    rerender(modal(true));
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+    await user.click(
+      (await screen.findAllByRole('button', {
+        name: 'resources.preheat.connectivity.recheck'
+      })).at(-1)!
+    );
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledTimes(3)
+    );
+
+    expect(api.createModelPreheatConnectivityCheck.mock.calls[2][1]).not.toBe(
+      api.createModelPreheatConnectivityCheck.mock.calls[0][1]
     );
   });
 
@@ -296,6 +483,49 @@ describe('预热策略触发方式', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('一条 Schedule 操作提交中不锁定另一条记录', async () => {
+    let resolveUpdate!: (value: ModelPreheatSchedule) => void;
+    api.updateModelPreheatSchedule.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      })
+    );
+    render(<ModelPreheatPolicies />);
+    fireEvent.click(
+      await screen.findByRole('tab', {
+        name: 'resources.preheat.policy.scheduled'
+      })
+    );
+    const firstRow = (await screen.findByText('manual-policy')).closest('tr')!;
+    const secondRow = screen.getByText('scheduled-policy').closest('tr')!;
+    fireEvent.click(
+      within(firstRow).getByRole('button', {
+        name: 'resources.preheat.policy.disable'
+      })
+    );
+    const confirmDialog = (await screen.findAllByRole('dialog')).at(-1)!;
+    fireEvent.click(
+      within(confirmDialog).getByRole('button', {
+        name: 'resources.preheat.policy.disable'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.updateModelPreheatSchedule).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ enabled: false })
+      )
+    );
+    expect(
+      within(secondRow).getByRole('button', {
+        name: 'resources.preheat.policy.disable'
+      })
+    ).not.toBeDisabled();
+
+    resolveUpdate(schedule(1, 'manual'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
   it('快捷入口取消后普通新建不会残留模型预填', async () => {
     const user = userEvent.setup();
     router.location.search =
@@ -304,23 +534,18 @@ describe('预热策略触发方式', () => {
 
     let dialog = await screen.findByRole('dialog');
     await user.click(
-      within(dialog).getByRole('button', { name: 'Cancel' })
+      within(dialog).getByRole('button', { name: 'common.button.cancel' })
+    );
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'resources.preheat.policy.scheduled'
+      })
     );
     await user.click(
       screen.getByRole('button', {
         name: /resources\.preheat\.policy\.create/
       })
     );
-    dialog = screen.getByRole('dialog');
-    await user.click(
-      within(dialog).getByRole('radio', {
-        name: 'resources.preheat.schedule.triggerMode.manual'
-      })
-    );
-    await user.click(
-      within(dialog).getByRole('button', { name: 'common.button.next' })
-    );
-
     expect(
       await screen.findByLabelText('resources.preheat.model')
     ).toHaveValue('');

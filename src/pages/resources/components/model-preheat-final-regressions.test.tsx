@@ -4,7 +4,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
 import ModelPreheatTasks from './model-preheat-tasks';
 
 const api = vi.hoisted(() => ({
+  createModelPreheatConnectivityCheck: vi.fn(),
   createModelPreheatSchedule: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
@@ -96,11 +98,33 @@ const terminalCheck: ModelPreheatConnectivityCheck = {
   finished_at: '2026-08-11T08:00:10Z'
 };
 
+const unavailableCheck: ModelPreheatConnectivityCheck = {
+  ...terminalCheck,
+  summary: { success: 0, failed: 1, not_checked: 0 },
+  finished_at: new Date().toISOString(),
+  workers: [
+    {
+      worker_uuid: 'worker-a',
+      worker_id: 12,
+      worker_name: 'a100-58',
+      state: 'error',
+      readable: false,
+      writable: false,
+      deletable: false,
+      cleanup_failed: false,
+      latency_ms: null,
+      error_code: 'access_denied',
+      failed_stage: 'write'
+    }
+  ]
+};
+
 const worker: ModelPreheatWorker = {
   id: 12,
   worker_uuid: 'worker-a',
   name: 'a100-58',
   state: 'ready',
+  model_storage_protocol_version: 1,
   status: { gpu_devices: [{ name: 'NVIDIA A100' }] }
 };
 
@@ -159,9 +183,9 @@ const page = <T,>(items: T[], current = 1, total = items.length) => ({
   items,
   pagination: {
     page: current,
-    per_page: 10,
+    perPage: 10,
     total,
-    total_page: Math.max(1, Math.ceil(total / 10))
+    totalPage: Math.max(1, Math.ceil(total / 10))
   }
 });
 
@@ -224,6 +248,7 @@ beforeEach(() => {
   api.queryModelPreheatPolicies.mockResolvedValue(page([]));
   api.queryModelPreheatSchedules.mockResolvedValue(page([]));
   api.createModelPreheatSchedule.mockResolvedValue({ id: 1 });
+  api.createModelPreheatConnectivityCheck.mockResolvedValue({ id: 23 });
   api.queryModelPreheatTasks.mockResolvedValue(page([]));
   api.queryModelPreheatTask.mockResolvedValue(task());
   api.queryWorkersList.mockResolvedValue(page([worker]));
@@ -232,6 +257,79 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe('手动预热连接检测', () => {
+  it('重新检测失败后重试复用同一个幂等键', async () => {
+    const user = userEvent.setup();
+    api.queryModelPreheatConnectivityCheck.mockResolvedValue(unavailableCheck);
+    api.createModelPreheatConnectivityCheck
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce({ id: 23 });
+    render(
+      <ModelPreheatModal
+        open
+        initialValues={{
+          source: 'modelscope',
+          model_id: 'team/model',
+          delivery_mode: 's3_only'
+        }}
+        onCancel={vi.fn()}
+        onCreated={vi.fn()}
+      />
+    );
+
+    await screen.findByRole('dialog');
+    const submitTask = await screen.findByRole('button', {
+      name: 'resources.preheat.task.submit'
+    });
+    await waitFor(() => expect(submitTask).toBeEnabled());
+    await user.click(submitTask);
+    const recheck = (await screen.findAllByRole('button', {
+      name: 'resources.preheat.connectivity.recheck'
+    })).at(-1)!;
+    await user.click(recheck);
+    const checkDialog = (await screen.findAllByRole('dialog')).at(-1)!;
+    const submit = within(checkDialog).getByRole('button', {
+      name: 'resources.storage.checkWorkers'
+    });
+    await user.click(submit);
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledTimes(1)
+    );
+    await user.click(submit);
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledTimes(2)
+    );
+
+    expect(api.createModelPreheatConnectivityCheck.mock.calls[0][1]).toBe(
+      api.createModelPreheatConnectivityCheck.mock.calls[1][1]
+    );
+  });
+
+  it('高级设置默认折叠，展开后仍可编辑 revision', async () => {
+    const user = userEvent.setup();
+    render(
+      <ModelPreheatModal
+        open
+        initialValues={{
+          source: 'modelscope',
+          model_id: 'team/model',
+          revision: 'main'
+        }}
+        onCancel={vi.fn()}
+        onCreated={vi.fn()}
+      />
+    );
+
+    const advanced = await screen.findByText('resources.form.advanced');
+    expect(advanced.closest('.ant-collapse-header')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    await user.click(advanced);
+    expect(await screen.findByLabelText('resources.preheat.revision')).toHaveValue('main');
+  });
 });
 
 describe('策略分页请求代次', () => {
@@ -269,19 +367,15 @@ describe('定时策略', () => {
   it('从统一入口创建定时策略并使用节点 UUID', async () => {
     const user = userEvent.setup();
     render(<ModelPreheatPolicies />);
-
+    await user.click(
+      await screen.findByRole('tab', {
+        name: 'resources.preheat.policy.scheduled'
+      })
+    );
     await user.click(
       (await screen.findByText('resources.preheat.policy.create')).closest(
         'button'
       )!
-    );
-    await user.click(
-      screen.getByRole('radio', {
-        name: 'resources.preheat.schedule.triggerMode.scheduled'
-      })
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'common.button.next' })
     );
     await screen.findByText('resources.preheat.schedule.create');
     await user.type(
@@ -294,6 +388,9 @@ describe('定时策略', () => {
     );
     await user.click(
       screen.getByRole('button', { name: 'common.button.save' })
+    );
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'common.button.save' })).at(-1)!
     );
 
     await waitFor(() =>

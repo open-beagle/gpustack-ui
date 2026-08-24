@@ -444,6 +444,16 @@ const latestWorkerRegistrations = (workers: ModelPreheatWorker[]) => {
   return Array.from(latest.values());
 };
 
+export const MODEL_STORAGE_PROTOCOL_VERSION = 1;
+export const MODEL_PREHEAT_CONNECTIVITY_TTL_MS = 10 * 60 * 1000;
+
+export const eligibleModelPreheatWorkers = (workers: ModelPreheatWorker[]) =>
+  latestWorkerRegistrations(workers).filter(
+    (worker) =>
+      worker.state === 'ready' &&
+      worker.model_storage_protocol_version === MODEL_STORAGE_PROTOCOL_VERSION
+  );
+
 const normalizedGpuNames = (worker: ModelPreheatWorker) =>
   new Set(
     (worker.status?.gpu_devices || [])
@@ -460,9 +470,28 @@ const resolveTargetWorkers = (
   reasons: ModelPreheatBlockingReason[]
 ) => {
   const latest = latestWorkerRegistrations(workers);
-  const byId = new Map(latest.map((worker) => [worker.id, worker]));
-  const ready = latest.filter((worker) => worker.state === 'ready');
+  const ready = eligibleModelPreheatWorkers(workers);
+  const byId = new Map(ready.map((worker) => [worker.id, worker]));
   const readyById = new Map(ready.map((worker) => [worker.id, worker]));
+
+  if (values.delivery_mode === 's3_only') {
+    const eligible = eligibleModelPreheatWorkers(workers);
+    const selected = values.seed_worker_id
+      ? eligible.find((worker) => worker.id === values.seed_worker_id)
+      : undefined;
+    if (values.seed_worker_id && !selected) {
+      reasons.push({ code: 'seed_worker_not_ready' });
+      return [];
+    }
+    if (selected) return [selected];
+    if (!eligible.length) {
+      reasons.push({ code: 'seed_worker_not_ready' });
+      return [];
+    }
+    return [eligible.sort((left, right) =>
+      left.worker_uuid.localeCompare(right.worker_uuid)
+    )[0]];
+  }
 
   if (values.target_scope === 'selected_workers') {
     if (!values.target_worker_ids.length) {
@@ -536,17 +565,11 @@ export function buildModelPreheatPreview(
 
   if (!profile || profile.id !== values.s3_profile_id) {
     blockingReasons.push({ code: 'profile_required' });
-  } else if (!check || check.profile_id !== profile.id) {
-    blockingReasons.push({ code: 'connectivity_check_required' });
-  } else if (check.profile_config_version !== profile.config_version) {
-    blockingReasons.push({ code: 'connectivity_config_stale' });
   } else if (
-    profile.connectivity_state === 'stale' &&
-    !['available', 'partial'].includes(check.state)
+    check &&
+    check.profile_id === profile.id &&
+    check.profile_config_version === profile.config_version
   ) {
-    // 当前版本的成功检测结果可直接使用，不能被旧的 Profile 汇总状态阻断。
-    blockingReasons.push({ code: 'profile_connectivity_stale' });
-  } else {
     const connectivityByIdentity = new Map(
       check.workers.map((worker) => [
         workerIdentityKey(worker.worker_uuid, worker.worker_id),
@@ -557,17 +580,13 @@ export function buildModelPreheatPreview(
       const result = connectivityByIdentity.get(
         workerIdentityKey(worker.worker_uuid, worker.id)
       );
-      if (!result) {
-        blockingReasons.push({
-          code: 'worker_connectivity_missing',
-          workerName: worker.name
-        });
-      } else if (
-        result.state !== 'ready' ||
-        !result.readable ||
-        !result.writable ||
-        !result.deletable
-      ) {
+      const checkedAt = check.finished_at
+        ? new Date(check.finished_at).getTime()
+        : 0;
+      const isRecent =
+        checkedAt > 0 &&
+        Date.now() - checkedAt < MODEL_PREHEAT_CONNECTIVITY_TTL_MS;
+      if (result?.state === 'error' && isRecent) {
         blockingReasons.push({
           code: 'worker_connectivity_unavailable',
           workerName: worker.name
@@ -603,15 +622,46 @@ export function buildModelPreheatCreatePayload(values: ModelPreheatCreate) {
     ...values,
     model_id: values.model_id.trim(),
     revision: values.revision?.trim() || null,
-    include_patterns: (values.include_patterns || [])
-      .map((value) => value.trim())
-      .filter(Boolean),
-    exclude_patterns: (values.exclude_patterns || [])
-      .map((value) => value.trim())
-      .filter(Boolean),
+    include_patterns:
+      values.source === 'ollama_library'
+        ? []
+        : (values.include_patterns || [])
+            .map((value) => value.trim())
+            .filter(Boolean),
+    exclude_patterns:
+      values.source === 'ollama_library'
+        ? []
+        : (values.exclude_patterns || [])
+            .map((value) => value.trim())
+            .filter(Boolean),
     target_worker_ids:
-      values.target_scope === 'selected_workers' ? values.target_worker_ids : []
+      values.delivery_mode === 's3_and_workers' &&
+      values.target_scope === 'selected_workers'
+        ? values.target_worker_ids
+        : [],
+    target_scope:
+      values.delivery_mode === 's3_only' ? 'selected_workers' : values.target_scope,
+    seed_worker_id: values.seed_worker_id || null,
+    keep_new_workers_in_sync:
+      values.delivery_mode === 's3_and_workers' && values.keep_new_workers_in_sync
   } satisfies ModelPreheatCreate;
+}
+
+export async function prepareModelPreheatWithFreshSnapshot(options: {
+  values: ModelPreheatCreate;
+  loadWorkers: () => Promise<ModelPreheatWorker[]>;
+  loadSnapshot: () => Promise<{
+    profile: ModelPreheatS3Profile;
+    check: ModelPreheatConnectivityCheck | null;
+  }>;
+}) {
+  const { values, loadWorkers, loadSnapshot } = options;
+  const [workers, { profile, check }] = await Promise.all([
+    loadWorkers(),
+    loadSnapshot()
+  ]);
+  const preview = buildModelPreheatPreview(values, workers, profile, check);
+  return { profile, check, preview, workers };
 }
 
 export async function submitModelPreheatWithFreshSnapshot<T>(options: {
@@ -625,13 +675,9 @@ export async function submitModelPreheatWithFreshSnapshot<T>(options: {
   }>;
   createTask: (payload: ModelPreheatCreate, key: string) => Promise<T>;
 }) {
-  const { values, idempotency, loadWorkers, loadSnapshot, createTask } =
-    options;
-  const [workers, { profile, check }] = await Promise.all([
-    loadWorkers(),
-    loadSnapshot()
-  ]);
-  const preview = buildModelPreheatPreview(values, workers, profile, check);
+  const { values, idempotency, createTask } = options;
+  const { profile, check, preview, workers } =
+    await prepareModelPreheatWithFreshSnapshot(options);
   if (!preview.canSubmit) {
     return { submitted: false, task: null, profile, check, preview, workers };
   }

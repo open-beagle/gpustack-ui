@@ -141,6 +141,10 @@ export default {
   'resources.preheat.includePatterns': 'Include Patterns',
   'resources.preheat.excludePatterns': 'Exclude Patterns',
   'resources.preheat.backfillPolicy': 'S3 Backfill Policy',
+  'resources.preheat.deliveryMode': 'Delivery Mode',
+  'resources.preheat.delivery.s3_only': 'Publish to S3 Only',
+  'resources.preheat.delivery.s3_and_workers': 'Publish to S3 and Workers',
+  'resources.preheat.connectivity.createAnyway': 'Create Anyway',
   'resources.preheat.keepInSync': 'Keep New Workers in Sync',
   'resources.preheat.fileCount': 'Files',
   'resources.preheat.lastVerified': 'Last Verified',
@@ -445,10 +449,16 @@ export default {
   'resources.storage.workerNotCurrent': 'This is not the latest worker registration.',
   'resources.storage.workerProtocolIncompatible':
     'The worker synchronization protocol is incompatible.',
+  'resources.storage.workerProtocolMissing':
+    'The worker does not report a synchronization protocol version.',
   'resources.storage.syncPolicy.disabled.profileMaintenance':
     'The target S3 profile is in maintenance mode.',
   'resources.storage.syncPolicy.disabled.policyDisabled':
     'The policy is disabled.',
+  'resources.preheat.policy.disabled.profileStale':
+    'The S3 profile version has changed. Reconcile the policy first.',
+  'resources.preheat.policy.disabled.blocked':
+    'The server currently blocks enablement: {reason}',
   'resources.storage.revision.modelscopeFilelist':
     'File-list fingerprint {fingerprint}',
   'resources.preheat.noReadyWorkers':
@@ -544,5 +554,22 @@ export default {
   'resources.storage.updatedAt': 'Updated at',
   'resources.storage.profile': 'S3 profile',
   'resources.storage.testCredentialsRequiredHint': 'Update credentials and enter both keys before testing the connection.',
-  'resources.storage.sync.confirmSummary': 'Matching model content is skipped; files with a different digest are replaced.'
+  'resources.storage.sync.confirmSummary': 'Matching model content is skipped; files with a different digest are replaced.',
+  'resources.preheat.confirm.title': 'Confirm Creation',
+  'resources.preheat.confirm.flow': 'Final flow',
+  'resources.preheat.confirm.flow.s3Only': '{model} -> S3 profile {profile}',
+  'resources.preheat.confirm.flow.workers': '{model} -> S3 profile {profile} -> target workers',
+  'resources.preheat.confirm.flow.artifact': 'Fixed S3 artifact {model} -> target workers in this cluster',
+  'resources.preheat.confirm.targetCount': 'Target workers',
+  'resources.preheat.confirm.targetPending': 'Matched by GPU scope at execution time',
+  'resources.preheat.confirm.capacity': 'Available capacity',
+  'resources.preheat.confirm.capacityUnavailable': 'Workers did not report capacity information',
+  'resources.preheat.confirm.artifactSize': 'S3 model size',
+  'resources.preheat.confirm.skipRule': 'Skip rule',
+  'resources.preheat.confirm.skipRuleValue': 'Files with the same digest are skipped.',
+  'resources.preheat.confirm.conflictRule': 'Overwrite/conflict rule',
+  'resources.preheat.confirm.conflictRuleValue': 'Files with a different digest are replaced; the server handles conflicts with idempotency and lease rules.',
+  'resources.preheat.confirm.conflictRuleValue.s3_only': 'Conflicting content with the same artifact ID is isolated or rejected; shared S3 artifacts are not overwritten.',
+  'resources.preheat.confirm.conflictRuleValue.workers': 'Target-worker files with a different digest are replaced under server idempotency and lease rules.',
+  'resources.preheat.confirm.conflictRuleValue.artifact': 'The fixed artifact is installed only on target workers; worker-file conflicts follow server idempotency and lease rules.'
 };

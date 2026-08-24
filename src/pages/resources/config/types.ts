@@ -192,6 +192,7 @@ export interface ModelPreheatWorker {
   worker_uuid: string;
   name: string;
   state: string;
+  model_storage_protocol_version?: number;
   status?: {
     gpu_devices?: Array<{ name: string }>;
   } | null;
@@ -441,7 +442,7 @@ export interface ModelPreheatConnectivityCheck {
 }
 
 export interface ModelPreheatCreate {
-  source: 'huggingface' | 'modelscope';
+  source: 'huggingface' | 'modelscope' | 'ollama_library';
   model_id: string;
   revision?: string | null;
   include_patterns: string[];
@@ -451,6 +452,8 @@ export interface ModelPreheatCreate {
   seed_worker_id?: number | null;
   s3_profile_id: number;
   s3_backfill_policy: ModelPreheatBackfillPolicy;
+  delivery_mode?: 's3_only' | 's3_and_workers';
+  connectivity_failure_override?: boolean;
   keep_new_workers_in_sync: boolean;
 }
 
@@ -482,7 +485,9 @@ export interface ModelPreheatTask {
   s3_profile_id: number;
   s3_profile_config_version: number;
   s3_backfill_policy: ModelPreheatBackfillPolicy;
+  delivery_mode?: 's3_only' | 's3_and_workers';
   keep_new_workers_in_sync: boolean;
+  connectivity_failure_override?: boolean;
   transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
@@ -507,6 +512,7 @@ export interface ModelPreheatDistributionPolicy {
   source_artifact?: string | null;
   source_sync_task_id?: number | null;
   profile_version_stale?: boolean;
+  blocked_reason?: string | null;
   last_reconciled_at: string | null;
   created_at: string;
   updated_at: string;
@@ -571,7 +577,7 @@ export interface ModelPreheatScheduleCreate {
   window_duration_minutes: number;
   max_concurrency: number;
   bandwidth_limit_mbps?: number | null;
-  source: 'huggingface' | 'modelscope';
+  source: 'huggingface' | 'modelscope' | 'ollama_library';
   model_id: string;
   revision?: string | null;
   include_patterns: string[];
@@ -581,7 +587,9 @@ export interface ModelPreheatScheduleCreate {
   seed_worker_uuid?: string | null;
   s3_profile_id: number;
   s3_backfill_policy: ModelPreheatBackfillPolicy;
+  delivery_mode?: 's3_only' | 's3_and_workers';
   keep_new_workers_in_sync: boolean;
+  connectivity_failure_override?: boolean;
 }
 
 export interface ModelPreheatSchedule extends ModelPreheatScheduleCreate {

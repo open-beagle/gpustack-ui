@@ -1,4 +1,5 @@
 import { Button, Select } from 'antd';
+import dayjs from 'dayjs';
 import { useIntl } from '@umijs/max';
 import React, { useEffect, useRef, useState } from 'react';
 import { queryModelStorageArtifacts } from '../apis';
@@ -8,13 +9,15 @@ import ModelStorageAsyncState from './model-storage-async-state';
 
 interface Props {
   profileId?: number;
+  profileName?: string;
   value?: string;
   onChange?: (value: string | undefined, artifact?: ModelStorageArtifact) => void;
+  onArtifactChange?: (artifact?: ModelStorageArtifact) => void;
   disabled?: boolean;
   disabledReason?: string;
 }
 
-const ArtifactSelect: React.FC<Props> = ({ profileId, value, onChange, disabled, disabledReason }) => {
+const ArtifactSelect: React.FC<Props> = ({ profileId, profileName, value, onChange, onArtifactChange, disabled, disabledReason }) => {
   const intl = useIntl();
   const requestId = useRef(0);
   const [items, setItems] = useState<ModelStorageArtifact[]>([]);
@@ -49,7 +52,7 @@ const ArtifactSelect: React.FC<Props> = ({ profileId, value, onChange, disabled,
   };
   useEffect(() => { requestId.current += 1; setItems([]); setSearch(''); setPage(1); setTotal(0); setError(undefined); }, [profileId]);
   return <ModelStorageAsyncState data={items} loading={loading} refreshing={loading && Boolean(items.length)} error={error} hasFilters={Boolean(search)} disabledReason={effectiveDisabledReason} onRetry={() => void load(search)}>
-    <Select showSearch allowClear filterOption={false} value={value} disabled={disabled || !profileId} onSearch={(nextSearch) => void load(nextSearch, 1)} onChange={(nextValue) => onChange?.(nextValue, items.find((item) => item.artifact_id === nextValue))} options={items.map((item) => ({ value: item.artifact_id, disabled: item.manifest_state !== 'valid', label: `${getModelStorageSourceLabel(item.source)} · ${item.model_id} · ${getModelStorageRevisionPresentation(item.resolved_revision).short}` }))} />
+    <Select showSearch allowClear filterOption={false} value={value} disabled={disabled || !profileId} onSearch={(nextSearch) => void load(nextSearch, 1)} onChange={(nextValue) => { const artifact = items.find((item) => item.artifact_id === nextValue); onChange?.(nextValue, artifact); onArtifactChange?.(artifact); }} options={items.map((item) => ({ value: item.artifact_id, disabled: item.manifest_state !== 'valid', label: `${getModelStorageSourceLabel(item.source)} · ${item.model_id} · ${getModelStorageRevisionPresentation(item.resolved_revision).short} · ${profileName || profileId} · ${item.last_verified_at ? dayjs(item.last_verified_at).format('YYYY-MM-DD HH:mm') : '-'}` }))} />
     {items.length < total && <Button type="link" loading={loading} onMouseDown={(event) => event.preventDefault()} onClick={() => void load(search, page + 1, true)}>{intl.formatMessage({ id: 'resources.storage.loadMore' })}</Button>}
   </ModelStorageAsyncState>;
 };

@@ -1,6 +1,6 @@
 import ModalFooter from '@/components/modal-footer';
 import { ExclamationCircleFilled } from '@ant-design/icons';
-import { Modal, Space, Typography } from 'antd';
+import { Modal, Space } from 'antd';
 import React from 'react';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   okText: string;
   loading?: boolean;
   danger?: boolean;
+  extra?: React.ReactNode;
   onOk: () => void;
   onCancel: () => void;
 }
@@ -21,6 +22,7 @@ const ModelPreheatConfirmModal: React.FC<Props> = ({
   okText,
   loading = false,
   danger = false,
+  extra,
   onOk,
   onCancel
 }) => (
@@ -52,12 +54,13 @@ const ModelPreheatConfirmModal: React.FC<Props> = ({
         loading={loading}
         okBtnProps={{ danger, disabled: loading }}
         cancelBtnProps={{ disabled: loading }}
+        extra={extra}
       />
     }
   >
-    <Typography.Paragraph style={{ margin: '8px 0 0 28px' }}>
+    <div style={{ margin: '8px 0 0 28px' }}>
       {content}
-    </Typography.Paragraph>
+    </div>
   </Modal>
 );
 

@@ -9,9 +9,8 @@ import {
 } from '@ant-design/icons';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
+  Alert,
   Button,
-  Modal,
-  Radio,
   Space,
   Table,
   Tabs,
@@ -53,8 +52,12 @@ import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
 type ScheduleAction = 'enable' | 'disable' | 'run' | 'delete';
-type StrategyKind = 'continuous' | 'manual' | 'scheduled';
 type PolicyMode = 'preheat' | 'distribution';
+type ActionLoading = {
+  type: 'policy' | 'schedule';
+  id: number;
+  action: ContinuousAction | ScheduleAction;
+};
 
 const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const intl = useIntl();
@@ -63,21 +66,25 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const policyRequests = useRef(new LatestRequestGate());
   const scheduleRequests = useRef(new LatestRequestGate());
   const runIdempotency = useRef(new IdempotencyKeyLifecycle());
-  const actionInFlight = useRef(false);
+  const actionInFlight = useRef(new Set<string>());
   const [policies, setPolicies] = useState<ModelPreheatDistributionPolicy[]>(
     []
   );
   const [schedules, setSchedules] = useState<ModelPreheatSchedule[]>([]);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [policyError, setPolicyError] = useState(false);
+  const [scheduleError, setScheduleError] = useState(false);
+  const [actionError, setActionError] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [schedulePage, setSchedulePage] = useState(1);
   const [schedulePageSize, setSchedulePageSize] = useState(10);
   const [scheduleTotal, setScheduleTotal] = useState(0);
-  const [createChooserOpen, setCreateChooserOpen] = useState(false);
-  const [strategyKind, setStrategyKind] = useState<StrategyKind>('continuous');
+  const [activeTab, setActiveTab] = useState<'continuous' | 'schedule'>(
+    mode === 'preheat' ? 'schedule' : 'continuous'
+  );
   const [continuousOpen, setContinuousOpen] = useState(false);
   const [distributionSyncTaskId, setDistributionSyncTaskId] =
     useState<number>();
@@ -93,23 +100,55 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     schedule: ModelPreheatSchedule;
     action: ScheduleAction;
   } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<ActionLoading | null>(null);
+
+  const policyActionDisabledReason = (
+    policy: ModelPreheatDistributionPolicy,
+    action: ContinuousAction
+  ) => {
+    if (action === 'reconcile' && !policy.enabled) {
+      return 'resources.storage.syncPolicy.disabled.policyDisabled';
+    }
+    if (action === 'enable' && policy.profile_version_stale) {
+      return 'resources.preheat.policy.disabled.profileStale';
+    }
+    if (action === 'enable' && policy.blocked_reason) {
+      return 'resources.preheat.policy.disabled.blocked';
+    }
+    return undefined;
+  };
+
+  const scheduleActionDisabledReason = (
+    schedule: ModelPreheatSchedule,
+    action: ScheduleAction
+  ) =>
+    action === 'run' && !schedule.enabled
+      ? 'resources.storage.syncPolicy.disabled.policyDisabled'
+      : undefined;
 
   const loadPolicies = useCallback(async () => {
     setPolicyLoading(true);
-    return policyRequests.current.run(
+    setPolicyError(false);
+    try {
+      return await policyRequests.current.run(
       () => queryModelPreheatPolicies({ page, perPage: pageSize }),
       (result) => {
         setPolicies(result.items);
         setTotal(result.pagination.total);
       },
       () => setPolicyLoading(false)
-    );
+      );
+    } catch (error) {
+      setPolicyError(true);
+      throw error;
+    }
   }, [page, pageSize]);
 
   const loadSchedules = useCallback(async () => {
     setScheduleLoading(true);
-    return scheduleRequests.current.run(
+    setScheduleError(false);
+    try {
+      return await scheduleRequests.current.run(
       () =>
         queryModelPreheatSchedules({
           page: schedulePage,
@@ -120,16 +159,22 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         setScheduleTotal(result.pagination.total);
       },
       () => setScheduleLoading(false)
-    );
+      );
+    } catch (error) {
+      setScheduleError(true);
+      throw error;
+    }
   }, [schedulePage, schedulePageSize]);
 
   useEffect(() => {
+    if (mode === 'preheat') return;
     void loadPolicies().catch(() => undefined);
-  }, [loadPolicies]);
+  }, [loadPolicies, mode]);
 
   useEffect(() => {
+    if (mode === 'distribution') return;
     void loadSchedules().catch(() => undefined);
-  }, [loadSchedules]);
+  }, [loadSchedules, mode]);
 
   useEffect(
     () => () => {
@@ -154,7 +199,10 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     const source = query.get('source');
     const profileId = Number(query.get('profile'));
     setPrefill({
-      source: source === 'huggingface' ? 'huggingface' : 'modelscope',
+      source:
+        source === 'huggingface' || source === 'ollama_library'
+          ? source
+          : 'modelscope',
       model_id: query.get('model') || '',
       revision: query.get('revision') || '',
       ...(Number.isInteger(profileId) && profileId > 0
@@ -163,27 +211,33 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     });
     if (mode === 'distribution') setContinuousOpen(true);
     else if (mode === 'preheat') setScheduleOpen(true);
-    else setCreateChooserOpen(true);
+    else if (activeTab === 'continuous') setContinuousOpen(true);
+    else setScheduleOpen(true);
     navigate(`${location.pathname}?tab=policies`, { replace: true });
-  }, [location.pathname, location.search, mode, navigate]);
+  }, [activeTab, location.pathname, location.search, mode, navigate]);
 
   const scheduleInitialValues = useMemo(
     () => ({
-      trigger_mode:
-        strategyKind === 'manual'
-          ? ('manual' as const)
-          : ('scheduled' as const),
+      trigger_mode: 'scheduled' as const,
       ...(prefill.source ? { source: prefill.source } : {}),
       ...(prefill.model_id ? { model_id: prefill.model_id } : {}),
       ...(prefill.revision ? { revision: prefill.revision } : {}),
       ...(prefill.s3_profile_id ? { s3_profile_id: prefill.s3_profile_id } : {})
     }),
-    [prefill, strategyKind]
+    [prefill]
   );
 
   const handlePolicyAction = async () => {
     if (!policyConfirm) return;
-    setActionLoading(true);
+    const actionKey = `policy:${policyConfirm.policy.id}`;
+    if (actionInFlight.current.has(actionKey)) return;
+    actionInFlight.current.add(actionKey);
+    setActionLoading({
+      type: 'policy',
+      id: policyConfirm.policy.id,
+      action: policyConfirm.action
+    });
+    setActionError(false);
     try {
       if (policyConfirm.action === 'delete') {
         await deleteModelPreheatPolicy(policyConfirm.policy.id);
@@ -197,15 +251,25 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       setPolicyConfirm(null);
       message.success(intl.formatMessage({ id: 'common.message.success' }));
       await loadPolicies();
+    } catch {
+      setActionError(true);
     } finally {
-      setActionLoading(false);
+      actionInFlight.current.delete(actionKey);
+      setActionLoading(null);
     }
   };
 
   const handleScheduleAction = async () => {
-    if (!scheduleConfirm || actionInFlight.current) return;
-    actionInFlight.current = true;
-    setActionLoading(true);
+    if (!scheduleConfirm) return;
+    const actionKey = `schedule:${scheduleConfirm.schedule.id}`;
+    if (actionInFlight.current.has(actionKey)) return;
+    actionInFlight.current.add(actionKey);
+    setActionLoading({
+      type: 'schedule',
+      id: scheduleConfirm.schedule.id,
+      action: scheduleConfirm.action
+    });
+    setActionError(false);
     try {
       if (scheduleConfirm.action === 'delete') {
         await deleteModelPreheatSchedule(scheduleConfirm.schedule.id);
@@ -224,10 +288,10 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       message.success(intl.formatMessage({ id: 'common.message.success' }));
       await loadSchedules();
     } catch {
-      return;
+      setActionError(true);
     } finally {
-      actionInFlight.current = false;
-      setActionLoading(false);
+      actionInFlight.current.delete(actionKey);
+      setActionLoading(null);
     }
   };
 
@@ -304,15 +368,31 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title: intl.formatMessage({ id: 'common.table.operation' }),
         key: 'operation',
         width: 140,
-        render: (_: unknown, policy: ModelPreheatDistributionPolicy) => (
-          <Space size={4}>
-            <Tooltip
-              title={intl.formatMessage({
-                id: policy.enabled
-                  ? 'resources.preheat.policy.disable'
-                  : 'resources.preheat.policy.enable'
-              })}
-            >
+        render: (_: unknown, policy: ModelPreheatDistributionPolicy) => {
+          const toggleAction = policy.enabled ? 'disable' : 'enable';
+          const toggleReason = policyActionDisabledReason(policy, toggleAction);
+          const reconcileReason = policyActionDisabledReason(policy, 'reconcile');
+          const toggleTooltip =
+            toggleReason === 'resources.preheat.policy.disabled.blocked'
+              ? intl.formatMessage(
+                  { id: toggleReason },
+                  { reason: policy.blocked_reason || '' }
+                )
+              : intl.formatMessage({
+                  id:
+                    toggleReason ||
+                    (policy.enabled
+                      ? 'resources.preheat.policy.disable'
+                      : 'resources.preheat.policy.enable')
+                });
+          const isLoading = (action: ContinuousAction) =>
+            actionLoading?.type === 'policy' &&
+            actionLoading.id === policy.id &&
+            actionLoading.action === action;
+          const hasActionInFlight =
+            actionLoading?.type === 'policy' && actionLoading.id === policy.id;
+          return <Space size={4}>
+            <Tooltip title={toggleTooltip}>
               <Button
                 type="text"
                 icon={
@@ -327,6 +407,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                     ? 'resources.preheat.policy.disable'
                     : 'resources.preheat.policy.enable'
                 })}
+                loading={isLoading(toggleAction)}
+                disabled={hasActionInFlight || Boolean(toggleReason)}
                 onClick={() =>
                   setPolicyConfirm({
                     policy,
@@ -335,18 +417,17 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 }
               />
             </Tooltip>
-            <Tooltip
-              title={intl.formatMessage({
-                id: 'resources.preheat.policy.reconcile'
-              })}
-            >
+            <Tooltip title={intl.formatMessage({
+              id: reconcileReason || 'resources.preheat.policy.reconcile'
+            })}>
               <Button
                 type="text"
                 icon={<SyncOutlined />}
                 aria-label={intl.formatMessage({
                   id: 'resources.preheat.policy.reconcile'
                 })}
-                disabled={!policy.enabled}
+                loading={isLoading('reconcile')}
+                disabled={hasActionInFlight || Boolean(reconcileReason)}
                 onClick={() =>
                   setPolicyConfirm({ policy, action: 'reconcile' })
                 }
@@ -358,14 +439,16 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 type="text"
                 icon={<DeleteOutlined />}
                 aria-label={intl.formatMessage({ id: 'common.button.delete' })}
+                loading={isLoading('delete')}
+                disabled={hasActionInFlight}
                 onClick={() => setPolicyConfirm({ policy, action: 'delete' })}
               />
             </Tooltip>
-          </Space>
-        )
+          </Space>;
+        }
       }
     ],
-    [intl]
+    [actionLoading, intl]
   );
 
   const scheduleColumns = useMemo(
@@ -433,13 +516,22 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title: intl.formatMessage({ id: 'common.table.operation' }),
         key: 'operation',
         width: 170,
-        render: (_: unknown, schedule: ModelPreheatSchedule) => (
-          <Space size={4}>
+        render: (_: unknown, schedule: ModelPreheatSchedule) => {
+          const toggleAction = schedule.enabled ? 'disable' : 'enable';
+          const runReason = scheduleActionDisabledReason(schedule, 'run');
+          const isLoading = (action: ScheduleAction) =>
+            actionLoading?.type === 'schedule' &&
+            actionLoading.id === schedule.id &&
+            actionLoading.action === action;
+          const hasActionInFlight =
+            actionLoading?.type === 'schedule' && actionLoading.id === schedule.id;
+          return <Space size={4}>
             <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
               <Button
                 type="text"
                 icon={<EditOutlined />}
                 aria-label={intl.formatMessage({ id: 'common.button.edit' })}
+                disabled={hasActionInFlight}
                 onClick={() => {
                   setEditingSchedule(schedule);
                   setScheduleOpen(true);
@@ -467,6 +559,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                     ? 'resources.preheat.policy.disable'
                     : 'resources.preheat.policy.enable'
                 })}
+                loading={isLoading(toggleAction)}
+                disabled={hasActionInFlight}
                 onClick={() =>
                   openScheduleConfirm(
                     schedule,
@@ -475,18 +569,17 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 }
               />
             </Tooltip>
-            <Tooltip
-              title={intl.formatMessage({
-                id: 'resources.preheat.schedule.runNow'
-              })}
-            >
+            <Tooltip title={intl.formatMessage({
+              id: runReason || 'resources.preheat.schedule.runNow'
+            })}>
               <Button
                 type="text"
                 icon={<SyncOutlined />}
                 aria-label={intl.formatMessage({
                   id: 'resources.preheat.schedule.runNow'
                 })}
-                disabled={!schedule.enabled}
+                loading={isLoading('run')}
+                disabled={hasActionInFlight || Boolean(runReason)}
                 onClick={() => openScheduleConfirm(schedule, 'run')}
               />
             </Tooltip>
@@ -496,14 +589,16 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 type="text"
                 icon={<DeleteOutlined />}
                 aria-label={intl.formatMessage({ id: 'common.button.delete' })}
+                loading={isLoading('delete')}
+                disabled={hasActionInFlight}
                 onClick={() => openScheduleConfirm(schedule, 'delete')}
               />
             </Tooltip>
-          </Space>
-        )
+          </Space>;
+        }
       }
     ],
-    [intl]
+    [actionLoading, intl]
   );
 
   return (
@@ -512,10 +607,16 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         <Button
           icon={<ReloadOutlined />}
           onClick={() => {
-            void loadPolicies();
-            void loadSchedules();
+            if (mode !== 'preheat') void loadPolicies();
+            if (mode !== 'distribution') void loadSchedules();
           }}
-          loading={policyLoading || scheduleLoading}
+          loading={
+            mode === 'preheat'
+              ? scheduleLoading
+              : mode === 'distribution'
+                ? policyLoading
+                : policyLoading || scheduleLoading
+          }
         >
           {intl.formatMessage({ id: 'common.button.refresh' })}
         </Button>
@@ -526,13 +627,38 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
             setPrefill({});
             if (mode === 'distribution') setContinuousOpen(true);
             else if (mode === 'preheat') setScheduleOpen(true);
-            else setCreateChooserOpen(true);
+            else if (activeTab === 'continuous') setContinuousOpen(true);
+            else setScheduleOpen(true);
           }}
         >
           {intl.formatMessage({ id: 'resources.preheat.policy.create' })}
         </Button>
       </Space>
+      {((mode !== 'preheat' && policyError) ||
+        (mode !== 'distribution' && scheduleError)) && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                if (mode !== 'preheat' && policyError) void loadPolicies();
+                if (mode !== 'distribution' && scheduleError) void loadSchedules();
+              }}
+            >
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
+        />
+      )}
       <Tabs
+        activeKey={activeTab}
+        onChange={(nextTab) =>
+          setActiveTab(nextTab as 'continuous' | 'schedule')
+        }
         items={[
           ...(mode !== 'preheat'
             ? [{
@@ -594,45 +720,6 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
             : [])
         ]}
       />
-      {!mode && <Modal
-        open={createChooserOpen}
-        centered
-        maskClosable={false}
-        title={intl.formatMessage({ id: 'resources.preheat.policy.create' })}
-        onCancel={() => {
-          setCreateChooserOpen(false);
-          setPrefill({});
-        }}
-        onOk={() => {
-          setCreateChooserOpen(false);
-          if (strategyKind === 'continuous') setContinuousOpen(true);
-          else setScheduleOpen(true);
-        }}
-        okText={intl.formatMessage({ id: 'common.button.next' })}
-      >
-        <Radio.Group
-          value={strategyKind}
-          onChange={(event) => setStrategyKind(event.target.value)}
-        >
-          <Space direction="vertical">
-            <Radio value="continuous">
-              {intl.formatMessage({
-                id: 'resources.storage.distributionPolicy.kind'
-              })}
-            </Radio>
-            <Radio value="manual">
-              {intl.formatMessage({
-                id: 'resources.preheat.schedule.triggerMode.manual'
-              })}
-            </Radio>
-            <Radio value="scheduled">
-              {intl.formatMessage({
-                id: 'resources.preheat.schedule.triggerMode.scheduled'
-              })}
-            </Radio>
-          </Space>
-        </Radio.Group>
-      </Modal>}
       <ModelDistributionPolicyModal
         open={continuousOpen}
         initialSyncTaskId={distributionSyncTaskId}
@@ -669,10 +756,18 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title={intl.formatMessage({
           id: `resources.preheat.policy.${policyConfirm?.action || 'disable'}Confirm`
         })}
-        content={intl.formatMessage(
-          { id: 'resources.preheat.policy.actionContent' },
-          { name: policyConfirm?.policy.name || '' }
-        )}
+        content={<>
+          {intl.formatMessage(
+            { id: 'resources.preheat.policy.actionContent' },
+            { name: policyConfirm?.policy.name || '' }
+          )}
+          {actionError && <Alert
+            type="error"
+            showIcon
+            style={{ marginTop: 12 }}
+            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+          />}
+        </>}
         okText={intl.formatMessage({
           id:
             policyConfirm?.action === 'delete'
@@ -680,7 +775,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
               : `resources.preheat.policy.${policyConfirm?.action || 'disable'}`
         })}
         danger={policyConfirm?.action === 'delete'}
-        loading={actionLoading}
+        loading={Boolean(actionLoading)}
         onOk={handlePolicyAction}
         onCancel={() => setPolicyConfirm(null)}
       />
@@ -689,10 +784,18 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title={intl.formatMessage({
           id: `resources.preheat.schedule.${scheduleConfirm?.action || 'disable'}Confirm`
         })}
-        content={intl.formatMessage(
-          { id: 'resources.preheat.schedule.actionContent' },
-          { name: scheduleConfirm?.schedule.name || '' }
-        )}
+        content={<>
+          {intl.formatMessage(
+            { id: 'resources.preheat.schedule.actionContent' },
+            { name: scheduleConfirm?.schedule.name || '' }
+          )}
+          {actionError && <Alert
+            type="error"
+            showIcon
+            style={{ marginTop: 12 }}
+            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+          />}
+        </>}
         okText={intl.formatMessage({
           id:
             scheduleConfirm?.action === 'delete'
@@ -702,7 +805,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 : `resources.preheat.policy.${scheduleConfirm?.action || 'disable'}`
         })}
         danger={scheduleConfirm?.action === 'delete'}
-        loading={actionLoading}
+        loading={Boolean(actionLoading)}
         onOk={handleScheduleAction}
         onCancel={closeScheduleConfirm}
       />

@@ -17,6 +17,8 @@ interface Props {
   searchers?: Partial<Record<'modelscope' | 'huggingface', RepositorySearch>>;
   disabled?: boolean;
   disabledReason?: string;
+  ariaLabel?: string;
+  id?: string;
 }
 
 const defaultModelscopeSearch: RepositorySearch = async ({ query, page, perPage, signal }) => {
@@ -30,7 +32,7 @@ const defaultHuggingfaceSearch: RepositorySearch = async ({ query, page, perPage
   return { items, total: items.length === perPage ? page * perPage + 1 : (page - 1) * perPage + items.length };
 };
 
-const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollamaHistory = [], searchers = {}, disabled, disabledReason }) => {
+const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollamaHistory = [], searchers = {}, disabled, disabledReason, ariaLabel, id }) => {
   const intl = useIntl();
   const message = (id: string) => intl.formatMessage({ id });
   const controller = useRef<AbortController>();
@@ -75,7 +77,7 @@ const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollam
   const historyItems = ollamaHistory.filter((item) => item.toLowerCase().includes(query.toLowerCase())).map((item) => ({ id: item, label: item }));
   const options = remote ? items : historyItems;
   return <ModelStorageAsyncState data={options} loading={loading} refreshing={loading && Boolean(options.length)} error={error} query={query} disabledReason={disabled ? disabledReason : undefined} onRetry={() => void load()}>
-    <Select showSearch allowClear filterOption={false} value={value} disabled={disabled} loading={loading} onSearch={(nextQuery) => { setQuery(nextQuery); setPage(1); if (remote) void load(nextQuery, 1); }} onChange={(nextValue) => onChange(nextValue, options.find((item) => item.id === nextValue))} options={options.map((item) => ({ value: item.id, label: item.label }))} />
+    <Select id={id} aria-label={ariaLabel} showSearch allowClear filterOption={false} value={value} disabled={disabled} loading={loading} onSearch={(nextQuery) => { setQuery(nextQuery); setPage(1); if (nextQuery) onChange(nextQuery, { id: nextQuery, label: nextQuery }); if (remote) void load(nextQuery, 1); }} onChange={(nextValue) => onChange(nextValue, options.find((item) => item.id === nextValue))} options={options.map((item) => ({ value: item.id, label: item.label }))} />
     {source === 'ollama_library' && <Collapse size="small" items={[{ key: 'exact', label: message('resources.storage.repository.advanced'), children: <Input aria-label={message('resources.storage.repository.exactInput')} placeholder={message('resources.storage.repository.exactInput')} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value || undefined, event.target.value ? { id: event.target.value, label: event.target.value } : undefined)} /> }]} />}
     {remote && total > 20 && <Pagination size="small" current={page} pageSize={20} total={total} onChange={(nextPage) => { setPage(nextPage); void load(query, nextPage); }} />}
   </ModelStorageAsyncState>;

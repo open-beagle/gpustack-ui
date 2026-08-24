@@ -18,6 +18,7 @@ import {
   getModelStorageRevisionPresentation,
   getModelStorageStatusPresentation,
   getModelStorageSourceLabel,
+  eligibleModelPreheatWorkers,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
   retryModelFileDeletePreflight,
@@ -58,6 +59,7 @@ const workers: ModelPreheatWorker[] = [
     worker_uuid: 'worker-a',
     name: 'a100-58',
     state: 'ready',
+    model_storage_protocol_version: 1,
     status: { gpu_devices: [{ name: ' NVIDIA A100 ' }] }
   },
   {
@@ -65,6 +67,7 @@ const workers: ModelPreheatWorker[] = [
     worker_uuid: 'worker-b',
     name: 'a100-59',
     state: 'ready',
+    model_storage_protocol_version: 1,
     status: { gpu_devices: [{ name: 'nvidia a100' }] }
   },
   {
@@ -135,13 +138,13 @@ describe('预热配置逻辑', () => {
     expect(preview.canSubmit).toBe(true);
   });
 
-  it('阻断旧配置检查和不在目标范围内的种子节点', () => {
+  it('旧配置检查不会触发连通性覆盖，但种子节点必须属于已选目标', () => {
     expect(
       buildModelPreheatPreview(values, workers, profile, {
         ...check,
         profile_config_version: 1
       }).blockingReasons
-    ).toEqual([{ code: 'connectivity_config_stale' }]);
+    ).toEqual([]);
     expect(
       buildModelPreheatPreview(
         {
@@ -235,20 +238,94 @@ describe('预热配置逻辑', () => {
     ).toEqual([]);
   });
 
-  it('Worker 重注册后不复用旧 Worker ID 的连通性结果', () => {
+  it('Worker 重注册后缺少当前 ID 的检查结果不要求覆盖', () => {
     const preview = buildModelPreheatPreview(
       { ...values, target_scope: 'seed_worker', seed_worker_id: 30 },
       [...workers, { ...workers[0], id: 30, name: 'a100-58-re-registered' }],
       profile,
       check
     );
-    expect(preview.blockingReasons).toEqual([
-      {
-        code: 'worker_connectivity_missing',
-        workerName: 'a100-58-re-registered'
-      }
-    ]);
+    expect(preview.blockingReasons).toEqual([]);
     expect(preview.rows[0].connectivity).toBeNull();
+  });
+
+  it('仅当前配置、已完成且 TTL 内的明确 ERROR 要求连通性覆盖', () => {
+    const preview = buildModelPreheatPreview(
+      values,
+      workers,
+      profile,
+      {
+        ...check,
+        finished_at: new Date().toISOString(),
+        workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
+      }
+    );
+
+    expect(preview.blockingReasons).toEqual([
+      { code: 'worker_connectivity_unavailable', workerName: 'a100-58' }
+    ]);
+  });
+
+  it('未检测、过期错误和协议不兼容节点都不会误触发覆盖', () => {
+    const noResult = buildModelPreheatPreview(
+      values,
+      workers,
+      profile,
+      { ...check, finished_at: new Date().toISOString(), workers: [] }
+    );
+    const expiredError = buildModelPreheatPreview(
+      values,
+      workers,
+      profile,
+      {
+        ...check,
+        finished_at: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+        workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
+      }
+    );
+    const incompatibleWorkers = [
+      ...workers,
+      {
+        id: 39,
+        worker_uuid: 'worker-missing-version',
+        name: 'missing-version',
+        state: 'ready' as const
+      },
+      {
+        id: 40,
+        worker_uuid: 'worker-c',
+        name: 'incompatible',
+        state: 'ready' as const,
+        model_storage_protocol_version: 2
+      }
+    ];
+
+    expect(noResult.blockingReasons).toEqual([]);
+    expect(expiredError.blockingReasons).toEqual([]);
+    expect(eligibleModelPreheatWorkers(incompatibleWorkers).map((worker) => worker.id)).toEqual([12, 18]);
+  });
+
+  it('S3-only 使用 UUID 最小的可用 Seed，并在该节点明确失败时要求覆盖', () => {
+    const preview = buildModelPreheatPreview(
+      {
+        ...values,
+        delivery_mode: 's3_only',
+        target_worker_ids: [],
+        seed_worker_id: null
+      },
+      workers,
+      profile,
+      {
+        ...check,
+        finished_at: new Date().toISOString(),
+        workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
+      }
+    );
+
+    expect(preview.rows.map((row) => row.worker.worker_uuid)).toEqual(['worker-a']);
+    expect(preview.blockingReasons).toEqual([
+      { code: 'worker_connectivity_unavailable', workerName: 'a100-58' }
+    ]);
   });
 });
 
