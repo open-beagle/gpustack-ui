@@ -1,6 +1,7 @@
 import ModalFooter from '@/components/modal-footer';
 import { useIntl } from '@umijs/max';
 import { Alert, Descriptions, Modal, Select, Tooltip, Typography } from 'antd';
+import { convertFileSize } from '@/utils';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createModelStorageSyncTask } from '../apis';
 import {
@@ -51,6 +52,10 @@ const ModelStorageSyncModal: React.FC<Props> = ({
   const revisionPresentation = revision
     ? getModelStorageRevisionPresentation(revision)
     : null;
+  const sourceWorker =
+    model?.worker_name ||
+    model?.worker_name_snapshot ||
+    (model?.worker_id ? `Worker #${model.worker_id}` : '-');
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +126,12 @@ const ModelStorageSyncModal: React.FC<Props> = ({
           })}
         />
       )}
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={intl.formatMessage({ id: 'resources.storage.sync.confirmSummary' })}
+      />
       <Descriptions column={1} size="small">
         <Descriptions.Item
           label={intl.formatMessage({ id: 'resources.storage.model' })}
@@ -130,7 +141,10 @@ const ModelStorageSyncModal: React.FC<Props> = ({
         <Descriptions.Item
           label={intl.formatMessage({ id: 'resources.storage.sourceWorker' })}
         >
-          {model?.worker_id || '-'}
+          {sourceWorker}
+        </Descriptions.Item>
+        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.flow' })}>
+          {sourceWorker} {' -> '} {selected?.name || '-'}
         </Descriptions.Item>
         <Descriptions.Item
           label={intl.formatMessage({ id: 'resources.storage.version' })}
@@ -158,7 +172,7 @@ const ModelStorageSyncModal: React.FC<Props> = ({
         <Descriptions.Item
           label={intl.formatMessage({ id: 'resources.storage.capacity' })}
         >
-          {model?.size || 0}
+          {convertFileSize(model?.size || 0, 1, true)}
         </Descriptions.Item>
         <Descriptions.Item
           label={intl.formatMessage({ id: 'resources.storage.targetProfile' })}

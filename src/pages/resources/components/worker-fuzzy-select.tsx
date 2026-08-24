@@ -1,7 +1,7 @@
 import { Button, Select } from 'antd';
 import { useIntl } from '@umijs/max';
-import React, { useRef, useState } from 'react';
-import { queryWorkersList } from '../apis';
+import React, { useEffect, useRef, useState } from 'react';
+import { queryWorker, queryWorkersList } from '../apis';
 import type { ListItem } from '../config/types';
 import { mergeModelStoragePage } from '../config/model-preheat';
 import ModelStorageAsyncState from './model-storage-async-state';
@@ -21,6 +21,7 @@ const WorkerFuzzySelect: React.FC<Props> = ({
 }) => {
   const intl = useIntl();
   const requestId = useRef(0);
+  const selectedRequestId = useRef(0);
   const [items, setItems] = useState<ListItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,6 +56,23 @@ const WorkerFuzzySelect: React.FC<Props> = ({
     }
   };
 
+  useEffect(() => {
+    void load('');
+  }, []);
+
+  useEffect(() => {
+    if (value === undefined || items.some((item) => item.id === value)) return;
+    const id = ++selectedRequestId.current;
+    void queryWorker(value)
+      .then((worker) => {
+        if (id !== selectedRequestId.current) return;
+        setItems((current) =>
+          mergeModelStoragePage(current, [worker], (item) => item.id)
+        );
+      })
+      .catch(() => undefined);
+  }, [items, value]);
+
   return (
     <ModelStorageAsyncState
       data={items}
@@ -77,7 +95,7 @@ const WorkerFuzzySelect: React.FC<Props> = ({
         }
         options={items.map((worker) => ({
           value: worker.id,
-          label: `${worker.name} · ${worker.state} · ${worker.ip || '-'} · ${(worker.status?.gpu_devices || []).map((gpu) => gpu.name).join(', ') || '-'}`
+          label: `${worker.name} · ${worker.state === 'ready' ? 'Ready' : worker.state} · ${worker.ip || '-'} · ${(worker.status?.gpu_devices || []).map((gpu) => gpu.name).join(', ') || '-'}${worker.model_storage_protocol_version !== undefined && worker.model_storage_protocol_version !== 1 ? ` · ${intl.formatMessage({ id: 'resources.storage.workerProtocolIncompatible' })}` : ''}`
         }))}
       />
       {items.length < total && (

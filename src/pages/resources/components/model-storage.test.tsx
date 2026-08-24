@@ -75,6 +75,24 @@ describe('统一模型存储交互', () => {
     request.resolve({ id: 1 });
   });
 
+  it('同步确认使用来源节点名称展示实际 Worker 到目标 S3 的流向', async () => {
+    render(
+      <ModelStorageSyncModal
+        open
+        model={{ ...model, worker_name: 'beagle-243' }}
+        profiles={[profile]}
+        onCancel={vi.fn()}
+        onCreated={vi.fn()}
+      />
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByText('beagle-243').length).toBeGreaterThan(0);
+    expect(
+      within(dialog).getByText('beagle-243 -> 默认模型库')
+    ).toBeInTheDocument();
+  });
+
   it('同步和库存选择器只展示 active Profile，连通性管理保留维护 Profile', async () => {
     const user = userEvent.setup();
     const maintenance = { ...profile, id: 8, name: '维护配置', lifecycle_state: 'maintenance' as const, is_default: true };

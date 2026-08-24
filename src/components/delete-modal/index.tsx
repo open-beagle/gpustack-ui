@@ -2,6 +2,7 @@ import useBodyScroll from '@/hooks/use-body-scroll';
 import { ExclamationCircleFilled } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
+  Alert,
   Button,
   Checkbox,
   Modal,
@@ -61,6 +62,7 @@ interface DataOptions {
   okText?: string;
   cancelText?: string;
   title?: string;
+  getErrorMessage?: (error: unknown) => string;
   operation: string;
   checkConfig?: {
     checkText: string;
@@ -72,7 +74,11 @@ interface Configuration {
   checked: boolean;
 }
 
-const DeleteModal = forwardRef((props, ref) => {
+interface DeleteModalProps {
+  error?: string;
+}
+
+const DeleteModal = forwardRef<any, DeleteModalProps>(({ error }, ref) => {
   const intl = useIntl();
   const { styles } = useStyles();
   const { saveScrollHeight, restoreScrollHeight } = useBodyScroll();
@@ -81,10 +87,12 @@ const DeleteModal = forwardRef((props, ref) => {
     checked: false
   });
   const [config, setConfig] = useState<ModalFuncProps & DataOptions>({} as any);
+  const [submitError, setSubmitError] = useState<string>();
 
   const show = (data: ModalFuncProps & DataOptions) => {
     saveScrollHeight();
     setConfig(data);
+    setSubmitError(undefined);
     setConfiguration({
       checked: data.checkConfig?.defautlChecked || false
     });
@@ -103,24 +111,36 @@ const DeleteModal = forwardRef((props, ref) => {
   };
 
   const handleOk = async () => {
+    let shouldClose = false;
     try {
       const res = await config.onOk?.();
+      if (res === false) return;
       const isArray = Array.isArray(res);
       if (isArray) {
-        const allSuccess = res.every(
-          (item: any) => item?.status === 'fulfilled'
-        );
-        if (allSuccess) {
-          message.success(intl.formatMessage({ id: 'common.message.success' }));
+        const failed = res.filter((item: any) => item?.status === 'rejected');
+        if (failed.length) {
+          setSubmitError(
+            config.getErrorMessage?.(failed) ||
+              `${failed.length} ${intl.formatMessage({ id: 'common.message.failed' })}`
+          );
+          return;
         }
+        message.success(intl.formatMessage({ id: 'common.message.success' }));
       } else {
         message.success(intl.formatMessage({ id: 'common.message.success' }));
       }
+      shouldClose = true;
     } catch (error) {
-      // Handle error if needed
+      setSubmitError(
+        config.getErrorMessage?.(error) ||
+          (error instanceof Error ? error.message : String(error))
+      );
+      return;
     } finally {
-      setVisible(false);
-      restoreScrollHeight();
+      if (shouldClose) {
+        setVisible(false);
+        restoreScrollHeight();
+      }
     }
   };
 
@@ -189,6 +209,9 @@ const DeleteModal = forwardRef((props, ref) => {
             : ''
         }}
       ></div>
+      {(error || submitError) && (
+        <Alert type="error" showIcon message={error || submitError} />
+      )}
       {config.checkConfig && (
         <CheckboxWrapper>
           <Checkbox

@@ -44,7 +44,7 @@ const activeProfiles = (profiles: ModelPreheatS3Profile[]) =>
 
 const syncableModels = (models: ModelFile[]) =>
   models.filter((model) => {
-    const action = getModelFileSyncActionState(model);
+    const action = getModelFileSyncActionState(model, undefined, false);
     return action.visible && !action.disabled;
   });
 

@@ -1,7 +1,18 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { WatchEventType } from '@/config';
+import useUpdateChunkedList from '@/hooks/use-update-chunk-list';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelStorageArtifact } from '../config/types';
+import { MODEL_FILE_WATCH_EVENTS } from '../config/model-preheat';
 import ArtifactSelect from './artifact-select';
 import ModelFileSelect from './model-file-select';
 import ModelRepositoryPicker from './model-repository-picker';
@@ -11,6 +22,7 @@ import WorkerFuzzySelect from './worker-fuzzy-select';
 const api = vi.hoisted(() => ({
   queryModelFilesList: vi.fn(),
   queryModelStorageArtifacts: vi.fn(),
+  queryWorker: vi.fn(),
   queryWorkersList: vi.fn()
 }));
 
@@ -51,6 +63,39 @@ afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
 
 describe('模型存储选择器', () => {
+  it('节点模型 SSE 的 UPDATE 可进入筛选集合，DELETE 可离开集合', () => {
+    const setDataList = vi.fn();
+    const { result } = renderHook(() =>
+      useUpdateChunkedList({
+        dataList: [],
+        events: MODEL_FILE_WATCH_EVENTS,
+        setDataList
+      })
+    );
+
+    act(() => {
+      result.current.updateChunkedList({
+        type: WatchEventType.UPDATE,
+        collection: [{ id: 7, state: 'ready' }],
+        ids: [],
+        data: null
+      });
+    });
+    expect(result.current.cacheDataListRef.current).toEqual([
+      { id: 7, state: 'ready' }
+    ]);
+
+    act(() => {
+      result.current.updateChunkedList({
+        type: WatchEventType.DELETE,
+        collection: [],
+        ids: [7],
+        data: null
+      });
+    });
+    expect(result.current.cacheDataListRef.current).toEqual([]);
+  });
+
   it('Worker 和 Artifact 使用服务端搜索与 page/perPage 分页', async () => {
     const user = userEvent.setup();
     api.queryWorkersList.mockResolvedValue(
@@ -106,6 +151,24 @@ describe('模型存储选择器', () => {
       expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3, { page: 2, perPage: 20, search: 'model' });
     });
     expect(screen.getAllByRole('option', { name: /worker-101|org\/101/, hidden: true }).length).toBeGreaterThan(0);
+  });
+
+  it('Worker 筛选会补取历史 ID，并保留不可执行节点作为筛选值', async () => {
+    api.queryWorkersList.mockResolvedValue(page([]));
+    api.queryWorker.mockResolvedValue({
+      id: 101,
+      name: 'retired-worker',
+      state: 'not_ready',
+      ip: '10.0.0.101',
+      status: { gpu_devices: [{ name: 'A100' }] }
+    });
+
+    render(<WorkerFuzzySelect value={101} onChange={vi.fn()} />);
+
+    await waitFor(() => expect(api.queryWorker).toHaveBeenCalledWith(101));
+    expect(
+      await screen.findByText('retired-worker · not_ready · 10.0.0.101 · A100')
+    ).toBeInTheDocument();
   });
 
   it('仓库搜索取消旧请求且只采纳最新结果，并支持重试', async () => {

@@ -21,13 +21,57 @@ export interface ModelStorageTransferPresentation {
 
 export type ModelFileSyncActionReason =
   | 'unsupported'
+  | 'model_not_ready'
   | 'worker_unavailable'
+  | 'no_default_profile'
   | 'already_from_default';
 
 export interface ModelFileSyncActionState {
   visible: boolean;
   disabled: boolean;
   reason: ModelFileSyncActionReason | null;
+}
+
+export type ModelFileDeletePreflight = 'available' | 'active' | 'error';
+
+export const MODEL_FILE_WATCH_EVENTS: Array<
+  'INSERT' | 'UPDATE' | 'DELETE'
+> = ['INSERT', 'UPDATE', 'DELETE'];
+
+type ModelFileSyncTaskQuery = (params: {
+  page: number;
+  perPage: number;
+  model_file_id: number;
+  state: string;
+}) => Promise<{ items: Array<{ state: string }> }>;
+
+/** 删除前逐个活动状态查询，避免历史终态占据首条记录时误放行。 */
+export async function getModelFileDeletePreflight(
+  modelFileIds: number[],
+  querySyncTasks: ModelFileSyncTaskQuery
+): Promise<ModelFileDeletePreflight> {
+  try {
+    const results = await Promise.all(
+      modelFileIds.flatMap((model_file_id) =>
+        ['pending', 'scanning', 'publishing'].map((state) =>
+          querySyncTasks({ page: 1, perPage: 1, model_file_id, state })
+        )
+      )
+    );
+    return results.some((result) => result.items.length > 0)
+      ? 'active'
+      : 'available';
+  } catch {
+    return 'error';
+  }
+}
+
+export function retryModelFileDeletePreflight(
+  retry: (() => void) | undefined,
+  clearFailure: () => void
+) {
+  clearFailure();
+  retry?.();
 }
 
 export interface ModelStorageRevisionPresentation {
@@ -76,16 +120,20 @@ export function getModelFileSyncActionState(
     transfer_profile_id?: number | null;
     worker_available?: boolean;
   },
-  defaultProfileId?: number
+  defaultProfileId?: number,
+  requireDefaultProfile = true
 ): ModelFileSyncActionState {
-  const supported =
-    model.state === 'ready' &&
-    ['model_scope', 'huggingface', 'ollama_library'].includes(model.source);
-  if (!supported) {
-    return { visible: false, disabled: true, reason: 'unsupported' };
+  if (!['model_scope', 'huggingface', 'ollama_library'].includes(model.source)) {
+    return { visible: true, disabled: true, reason: 'unsupported' };
+  }
+  if (model.state !== 'ready') {
+    return { visible: true, disabled: true, reason: 'model_not_ready' };
   }
   if (model.worker_available === false) {
     return { visible: true, disabled: true, reason: 'worker_unavailable' };
+  }
+  if (requireDefaultProfile && defaultProfileId === undefined) {
+    return { visible: true, disabled: true, reason: 'no_default_profile' };
   }
   if (
     defaultProfileId !== undefined &&

@@ -180,7 +180,7 @@ export default {
   'resources.storage.syncBatch.reason.no_ready_workers': 'Нет доступных Ready-воркеров',
   'resources.storage.deleteSync': 'Удалить запись синхронизации',
   'resources.storage.deleteSyncConfirm': 'Удалить запись синхронизации',
-  'resources.storage.deleteSyncContent': 'Удалить запись синхронизации #{id}? Это действие нельзя отменить.',
+  'resources.storage.deleteSyncContent': 'Удалить запись синхронизации #{id}? Это действие нельзя отменить; артефакт S3 и локальные файлы модели не будут удалены.',
   'resources.storage.syncTask.time': 'Время синхронизации',
   'resources.storage.syncTask.from': 'Исходный воркер',
   'resources.storage.syncTask.to': 'Целевой S3',
@@ -249,7 +249,17 @@ export default {
   'resources.storage.createdAt': 'Создано',
   'resources.storage.updatedAt': 'Обновлено',
   'resources.storage.profile': 'Профиль S3',
-  'resources.storage.testCredentialsRequiredHint': 'Перед проверкой подключения обновите учетные данные и заполните оба ключа.'
+  'resources.storage.testCredentialsRequiredHint': 'Перед проверкой подключения обновите учетные данные и заполните оба ключа.',
+  'resources.storage.sync.confirmSummary': 'Совпадающее содержимое модели пропускается, а файлы с другим хешем заменяются.',
+  'resources.storage.sync.unsupportedSource': 'Этот источник не поддерживается для синхронизации с S3.',
+  'resources.storage.sync.modelNotReady': 'Модель еще не готова к синхронизации.',
+  'resources.storage.workerNotCurrent': 'Это не последняя регистрация Worker.',
+  'resources.storage.workerProtocolIncompatible': 'Протокол синхронизации Worker несовместим.',
+  'resources.storage.syncPolicy.disabled.profileMaintenance': 'Целевой профиль S3 находится на обслуживании.',
+  'resources.storage.syncPolicy.disabled.policyDisabled': 'Политика отключена.',
+  'resources.storage.deleteModelBlocked': 'Невозможно удалить запись модели',
+  'resources.storage.deleteModelBlockedContent': 'У модели «{name}» есть активная задача синхронизации. Дождитесь ее завершения или отмените задачу перед удалением записи.',
+  'resources.storage.deleteModelBlockedBatchName': 'Выбранные модели: {count}'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

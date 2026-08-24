@@ -365,6 +365,14 @@ export default {
     '该模型已来自默认 S3 模型库，无需重复同步。',
   'resources.storage.sync.missingRevision':
     '该旧模型缺少可信版本信息，请重新下载后再同步到 S3。',
+  'resources.storage.sync.unsupportedSource':
+    '此来源不受 S3 同步支持。',
+  'resources.storage.sync.modelNotReady': '模型尚未就绪，暂不能同步。',
+  'resources.storage.workerNotCurrent': '不是最新注册节点。',
+  'resources.storage.workerProtocolIncompatible': '同步协议不兼容。',
+  'resources.storage.syncPolicy.disabled.profileMaintenance':
+    '目标 S3 配置处于维护模式。',
+  'resources.storage.syncPolicy.disabled.policyDisabled': '策略已停用。',
   'resources.storage.revision.modelscopeFilelist': '文件清单指纹 {fingerprint}',
   'resources.storage.syncBatch.create': '新建同步任务',
   'resources.storage.syncBatch.scope': '同步范围',
@@ -405,7 +413,11 @@ export default {
   'resources.storage.deleteSync': '删除同步记录',
   'resources.storage.deleteSyncConfirm': '删除同步记录',
   'resources.storage.deleteSyncContent':
-    '确认删除同步记录 #{id}？删除后无法恢复。',
+    '确认删除同步记录 #{id}？删除后无法恢复，不会删除 S3 Artifact 或本地模型文件。',
+  'resources.storage.deleteModelBlocked': '无法删除模型记录',
+  'resources.storage.deleteModelBlockedContent':
+    '模型“{name}”有关联的活动同步任务。请等待任务结束或先取消任务后再删除。',
+  'resources.storage.deleteModelBlockedBatchName': '已选的 {count} 个模型',
   'resources.storage.systemProfile': '系统配置',
   'resources.storage.setDefault': '设为默认',
   'resources.storage.setDefaultConfirm': '切换默认 S3 配置',
@@ -524,5 +536,6 @@ export default {
   'resources.storage.createdAt': '创建时间',
   'resources.storage.updatedAt': '更新时间',
   'resources.storage.profile': 'S3 配置',
-  'resources.storage.testCredentialsRequiredHint': '请先更新凭据并填写访问密钥和秘密密钥，再测试连接。'
+  'resources.storage.testCredentialsRequiredHint': '请先更新凭据并填写访问密钥和秘密密钥，再测试连接。',
+  'resources.storage.sync.confirmSummary': '摘要相同的模型内容会跳过；摘要不一致的文件会被覆盖。'
 };

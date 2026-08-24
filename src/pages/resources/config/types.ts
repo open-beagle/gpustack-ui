@@ -96,6 +96,7 @@ export interface ListItem {
   created_at: string;
   updated_at: string;
   worker_uuid: string;
+  model_storage_protocol_version?: number;
 }
 
 export interface ModelFile {

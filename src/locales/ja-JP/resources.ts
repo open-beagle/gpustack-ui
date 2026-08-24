@@ -182,7 +182,7 @@ export default {
   'resources.storage.syncBatch.reason.no_ready_workers': '利用可能な Ready ワーカーがありません',
   'resources.storage.deleteSync': '同期記録を削除',
   'resources.storage.deleteSyncConfirm': '同期記録を削除',
-  'resources.storage.deleteSyncContent': '同期記録 #{id} を削除しますか？この操作は元に戻せません。',
+  'resources.storage.deleteSyncContent': '同期記録 #{id} を削除しますか？この操作は元に戻せず、S3 Artifact やローカルモデルファイルは削除されません。',
   'resources.storage.syncTask.time': '同期時刻',
   'resources.storage.syncTask.from': 'ソースワーカー',
   'resources.storage.syncTask.to': '対象 S3',
@@ -251,7 +251,17 @@ export default {
   'resources.storage.createdAt': '作成日時',
   'resources.storage.updatedAt': '更新日時',
   'resources.storage.profile': 'S3 プロファイル',
-  'resources.storage.testCredentialsRequiredHint': '接続をテストする前に、認証情報を更新して両方のキーを入力してください。'
+  'resources.storage.testCredentialsRequiredHint': '接続をテストする前に、認証情報を更新して両方のキーを入力してください。',
+  'resources.storage.sync.confirmSummary': '同じダイジェストのモデル内容はスキップされ、異なるダイジェストのファイルは上書きされます。',
+  'resources.storage.sync.unsupportedSource': 'このソースは S3 同期に対応していません。',
+  'resources.storage.sync.modelNotReady': 'モデルはまだ同期可能な状態ではありません。',
+  'resources.storage.workerNotCurrent': '最新の Worker 登録ではありません。',
+  'resources.storage.workerProtocolIncompatible': 'Worker 同期プロトコルに互換性がありません。',
+  'resources.storage.syncPolicy.disabled.profileMaintenance': '対象の S3 プロファイルはメンテナンス中です。',
+  'resources.storage.syncPolicy.disabled.policyDisabled': 'ポリシーは無効です。',
+  'resources.storage.deleteModelBlocked': 'モデル記録を削除できません',
+  'resources.storage.deleteModelBlockedContent': 'モデル「{name}」には実行中の同期タスクがあります。終了を待つか、タスクをキャンセルしてから削除してください。',
+  'resources.storage.deleteModelBlockedBatchName': '選択した {count} 件のモデル'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

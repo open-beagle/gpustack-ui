@@ -45,6 +45,10 @@ export async function queryWorkersList(params: Global.SearchParams) {
   });
 }
 
+export async function queryWorker(id: string | number) {
+  return request<ListItem>(`${WORKERS_API}/${id}`, { method: 'GET' });
+}
+
 export async function queryGpuDevicesList(params: Global.SearchParams) {
   return request<Global.PageResponse<GPUDeviceItem>>(`${GPU_DEVICES_API}`, {
     methos: 'GET',

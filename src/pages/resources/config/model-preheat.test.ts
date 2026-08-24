@@ -9,6 +9,7 @@ import {
   buildModelPreheatPreview,
   buildModelPreheatS3ProfilePayload,
   buildSystemManagedModelPreheatS3ProfilePayload,
+  getModelFileDeletePreflight,
   getModelFileStorageModelId,
   getModelFileSyncActionState,
   getModelPreheatTaskActions,
@@ -19,6 +20,7 @@ import {
   getModelStorageSourceLabel,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
+  retryModelFileDeletePreflight,
   shouldPollModelPreheatConnectivity,
   submitModelPreheatWithFreshSnapshot
 } from './model-preheat';
@@ -308,6 +310,19 @@ describe('S3 配置删除文案', () => {
   );
 });
 
+describe('同步确认文案', () => {
+  const locales = [
+    ['zh-CN', zhCNResources],
+    ['en-US', enUSResources],
+    ['ja-JP', jaJPResources],
+    ['ru-RU', ruRUResources]
+  ] as const;
+
+  it.each(locales)('%s 说明摘要跳过和覆盖行为', (_locale, resources) => {
+    expect(resources['resources.storage.sync.confirmSummary']).toBeTruthy();
+  });
+});
+
 describe('节点模型同步入口', () => {
   it('Ready Hub 模型缺少 revision 仍可同步，原节点不可用时禁用', () => {
     const base = {
@@ -319,6 +334,16 @@ describe('节点模型同步入口', () => {
     };
 
     expect(getModelFileSyncActionState(base, 3)).toEqual({
+      visible: true,
+      disabled: false,
+      reason: null
+    });
+    expect(getModelFileSyncActionState(base)).toEqual({
+      visible: true,
+      disabled: true,
+      reason: 'no_default_profile'
+    });
+    expect(getModelFileSyncActionState(base, undefined, false)).toEqual({
       visible: true,
       disabled: false,
       reason: null
@@ -350,7 +375,7 @@ describe('节点模型同步入口', () => {
     expect(
       getModelFileSyncActionState({ ...base, source: 'local_path' }, 3)
     ).toEqual({
-      visible: false,
+      visible: true,
       disabled: true,
       reason: 'unsupported'
     });
@@ -409,6 +434,38 @@ describe('节点模型同步入口', () => {
         'local-snapshot-d0f0cb5439088a905edc0cfde4676847'
       ).short
     ).toBe('d0f0cb543908');
+  });
+});
+
+describe('节点模型删除预检', () => {
+  it('逐状态查询所有选中模型，活动任务和查询错误都不会放行', async () => {
+    const query = async (params: {
+      model_file_id: number;
+      state: string;
+    }) => ({
+      items:
+        params.model_file_id === 2 && params.state === 'publishing'
+          ? [{ state: 'publishing' }]
+          : []
+    });
+    await expect(getModelFileDeletePreflight([1, 2], query)).resolves.toBe(
+      'active'
+    );
+
+    await expect(
+      getModelFileDeletePreflight([1], async () => {
+        throw new Error('network');
+      })
+    ).resolves.toBe('error');
+  });
+
+  it.each(['单删', '批删'])('%s 重试先清理旧错误弹窗再重新预检', () => {
+    const calls: string[] = [];
+    retryModelFileDeletePreflight(
+      () => calls.push('retry'),
+      () => calls.push('clear')
+    );
+    expect(calls).toEqual(['clear', 'retry']);
   });
 });
 

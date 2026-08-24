@@ -180,11 +180,13 @@ export default function useTableFetch<ListItem>(
   };
 
   const handleQueryChange = (params: any) => {
-    setQueryParams({
+    const nextQuery = {
       ...queryParams,
       ...params
-    });
-    fetchData({ query: { ...queryParams, ...params } });
+    };
+    setQueryParams(nextQuery);
+    fetchData({ query: nextQuery });
+    void createModelsChunkRequest(nextQuery);
   };
 
   const handlePageChange = (page: number, pageSize: number) => {
@@ -204,10 +206,6 @@ export default function useTableFetch<ListItem>(
       page: 1,
       search: e.target.value
     });
-    createModelsChunkRequest({
-      ...queryParams,
-      search: e.target.value
-    });
   }, 350);
 
   const handleNameChange = debounceUpdateFilter;
@@ -222,7 +220,7 @@ export default function useTableFetch<ListItem>(
       name: row.name,
       ...options,
       async onOk() {
-        console.log('OK');
+        if (options.beforeDelete && !(await options.beforeDelete())) return false;
         await deleteAPI?.(row.id, {
           ...modalRef.current?.configuration
         });
@@ -239,6 +237,7 @@ export default function useTableFetch<ListItem>(
       ...options,
       async onOk() {
         if (!deleteAPI) return;
+        if (options.beforeDelete && !(await options.beforeDelete())) return false;
         const successIds: any[] = [];
         const res = await handleBatchRequest(
           rowSelection.selectedRowKeys,

@@ -42,6 +42,8 @@ import {
 } from '../apis';
 import { buildSyncPolicyPatch } from '../config/model-policy';
 import {
+  getModelFileStorageModelId,
+  getModelFileSyncActionState,
   IdempotencyKeyLifecycle,
   loadAllPaginated
 } from '../config/model-preheat';
@@ -77,6 +79,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const [workers, setWorkers] = useState<ListItem[]>([]);
   const [models, setModels] = useState<ModelFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dependencyLoading, setDependencyLoading] = useState(false);
+  const [dependencyError, setDependencyError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ModelStorageSyncPolicy | null>(null);
@@ -84,7 +88,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
     policy: ModelStorageSyncPolicy;
     action: Action;
   } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<number>();
   const key = useRef(new IdempotencyKeyLifecycle());
   const scope = Form.useWatch('scope', form);
   const trigger = Form.useWatch('trigger_mode', form);
@@ -112,34 +116,57 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const openEditor = async (record?: ModelStorageSyncPolicy) => {
     setEditing(record || null);
     setOpen(true);
-    const [profileItems, workerItems, modelItems] = await Promise.all([
-      loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
-        queryModelPreheatS3Profiles({ page, perPage })
-      ),
-      loadAllPaginated<ListItem>((page, perPage) =>
-        queryWorkersList({ page, perPage })
-      ),
-      loadAllPaginated<ModelFile>((page, perPage) =>
-        queryModelFilesList({ page, perPage })
-      )
-    ]);
-    setProfiles(profileItems);
-    setWorkers(workerItems.filter((item) => item.state === 'ready'));
-    setModels(
-      modelItems.filter(
-        (item) => item.state === 'ready' && item.worker_available !== false
-      )
-    );
-    const values = record
-      ? { ...record }
-      : {
-          ...defaults,
-          profile_id:
-            profileItems.find(
-              (item) => item.is_default && item.lifecycle_state === 'active'
-            )?.id || 0
-        };
-    form.setFieldsValue(values);
+    setDependencyError(false);
+    setDependencyLoading(true);
+    try {
+      const [profileItems, workerItems, modelItems] = await Promise.all([
+        loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
+          queryModelPreheatS3Profiles({ page, perPage })
+        ),
+        loadAllPaginated<ListItem>((page, perPage) =>
+          queryWorkersList({ page, perPage })
+        ),
+        loadAllPaginated<ModelFile>((page, perPage) =>
+          queryModelFilesList({ page, perPage })
+        )
+      ]);
+      setProfiles(profileItems);
+      setWorkers(workerItems);
+      setModels(modelItems);
+      const values = record
+        ? { ...record }
+        : {
+            ...defaults,
+            profile_id:
+              profileItems.find(
+                (item) => item.is_default && item.lifecycle_state === 'active'
+              )?.id || 0
+          };
+      form.setFieldsValue(values);
+    } catch {
+      setDependencyError(true);
+    } finally {
+      setDependencyLoading(false);
+    }
+  };
+
+  const profileInMaintenance = (policy: ModelStorageSyncPolicy) =>
+    profiles.find((item) => item.id === policy.profile_id)?.lifecycle_state ===
+    'maintenance';
+  const editingProfileMaintenance = Boolean(
+    editing && profileInMaintenance(editing)
+  );
+  const actionDisabledReason = (
+    policy: ModelStorageSyncPolicy,
+    action: 'run' | 'enable'
+  ) => {
+    if (profileInMaintenance(policy)) {
+      return 'resources.storage.syncPolicy.disabled.profileMaintenance';
+    }
+    if (action === 'run' && !policy.enabled) {
+      return 'resources.storage.syncPolicy.disabled.policyDisabled';
+    }
+    return undefined;
   };
 
   const save = async () => {
@@ -180,7 +207,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
       (confirm.action === 'run' || confirm.action === 'enable')
     )
       return;
-    setActionLoading(true);
+    setActionLoadingId(confirm.policy.id);
     try {
       if (confirm.action === 'delete')
         await deleteModelStorageSyncPolicy(confirm.policy.id);
@@ -198,24 +225,55 @@ const ModelStorageSyncPolicies: React.FC = () => {
       await load();
       message.success(intl.formatMessage({ id: 'common.message.success' }));
     } finally {
-      setActionLoading(false);
+      setActionLoadingId(undefined);
     }
   };
 
   const workerOptions = useMemo(
     () =>
-      workers.map((item) => ({ label: item.name, value: item.worker_uuid })),
-    [workers]
-  );
-  const editingProfileMaintenance = Boolean(
-    editing &&
-    profiles.find((item) => item.id === editing.profile_id)?.lifecycle_state ===
-      'maintenance'
+      workers.map((item) => {
+        const latest = workers
+          .filter((candidate) => candidate.worker_uuid === item.worker_uuid)
+          .sort((left, right) => right.id - left.id)[0];
+        const reason =
+          latest?.id !== item.id
+            ? intl.formatMessage({ id: 'resources.storage.workerNotCurrent' })
+            : item.state !== 'ready'
+            ? intl.formatMessage({ id: 'resources.storage.workerUnavailable' })
+            : item.model_storage_protocol_version !== 1
+            ? intl.formatMessage({
+                id: 'resources.storage.workerProtocolIncompatible'
+              })
+            : undefined;
+        return {
+          label: `${item.name} · ${item.state === 'ready' ? 'Ready' : item.state}${reason ? ` · ${reason}` : ''}`,
+          value: item.worker_uuid,
+          disabled: Boolean(reason)
+        };
+      }),
+    [intl, workers]
   );
 
-  const profileInMaintenance = (policy: ModelStorageSyncPolicy) =>
-    profiles.find((item) => item.id === policy.profile_id)?.lifecycle_state ===
-    'maintenance';
+  const modelOptions = useMemo(
+    () =>
+      models.map((item) => {
+        const action = getModelFileSyncActionState(item, undefined, false);
+        const reason =
+          action.reason === 'unsupported'
+            ? intl.formatMessage({ id: 'resources.storage.sync.unsupportedSource' })
+            : action.reason === 'worker_unavailable'
+            ? intl.formatMessage({ id: 'resources.storage.workerUnavailable' })
+            : action.reason === 'model_not_ready'
+            ? intl.formatMessage({ id: 'resources.storage.sync.modelNotReady' })
+            : undefined;
+        return {
+          value: item.id,
+          label: `${getModelFileStorageModelId(item)}${reason ? ` · ${reason}` : ''}`,
+          disabled: action.disabled
+        };
+      }),
+    [intl, models]
+  );
 
   return (
     <>
@@ -299,18 +357,31 @@ const ModelStorageSyncPolicies: React.FC = () => {
                   <Button
                     type="text"
                     icon={<EditOutlined />}
+                    aria-label={intl.formatMessage({ id: 'common.button.edit' })}
                     onClick={() => void openEditor(record)}
                   />
                 </Tooltip>
                 <Tooltip
                   title={intl.formatMessage({
-                    id: 'resources.preheat.schedule.runNow'
+                    id:
+                      actionDisabledReason(record, 'run') ||
+                      'resources.preheat.schedule.runNow'
                   })}
                 >
                   <Button
                     type="text"
-                    disabled={!record.enabled || profileInMaintenance(record)}
+                    disabled={
+                      actionLoadingId === record.id ||
+                      !record.enabled ||
+                      profileInMaintenance(record)
+                    }
+                    loading={
+                      actionLoadingId === record.id && confirm?.action === 'run'
+                    }
                     icon={<SyncOutlined />}
+                    aria-label={intl.formatMessage({
+                      id: 'resources.preheat.schedule.runNow'
+                    })}
                     onClick={() => {
                       key.current.start();
                       setConfirm({ policy: record, action: 'run' });
@@ -319,14 +390,24 @@ const ModelStorageSyncPolicies: React.FC = () => {
                 </Tooltip>
                 <Tooltip
                   title={intl.formatMessage({
-                    id: record.enabled
-                      ? 'resources.preheat.policy.disable'
-                      : 'resources.preheat.policy.enable'
+                    id:
+                      actionDisabledReason(record, 'enable') ||
+                      (record.enabled
+                        ? 'resources.preheat.policy.disable'
+                        : 'resources.preheat.policy.enable')
                   })}
                 >
                   <Button
                     type="text"
-                    disabled={!record.enabled && profileInMaintenance(record)}
+                    disabled={
+                      actionLoadingId === record.id ||
+                      (!record.enabled && profileInMaintenance(record))
+                    }
+                    loading={
+                      actionLoadingId === record.id &&
+                      (confirm?.action === 'enable' ||
+                        confirm?.action === 'disable')
+                    }
                     icon={
                       record.enabled ? (
                         <PauseCircleOutlined />
@@ -334,6 +415,11 @@ const ModelStorageSyncPolicies: React.FC = () => {
                         <PlayCircleOutlined />
                       )
                     }
+                    aria-label={intl.formatMessage({
+                      id: record.enabled
+                        ? 'resources.preheat.policy.disable'
+                        : 'resources.preheat.policy.enable'
+                    })}
                     onClick={() =>
                       setConfirm({
                         policy: record,
@@ -348,7 +434,13 @@ const ModelStorageSyncPolicies: React.FC = () => {
                   <Button
                     type="text"
                     danger
+                    disabled={actionLoadingId === record.id}
+                    loading={
+                      actionLoadingId === record.id &&
+                      confirm?.action === 'delete'
+                    }
                     icon={<DeleteOutlined />}
+                    aria-label={intl.formatMessage({ id: 'common.button.delete' })}
                     onClick={() =>
                       setConfirm({ policy: record, action: 'delete' })
                     }
@@ -376,9 +468,27 @@ const ModelStorageSyncPolicies: React.FC = () => {
             onCancel={() => setOpen(false)}
             loading={saving}
             okText={intl.formatMessage({ id: 'common.button.save' })}
+            okBtnProps={{ disabled: dependencyLoading || dependencyError }}
+            cancelBtnProps={{ disabled: saving }}
           />
         }
       >
+        {dependencyError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+            action={
+              <Button
+                type="link"
+                onClick={() => void openEditor(editing || undefined)}
+              >
+                {intl.formatMessage({ id: 'resources.storage.retry' })}
+              </Button>
+            }
+          />
+        )}
         <Form form={form} layout="vertical">
           {editingProfileMaintenance && (
             <Alert
@@ -499,13 +609,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
                 disabled={editingProfileMaintenance}
                 showSearch
                 optionFilterProp="label"
-                options={models.map((item) => ({
-                  value: item.id,
-                  label:
-                    item.model_scope_model_id ||
-                    item.huggingface_repo_id ||
-                    item.local_path
-                }))}
+                options={modelOptions}
               />
             </Form.Item>
           )}
@@ -544,7 +648,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
               : 'common.button.confirm'
         })}
         danger={confirm?.action === 'delete'}
-        loading={actionLoading}
+        loading={Boolean(actionLoadingId)}
         onOk={act}
         onCancel={() => {
           key.current.abandon();

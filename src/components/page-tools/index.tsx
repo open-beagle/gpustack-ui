@@ -55,6 +55,7 @@ interface ActionItem {
 interface FilterBarProps {
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSelectChange?: (value: any) => void;
+  handleSelectSearch?: (value: string) => void;
   handleSearch: () => void;
   handleDeleteByBatch?: () => void;
   handleClickPrimary?: (item: any) => void;
@@ -62,6 +63,9 @@ interface FilterBarProps {
   actionItems?: ActionItem[];
   selectOptions?: Global.BaseOption<string | number>[];
   showSelect?: boolean;
+  selectLoading?: boolean;
+  selectSearch?: boolean;
+  extraFilters?: React.ReactNode;
   buttonText: string;
   buttonIcon?: React.ReactNode;
   marginBottom?: number;
@@ -81,6 +85,7 @@ export const FilterBar: React.FC<FilterBarProps> = (props) => {
   const {
     handleInputChange,
     handleSelectChange,
+    handleSelectSearch,
     handleSearch,
     handleDeleteByBatch,
     handleClickPrimary,
@@ -88,6 +93,9 @@ export const FilterBar: React.FC<FilterBarProps> = (props) => {
     actionItems,
     selectOptions,
     showSelect,
+    selectLoading,
+    selectSearch,
+    extraFilters,
     buttonText,
     buttonIcon,
     actionType = 'button',
@@ -171,16 +179,20 @@ export const FilterBar: React.FC<FilterBarProps> = (props) => {
           {showSelect && (
             <Select
               allowClear
-              showSearch={false}
+              showSearch={selectSearch}
+              filterOption={!selectSearch}
+              loading={selectLoading}
               placeholder={intl.formatMessage({
                 id: selectHolder
               })}
               style={{ width: width?.select || 230 }}
               size="large"
               onChange={handleSelectChange}
+              onSearch={handleSelectSearch}
               options={selectOptions}
             ></Select>
           )}
+          {extraFilters}
           <Button
             type="text"
             style={{ color: 'var(--ant-color-text-tertiary)' }}

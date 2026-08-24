@@ -34,6 +34,8 @@ import {
   Button,
   ConfigProvider,
   Empty,
+  Modal,
+  Select,
   Table,
   Tabs,
   Tag,
@@ -44,7 +46,7 @@ import {
 import dayjs from 'dayjs';
 import { useAtom } from 'jotai';
 import _ from 'lodash';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import {
   checkCurrentbackend,
@@ -57,6 +59,7 @@ import {
   downloadModelFile,
   queryModelFilesList,
   queryModelPreheatS3Profiles,
+  queryModelStorageSyncTasks,
   queryWorkersList,
   retryDownloadModelFile
 } from '../apis';
@@ -67,8 +70,12 @@ import {
   WorkerStatusMap
 } from '../config';
 import {
+  MODEL_FILE_WATCH_EVENTS,
+  getModelFileDeletePreflight,
   getModelFileSyncActionState,
-  getModelStorageTransferPresentation
+  getModelStorageRevisionPresentation,
+  getModelStorageTransferPresentation,
+  retryModelFileDeletePreflight
 } from '../config/model-preheat';
 import {
   ModelFile as ListItem,
@@ -79,6 +86,7 @@ import ModelStorage from './model-storage';
 import ModelStorageSyncModal from './model-storage-sync-modal';
 import ModelTaskPolicies from './model-task-policies';
 import ModelTaskRecords from './model-task-records';
+import WorkerFuzzySelect from './worker-fuzzy-select';
 
 const { Paragraph } = Typography;
 
@@ -331,6 +339,7 @@ const LocalModelFiles = () => {
     deleteAPI: deleteModelFile,
     API: MODEL_FILES_API,
     watch: true,
+    events: MODEL_FILE_WATCH_EVENTS,
     contentForDelete: 'resources.modelfiles.modelfile'
   });
   const { getModelFileList, generateModelFileOptions } =
@@ -369,6 +378,12 @@ const LocalModelFiles = () => {
     isGGUF: false
   });
   const [syncRecord, setSyncRecord] = useState<ListItem | null>(null);
+  const [blockedDeleteRecord, setBlockedDeleteRecord] =
+    useState<ListItem | null>(null);
+  const [deletePreflightError, setDeletePreflightError] = useState('');
+  const [deletePreflightFailure, setDeletePreflightFailure] = useState<{
+    retry: () => void;
+  } | null>(null);
   const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const defaultSyncProfileId = useMemo(
     () => profiles.find((profile) => profile.is_default)?.id,
@@ -376,26 +391,17 @@ const LocalModelFiles = () => {
   );
 
   useEffect(() => {
-    const fetchWorkerList = async () => {
-      try {
-        const res = await queryWorkersList({
-          page: 1,
-          perPage: 100
-        });
-
-        const list = res.items?.map((item: WorkerListItem) => {
-          return {
+    void queryWorkersList({ page: 1, perPage: 100 })
+      .then((result) =>
+        setWorkersList(
+          result.items.map((item: WorkerListItem) => ({
             ...item,
             value: item.id,
             label: item.name
-          };
-        });
-        setWorkersList(list);
-      } catch (error) {
-        // console.log('error', error);
-      }
-    };
-    fetchWorkerList();
+          }))
+        )
+      )
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -412,7 +418,7 @@ const LocalModelFiles = () => {
     return name.replace(filterPattern, '$1');
   };
 
-  const handleWorkerChange = (value: number) => {
+  const handleWorkerChange = (value: number | undefined) => {
     handleQueryChange({
       page: 1,
       worker_id: value
@@ -458,21 +464,60 @@ const LocalModelFiles = () => {
     };
   };
 
+  const hasActiveSyncTasks = async (modelFileIds: number[]) => {
+    const result = await getModelFileDeletePreflight(
+      modelFileIds,
+      queryModelStorageSyncTasks
+    );
+    if (result === 'error') {
+      setDeletePreflightError(
+        intl.formatMessage({ id: 'resources.storage.state.error' })
+      );
+      return undefined;
+    }
+    return result === 'active';
+  };
+
+  const requestDelete = async (record: ListItem) => {
+    setDeletePreflightError('');
+    const active = await hasActiveSyncTasks([record.id]);
+    if (active === undefined) {
+      setDeletePreflightFailure({ retry: () => void requestDelete(record) });
+      return;
+    }
+    if (active) {
+      setBlockedDeleteRecord(record);
+      return;
+    }
+    handleDelete(
+      { ...record, name: record.resolved_paths?.[0] },
+      {
+        getErrorMessage: (error: any) =>
+          (error?.response?.data?.message || error?.message) ===
+          'model_file_has_active_sync_task'
+            ? intl.formatMessage({
+                id: 'resources.storage.deleteModelBlockedContent'
+              }, { name: record.resolved_paths?.[0] || '' })
+            : intl.formatMessage({ id: 'resources.storage.state.error' }),
+        beforeDelete: async () => {
+          setDeletePreflightError('');
+          const activeNow = await hasActiveSyncTasks([record.id]);
+          if (activeNow === undefined) return false;
+          if (activeNow) setBlockedDeleteRecord(record);
+          return !activeNow;
+        },
+        checkConfig: {
+          checkText: 'resources.modelfiles.delete.tips',
+          defautlChecked: record.source !== modelSourceMap.local_path_value
+        }
+      }
+    );
+  };
+
   const handleSelect = async (val: any, record: ListItem) => {
     try {
       if (val === 'delete') {
-        handleDelete(
-          {
-            ...record,
-            name: record.resolved_paths?.[0]
-          },
-          {
-            checkConfig: {
-              checkText: 'resources.modelfiles.delete.tips',
-              defautlChecked: record.source !== modelSourceMap.local_path_value
-            }
-          }
-        );
+        await requestDelete(record);
       } else if (val === 'retry') {
         await retryDownloadModelFile(record.id);
         showSuccess();
@@ -493,8 +538,10 @@ const LocalModelFiles = () => {
           show: true
         });
       }
-    } catch (error) {
-      // console.log('error', error);
+    } catch {
+      setDeletePreflightError(
+        intl.formatMessage({ id: 'resources.storage.state.error' })
+      );
     }
   };
 
@@ -574,8 +621,55 @@ const LocalModelFiles = () => {
     restoreScrollHeight();
   };
 
-  const handleDeleteByBatch = () => {
+  const handleDeleteByBatch = async () => {
+    const selectedIds = rowSelection.selectedRowKeys as number[];
+    setDeletePreflightError('');
+    const active = await hasActiveSyncTasks(selectedIds);
+    if (active === undefined) {
+      setDeletePreflightFailure({ retry: () => void handleDeleteByBatch() });
+      return;
+    }
+    if (active) {
+      setBlockedDeleteRecord({
+        resolved_paths: [
+          intl.formatMessage(
+            { id: 'resources.storage.deleteModelBlockedBatchName' },
+            { count: selectedIds.length }
+          )
+        ]
+      } as ListItem);
+      return;
+    }
     handleDeleteBatch({
+      getErrorMessage: (error: any) => {
+        const rejected = Array.isArray(error) ? error : [error];
+        const firstError = rejected[0]?.reason || rejected[0];
+        return (firstError?.response?.data?.message || firstError?.message) ===
+          'model_file_has_active_sync_task'
+          ? intl.formatMessage({
+              id: 'resources.storage.deleteModelBlockedContent'
+            }, { name: intl.formatMessage(
+              { id: 'resources.storage.deleteModelBlockedBatchName' },
+              { count: selectedIds.length }
+            ) })
+          : intl.formatMessage({ id: 'resources.storage.state.error' });
+      },
+      beforeDelete: async () => {
+        setDeletePreflightError('');
+        const activeNow = await hasActiveSyncTasks(selectedIds);
+        if (activeNow === undefined) return false;
+        if (activeNow) {
+          setBlockedDeleteRecord({
+            resolved_paths: [
+              intl.formatMessage(
+                { id: 'resources.storage.deleteModelBlockedBatchName' },
+                { count: selectedIds.length }
+              )
+            ]
+          } as ListItem);
+        }
+        return !activeNow;
+      },
       checkConfig: {
         checkText: 'resources.modelfiles.delete.tips',
         defautlChecked: false
@@ -681,6 +775,20 @@ const LocalModelFiles = () => {
       }
     },
     {
+      title: intl.formatMessage({ id: 'resources.storage.version' }),
+      dataIndex: 'resolved_revision',
+      width: 130,
+      render: (revision: string | null | undefined) => {
+        if (!revision) return '-';
+        const presentation = getModelStorageRevisionPresentation(revision);
+        return (
+          <Tooltip title={presentation.full}>
+            <span>{presentation.short}</span>
+          </Tooltip>
+        );
+      }
+    },
+    {
       title: intl.formatMessage({ id: 'resources.modelfiles.form.path' }),
       dataIndex: 'resolved_paths',
       width: '30%',
@@ -731,10 +839,18 @@ const LocalModelFiles = () => {
           defaultSyncProfileId
         );
         const syncTooltip =
-          syncAction.reason === 'worker_unavailable'
+          syncAction.reason === 'unsupported'
+            ? intl.formatMessage({
+                id: 'resources.storage.sync.unsupportedSource'
+              })
+            : syncAction.reason === 'model_not_ready'
+            ? intl.formatMessage({ id: 'resources.storage.sync.modelNotReady' })
+            : syncAction.reason === 'worker_unavailable'
             ? intl.formatMessage({
                 id: 'resources.storage.workerUnavailable'
               })
+            : syncAction.reason === 'no_default_profile'
+            ? intl.formatMessage({ id: 'resources.storage.sync.noDefault' })
             : syncAction.reason === 'already_from_default'
               ? intl.formatMessage({
                   id: 'resources.storage.sync.alreadyFromDefault'
@@ -788,14 +904,51 @@ const LocalModelFiles = () => {
           id: 'resources.modelfiles.download'
         })}
         handleSelectChange={handleWorkerChange}
-        handleDeleteByBatch={handleDeleteByBatch}
+        handleDeleteByBatch={() => void handleDeleteByBatch()}
         handleClickPrimary={handleClickDropdown}
         handleSearch={handleSearch}
-        selectOptions={workersList}
+        selectOptions={[]}
+        extraFilters={
+          <>
+            <WorkerFuzzySelect
+              value={queryParams.worker_id as number | undefined}
+              onChange={handleWorkerChange}
+            />
+            <Select
+              allowClear
+              placeholder={intl.formatMessage({ id: 'resources.filter.source' })}
+              style={{ width: 150 }}
+              value={queryParams.source}
+              onChange={(value) =>
+                handleQueryChange({ page: 1, source: value || undefined })
+              }
+              options={[
+                { value: 'model_scope', label: 'ModelScope' },
+                { value: 'huggingface', label: 'Hugging Face' },
+                { value: 'ollama_library', label: 'Ollama Library' },
+                { value: 'local_path', label: 'Local Path' }
+              ]}
+            />
+            <Select
+              allowClear
+              placeholder={intl.formatMessage({ id: 'common.table.status' })}
+              style={{ width: 130 }}
+              value={queryParams.state}
+              onChange={(value) =>
+                handleQueryChange({ page: 1, state: value || undefined })
+              }
+              options={[
+                { value: 'ready', label: 'Ready' },
+                { value: 'downloading', label: 'Downloading' },
+                { value: 'error', label: 'Error' }
+              ]}
+            />
+          </>
+        }
         handleInputChange={handleNameChange}
         rowSelection={rowSelection}
         actionItems={onLineSourceOptions}
-        showSelect={true}
+        showSelect={false}
       ></FilterBar>
       <ConfigProvider renderEmpty={renderEmpty}>
         <Table
@@ -817,7 +970,56 @@ const LocalModelFiles = () => {
           }}
         ></Table>
       </ConfigProvider>
-      <DeleteModal ref={modalRef}></DeleteModal>
+      <DeleteModal ref={modalRef} error={deletePreflightError}></DeleteModal>
+      <Modal
+        open={Boolean(deletePreflightFailure)}
+        centered
+        maskClosable={false}
+        title={intl.formatMessage({ id: 'resources.storage.deleteModelBlocked' })}
+        onCancel={() => setDeletePreflightFailure(null)}
+        footer={
+          <>
+            <Button onClick={() => setDeletePreflightFailure(null)}>
+              {intl.formatMessage({ id: 'common.button.cancel' })}
+            </Button>
+            <Button
+              type="primary"
+              onClick={() =>
+                retryModelFileDeletePreflight(
+                  deletePreflightFailure?.retry,
+                  () => {
+                    setDeletePreflightFailure(null);
+                    setDeletePreflightError('');
+                  }
+                )
+              }
+            >
+              {intl.formatMessage({ id: 'resources.storage.retry' })}
+            </Button>
+          </>
+        }
+      >
+        {deletePreflightError}
+      </Modal>
+      <Modal
+        open={Boolean(blockedDeleteRecord)}
+        centered
+        width={460}
+        maskClosable={false}
+        keyboard={false}
+        title={intl.formatMessage({ id: 'resources.storage.deleteModelBlocked' })}
+        onCancel={() => setBlockedDeleteRecord(null)}
+        footer={
+          <Button type="primary" onClick={() => setBlockedDeleteRecord(null)}>
+            {intl.formatMessage({ id: 'common.button.close' })}
+          </Button>
+        }
+      >
+        {intl.formatMessage(
+          { id: 'resources.storage.deleteModelBlockedContent' },
+          { name: blockedDeleteRecord?.resolved_paths?.[0] || '' }
+        )}
+      </Modal>
       <DownloadModal
         onCancel={handleDownloadCancel}
         onOk={handleDownload}

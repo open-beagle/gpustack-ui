@@ -438,6 +438,17 @@ export default {
     'This model already comes from the default S3 model library and does not need to be synced again.',
   'resources.storage.sync.missingRevision':
     'This legacy model has no trusted revision metadata. Download it again before syncing it to S3.',
+  'resources.storage.sync.unsupportedSource':
+    'This source is not supported for S3 sync.',
+  'resources.storage.sync.modelNotReady':
+    'The model is not ready for synchronization.',
+  'resources.storage.workerNotCurrent': 'This is not the latest worker registration.',
+  'resources.storage.workerProtocolIncompatible':
+    'The worker synchronization protocol is incompatible.',
+  'resources.storage.syncPolicy.disabled.profileMaintenance':
+    'The target S3 profile is in maintenance mode.',
+  'resources.storage.syncPolicy.disabled.policyDisabled':
+    'The policy is disabled.',
   'resources.storage.revision.modelscopeFilelist':
     'File-list fingerprint {fingerprint}',
   'resources.preheat.noReadyWorkers':
@@ -477,7 +488,11 @@ export default {
   'resources.storage.deleteSync': 'Delete Sync Record',
   'resources.storage.deleteSyncConfirm': 'Delete Sync Record',
   'resources.storage.deleteSyncContent':
-    'Delete sync record #{id}? This cannot be undone.',
+    'Delete sync record #{id}? This cannot be undone and does not delete the S3 artifact or local model files.',
+  'resources.storage.deleteModelBlocked': 'Cannot Delete Model Record',
+  'resources.storage.deleteModelBlockedContent':
+    'Model “{name}” has an active sync task. Wait for it to finish or cancel it before deleting the record.',
+  'resources.storage.deleteModelBlockedBatchName': '{count} selected models',
   'resources.storage.syncTask.time': 'Sync Time',
   'resources.storage.syncTask.from': 'Source Worker',
   'resources.storage.syncTask.to': 'Target S3',
@@ -528,5 +543,6 @@ export default {
   'resources.storage.createdAt': 'Created at',
   'resources.storage.updatedAt': 'Updated at',
   'resources.storage.profile': 'S3 profile',
-  'resources.storage.testCredentialsRequiredHint': 'Update credentials and enter both keys before testing the connection.'
+  'resources.storage.testCredentialsRequiredHint': 'Update credentials and enter both keys before testing the connection.',
+  'resources.storage.sync.confirmSummary': 'Matching model content is skipped; files with a different digest are replaced.'
 };
