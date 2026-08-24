@@ -10,6 +10,7 @@ import {
 import { useIntl } from '@umijs/max';
 import {
   Button,
+  Alert,
   Descriptions,
   Modal,
   Space,
@@ -31,6 +32,10 @@ import {
 } from '../apis';
 import {
   LatestRequestGate,
+  getModelStorageFlowPresentation,
+  getModelStorageRevisionPresentation,
+  getModelStorageSourceLabel,
+  getModelStorageTaskStatusPresentation,
   getModelPreheatTaskActions,
   getModelStorageTransferPresentation,
   type ModelPreheatTaskAction
@@ -67,6 +72,12 @@ const ModelPreheatTasks: React.FC = () => {
   const intl = useIntl();
   const taskRequests = useRef(new LatestRequestGate());
   const detailRequests = useRef(new LatestRequestGate());
+  const shouldPollTasks = useRef(true);
+  const pollingTimer = useRef<number>();
+  const pollingRunning = useRef(false);
+  const pollingRestartRequested = useRef(false);
+  const pollingMounted = useRef(false);
+  const pollingGeneration = useRef(0);
   const [tasks, setTasks] = useState<ModelPreheatTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -75,6 +86,7 @@ const ModelPreheatTasks: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [detail, setDetail] = useState<ModelPreheatTask | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [confirm, setConfirm] = useState<{
     task: ModelPreheatTask;
     action: ModelPreheatTaskAction;
@@ -82,6 +94,7 @@ const ModelPreheatTasks: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [profileNames, setProfileNames] = useState<Record<number, string>>({});
   const [workerNames, setWorkerNames] = useState<Record<number, string>>({});
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -112,6 +125,16 @@ const ModelPreheatTasks: React.FC = () => {
         (result) => {
           setTasks(result.items);
           setTotal(result.pagination.total);
+          setLoadError(false);
+          // 空列表仍需发现策略新建的任务；只有可见记录均为终态才停止。
+          shouldPollTasks.current =
+            result.items.length === 0 ||
+            result.items.some(
+              (task) =>
+                !['ready', 'partial', 'error', 'canceled'].includes(
+                  task.execution_state
+                )
+            );
         },
         () => setLoading(false)
       );
@@ -119,27 +142,51 @@ const ModelPreheatTasks: React.FC = () => {
     [page, pageSize]
   );
 
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    async function refresh(silent: boolean) {
-      try {
-        await loadTasks(silent);
-      } catch {
-        // 下一轮继续尝试，页面保留最后一次成功数据。
-      }
-      if (active) {
-        timer = window.setTimeout(() => {
-          void refresh(true);
-        }, 5000);
-      }
+  const clearPollingTimer = useCallback(() => {
+    if (pollingTimer.current !== undefined) {
+      window.clearTimeout(pollingTimer.current);
+      pollingTimer.current = undefined;
     }
-    void refresh(false);
+  }, []);
+
+  const startPolling = useCallback(async (silent = false) => {
+    clearPollingTimer();
+    const generation = ++pollingGeneration.current;
+    if (!pollingMounted.current) return;
+    if (pollingRunning.current) {
+      pollingRestartRequested.current = true;
+      return;
+    }
+    pollingRunning.current = true;
+    try {
+      await loadTasks(silent);
+    } catch {
+      setLoadError(true);
+    } finally {
+      pollingRunning.current = false;
+    }
+    if (!pollingMounted.current) return;
+    if (pollingRestartRequested.current) {
+      pollingRestartRequested.current = false;
+      void startPolling(false);
+      return;
+    }
+    if (generation !== pollingGeneration.current) return;
+    if (shouldPollTasks.current) {
+      pollingTimer.current = window.setTimeout(() => void startPolling(true), 5000);
+    }
+  }, [clearPollingTimer, loadTasks]);
+
+  useEffect(() => {
+    pollingMounted.current = true;
+    void startPolling(false);
     return () => {
-      active = false;
-      if (timer) window.clearTimeout(timer);
+      pollingMounted.current = false;
+      pollingGeneration.current += 1;
+      pollingRestartRequested.current = false;
+      clearPollingTimer();
     };
-  }, [loadTasks]);
+  }, [clearPollingTimer, startPolling]);
 
   useEffect(
     () => () => {
@@ -152,6 +199,7 @@ const ModelPreheatTasks: React.FC = () => {
   const openDetail = async (task: ModelPreheatTask) => {
     setDetail(task);
     setDetailLoading(true);
+    setDetailError(false);
     return detailRequests.current.run(
       () => queryModelPreheatTask(task.id),
       setDetail,
@@ -170,7 +218,7 @@ const ModelPreheatTasks: React.FC = () => {
       setConfirm(null);
       if (detail?.id === task.id) setDetail(task);
       message.success(intl.formatMessage({ id: 'common.message.success' }));
-      await loadTasks();
+      await startPolling(false);
     } finally {
       setActionLoading(false);
     }
@@ -190,17 +238,44 @@ const ModelPreheatTasks: React.FC = () => {
     {
       title: intl.formatMessage({ id: 'resources.preheat.revision' }),
       dataIndex: 'resolved_revision',
-      ellipsis: true
+      width: 140,
+      render: (value: string) => {
+        const revision = getModelStorageRevisionPresentation(value);
+        return <Tooltip title={revision.full}>{revision.short}</Tooltip>;
+      }
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.storage.modelSource' }),
+      dataIndex: 'source',
+      width: 130,
+      render: (source: ModelPreheatTask['source']) =>
+        getModelStorageSourceLabel(source as 'modelscope' | 'huggingface' | 'ollama_library')
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.confirm.flow' }),
+      width: 240,
+      render: (_: unknown, task: ModelPreheatTask) => {
+        const source = workerNames[task.source_worker_id || 0] || '';
+        const profile = profileNames[task.transfer_profile_id || task.s3_profile_id] || `Profile #${task.s3_profile_id}`;
+        const flow = getModelStorageFlowPresentation(source, profile, task.delivery_mode === 's3_and_workers' ? `${task.target_worker_uuids.length}` : undefined);
+        return intl.formatMessage({ id: flow.messageId }, flow.values);
+      }
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.targetCount' }),
+      width: 100,
+      render: (_: unknown, task: ModelPreheatTask) => task.delivery_mode === 's3_only' ? 'S3' : `${task.target_worker_uuids.length}`
     },
     {
       title: intl.formatMessage({ id: 'common.table.status' }),
       dataIndex: 'execution_state',
       width: 120,
-      render: (value: string) => (
-        <Tag color={statusColors[value]}>
-          {intl.formatMessage({ id: `resources.preheat.state.${value}` })}
+      render: (value: string | null) => {
+        const status = getModelStorageTaskStatusPresentation(value);
+        return <Tag color={statusColors[value]}>
+          {intl.formatMessage({ id: status.messageId })}
         </Tag>
-      )
+      }
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.attempt' }),
@@ -220,6 +295,18 @@ const ModelPreheatTasks: React.FC = () => {
       render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm:ss')
     },
     {
+      title: intl.formatMessage({ id: 'resources.storage.startedAt' }),
+      width: 170,
+      // 当前 Public 契约未公开 started_at，不能把 updated_at 伪装成开始时间。
+      render: () => '-'
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.storage.finishedAt' }),
+      width: 170,
+      // 当前 Public 契约未公开 finished_at，不能把 updated_at 伪装成完成时间。
+      render: () => '-'
+    },
+    {
       title: intl.formatMessage({ id: 'common.table.operation' }),
       key: 'operation',
       width: 180,
@@ -229,8 +316,9 @@ const ModelPreheatTasks: React.FC = () => {
             <Button
               type="text"
               icon={<EyeOutlined />}
+              aria-label={intl.formatMessage({ id: 'common.button.detail' })}
               onClick={() => {
-                void openDetail(task).catch(() => undefined);
+                void openDetail(task).catch(() => setDetailError(true));
               }}
             />
           </Tooltip>
@@ -248,6 +336,7 @@ const ModelPreheatTasks: React.FC = () => {
                 type="text"
                 danger={action === 'cancel'}
                 icon={actionIcons[action]}
+                aria-label={intl.formatMessage({ id: `resources.preheat.action.${action}` })}
                 onClick={() => setConfirm({ task, action })}
               />
             </Tooltip>
@@ -282,7 +371,7 @@ const ModelPreheatTasks: React.FC = () => {
         <Button
           icon={<ReloadOutlined />}
           onClick={() => {
-            void loadTasks().catch(() => undefined);
+            void startPolling(false);
           }}
           loading={loading}
         >
@@ -301,7 +390,7 @@ const ModelPreheatTasks: React.FC = () => {
         columns={columns}
         dataSource={tasks}
         loading={loading}
-        scroll={{ x: 1050 }}
+        scroll={{ x: 1560 }}
         pagination={{
           current: page,
           pageSize,
@@ -314,14 +403,21 @@ const ModelPreheatTasks: React.FC = () => {
           }
         }}
       />
+      {loadError && <Alert
+        type="error"
+        showIcon
+        style={{ marginTop: 12 }}
+        message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+        action={<Button size="small" onClick={() => void startPolling(false)}>{intl.formatMessage({ id: 'common.button.retry' })}</Button>}
+      />}
       <ModelPreheatModal
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         onCreated={(task) => {
           setCreateOpen(false);
           message.success(intl.formatMessage({ id: 'common.message.success' }));
-          void loadTasks().catch(() => undefined);
-          void openDetail(task).catch(() => undefined);
+          void startPolling(false);
+          void openDetail(task).catch(() => setDetailError(true));
         }}
       />
       <Modal
@@ -336,9 +432,17 @@ const ModelPreheatTasks: React.FC = () => {
         onCancel={() => {
           detailRequests.current.invalidate();
           setDetail(null);
+          setDetailError(false);
         }}
       >
         <Spin spinning={detailLoading}>
+          {detailError && <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+            action={<Button size="small" onClick={() => detail && void openDetail(detail).catch(() => setDetailError(true))}>{intl.formatMessage({ id: 'common.button.retry' })}</Button>}
+          />}
           <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small">
             <Descriptions.Item
               label={intl.formatMessage({ id: 'resources.preheat.model' })}
@@ -348,12 +452,12 @@ const ModelPreheatTasks: React.FC = () => {
             <Descriptions.Item
               label={intl.formatMessage({ id: 'resources.preheat.revision' })}
             >
-              {detail?.resolved_revision}
+              {getModelStorageRevisionPresentation(detail?.resolved_revision).short}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({ id: 'common.table.status' })}
             >
-              {detail?.execution_state}
+              {detail ? intl.formatMessage({ id: getModelStorageTaskStatusPresentation(detail.execution_state).messageId }) : '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({
@@ -379,6 +483,9 @@ const ModelPreheatTasks: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label="Artifact ID" span={3}>
               <Typography.Text copyable>{detail?.artifact_id || '-'}</Typography.Text>
+            </Descriptions.Item>
+            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.taskTimeline' })} span={3}>
+              {detail ? `${intl.formatMessage({ id: 'resources.storage.createdAt' })} ${dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss')} -> ${intl.formatMessage({ id: 'resources.storage.updatedAt' })} ${dayjs(detail.updated_at).format('YYYY-MM-DD HH:mm:ss')}` : '-'}
             </Descriptions.Item>
           </Descriptions>
         </Spin>

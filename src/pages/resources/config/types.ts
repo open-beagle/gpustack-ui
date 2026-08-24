@@ -469,7 +469,7 @@ export interface ModelPreheatTask {
   source: string;
   model_id: string;
   requested_revision: string | null;
-  resolved_revision: string;
+  resolved_revision: string | null;
   include_patterns: string[];
   exclude_patterns: string[];
   selection_digest: string;
@@ -500,6 +500,9 @@ export interface ModelPreheatDistributionPolicy {
   id: number;
   name: string;
   enabled: boolean;
+  trigger_mode: 'manual' | 'scheduled' | 'continuous';
+  cron_expression: string | null;
+  timezone: string;
   profile_id: number;
   profile_config_version: number;
   request_identity: ModelStorageRequestIdentity;
@@ -514,6 +517,8 @@ export interface ModelPreheatDistributionPolicy {
   profile_version_stale?: boolean;
   blocked_reason?: string | null;
   last_reconciled_at: string | null;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -553,6 +558,9 @@ export interface ModelStorageSyncPolicyRun {
 
 export interface ModelPreheatDistributionPolicyCreate {
   name: string;
+  trigger_mode?: 'manual' | 'scheduled' | 'continuous';
+  cron_expression?: string | null;
+  timezone?: string;
   profile_id?: number;
   artifact_id?: string;
   sync_task_id?: number;

@@ -202,9 +202,11 @@ const deferred = <T,>() => {
 const installPollScheduler = (delay: number) => {
   type Callback = () => void;
   type WindowTimerHandler = Parameters<typeof window.setTimeout>[0];
-  const timeouts: Callback[] = [];
+  const timeouts = new Map<number, Callback>();
+  let nextTimeoutId = 9001;
   let interval: Callback | null = null;
   const originalTimeout = window.setTimeout.bind(window);
+  const originalClearTimeout = window.clearTimeout.bind(window);
   const originalInterval = window.setInterval.bind(window);
 
   vi.spyOn(window, 'setTimeout').mockImplementation(((
@@ -213,11 +215,16 @@ const installPollScheduler = (delay: number) => {
     ...args: unknown[]
   ) => {
     if (timeout === delay && typeof handler === 'function') {
-      timeouts.push(() => handler(...args));
-      return 9001;
+      const id = nextTimeoutId++;
+      timeouts.set(id, () => handler(...args));
+      return id;
     }
     return originalTimeout(handler, timeout, ...args);
   }) as typeof window.setTimeout);
+  vi.spyOn(window, 'clearTimeout').mockImplementation(((id?: number) => {
+    if (typeof id === 'number' && timeouts.delete(id)) return;
+    originalClearTimeout(id);
+  }) as typeof window.clearTimeout);
   vi.spyOn(window, 'setInterval').mockImplementation(((
     handler: WindowTimerHandler,
     timeout?: number,
@@ -231,9 +238,11 @@ const installPollScheduler = (delay: number) => {
   }) as typeof window.setInterval);
 
   return {
-    pending: () => timeouts.length + (interval ? 1 : 0),
+    pending: () => timeouts.size + (interval ? 1 : 0),
     runNext: () => {
-      const callback = timeouts.shift() || interval;
+      const entry = timeouts.entries().next().value as [number, Callback] | undefined;
+      if (entry) timeouts.delete(entry[0]);
+      const callback = entry?.[1] || interval;
       if (!callback) throw new Error(`没有 ${delay}ms 轮询回调`);
       callback();
     }
@@ -590,5 +599,50 @@ describe('任务发现与串行轮询', () => {
     await act(async () => {
       await slowPage.promise;
     });
+  });
+
+  it('终态列表手动刷新发现活动任务后恢复串行轮询', async () => {
+    const scheduler = installPollScheduler(5000);
+    api.queryModelPreheatTasks
+      .mockResolvedValueOnce(page([task({ execution_state: 'ready' })]))
+      .mockResolvedValueOnce(page([task({ execution_state: 'distributing' })]))
+      .mockResolvedValueOnce(page([task({ execution_state: 'ready' })]));
+    render(<ModelPreheatTasks />);
+
+    await screen.findByText('scheduled/model');
+    expect(scheduler.pending()).toBe(0);
+    fireEvent.click(screen.getByText('common.button.refresh'));
+    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    act(() => scheduler.runNext());
+    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(3));
+  });
+
+  it('活动任务手动刷新会替换旧 timer，始终只保留一条轮询链', async () => {
+    const scheduler = installPollScheduler(5000);
+    api.queryModelPreheatTasks.mockResolvedValue(page([task()]));
+    render(<ModelPreheatTasks />);
+
+    await screen.findByText('scheduled/model');
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    fireEvent.click(screen.getByText('common.button.refresh'));
+    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+  });
+
+  it('在途任务请求卸载后不重新安排 timer 或发起新查询', async () => {
+    const scheduler = installPollScheduler(5000);
+    const slowPage = deferred<ReturnType<typeof page<ModelPreheatTask>>>();
+    api.queryModelPreheatTasks.mockReturnValueOnce(slowPage.promise);
+    const view = render(<ModelPreheatTasks />);
+
+    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(1));
+    view.unmount();
+    slowPage.resolve(page([task()]));
+    await act(async () => {
+      await slowPage.promise;
+    });
+    expect(scheduler.pending()).toBe(0);
+    expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(1);
   });
 });

@@ -202,6 +202,32 @@ describe('预热策略触发方式', () => {
     );
   });
 
+  it('从手动切换为每天后由共享编辑器同步 scheduled payload', async () => {
+    const user = userEvent.setup();
+    render(
+      <ModelPreheatScheduleModal
+        open
+        initialValues={{
+          name: 'scheduled-policy',
+          trigger_mode: 'manual',
+          source: 'modelscope',
+          model_id: 'Qwen/Test'
+        }}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    await user.click(await screen.findByLabelText('resources.preheat.schedule.triggerMode'));
+    await user.click(await screen.findByText('resources.preheat.schedule.preset.daily'));
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+    await user.click((await screen.findAllByRole('button', { name: 'common.button.save' })).at(-1)!);
+
+    await waitFor(() => expect(api.createModelPreheatSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ trigger_mode: 'scheduled', cron_expression: '00 00 * * *' })
+    ));
+  });
+
   it('编辑时清空版本会提交 null', async () => {
     const user = userEvent.setup();
     render(

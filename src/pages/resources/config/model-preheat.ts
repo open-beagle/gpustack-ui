@@ -84,8 +84,11 @@ const MODELSCOPE_FILELIST_REVISION_PREFIX = 'modelscope-filelist-v1-';
 const LOCAL_SNAPSHOT_REVISION_PREFIX = 'local-snapshot-';
 
 export function getModelStorageRevisionPresentation(
-  revision: string
+  revision: string | null | undefined
 ): ModelStorageRevisionPresentation {
+  if (!revision) {
+    return { full: '-', short: '-', kind: 'revision' };
+  }
   if (revision.startsWith(MODELSCOPE_FILELIST_REVISION_PREFIX)) {
     const fingerprint = revision.slice(
       MODELSCOPE_FILELIST_REVISION_PREFIX.length
@@ -194,6 +197,21 @@ const STORAGE_STATUS_IDS: Record<string, string> = {
   stale: 'resources.storage.status.stale'
 };
 
+const TASK_STATUS_IDS: Record<string, string> = {
+  pending: 'resources.storage.syncTask.state.pending',
+  resolving: 'resources.storage.syncTask.state.running',
+  scanning: 'resources.storage.syncTask.state.running',
+  staging: 'resources.storage.syncTask.state.running',
+  publishing: 'resources.storage.syncTask.state.running',
+  distributing: 'resources.storage.syncTask.state.running',
+  running: 'resources.storage.syncTask.state.running',
+  paused: 'resources.storage.taskState.paused',
+  partial: 'resources.storage.taskState.partial',
+  ready: 'resources.storage.syncTask.state.ready',
+  error: 'resources.storage.syncTask.state.error',
+  canceled: 'resources.storage.syncTask.state.canceled'
+};
+
 const STORAGE_ERROR_IDS: Record<string, string> = {
   artifact_not_ready: 'resources.storage.error.artifactNotReady',
   s3_profile_in_maintenance: 'resources.storage.error.profileMaintenance',
@@ -225,6 +243,14 @@ export function getModelStorageStatusPresentation(status?: string | null) {
   return {
     value,
     messageId: STORAGE_STATUS_IDS[value] || 'resources.storage.status.unknown'
+  };
+}
+
+export function getModelStorageTaskStatusPresentation(status?: string | null) {
+  const value = status || 'unknown';
+  return {
+    value,
+    messageId: TASK_STATUS_IDS[value] || 'resources.storage.taskState.unknown'
   };
 }
 

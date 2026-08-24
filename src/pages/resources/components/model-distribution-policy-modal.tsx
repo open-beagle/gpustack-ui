@@ -19,8 +19,13 @@ import ModelPreheatCreateSummary from './model-preheat-create-summary';
 import WorkerUuidMultiSelect, {
   getEligibleWorkerUuidRecords
 } from './worker-uuid-multi-select';
+import ScheduleEditor, {
+  getSchedulePayload,
+  getBrowserTimezone,
+  type ScheduleDraft
+} from './model-storage-schedule-editor';
 
-interface FormValues {
+interface FormValues extends ScheduleDraft {
   name: string;
   profile_id: number;
   artifact_id: string;
@@ -84,7 +89,10 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
             activeProfiles[0]?.id,
           artifact_id: initialArtifactId,
           target_scope: 'selected_workers',
-          worker_uuids: []
+          worker_uuids: [],
+          trigger_mode: 'manual',
+          schedule_preset: 'manual',
+          timezone: getBrowserTimezone()
         });
       })
       .catch(() => setDataError(true))
@@ -119,6 +127,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
     const values = confirmValues;
     setSaving(true);
     try {
+      const schedulePayload = getSchedulePayload(values, true);
       await createModelPreheatPolicy({
         name: values.name,
         profile_id: values.profile_id,
@@ -131,7 +140,9 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
         gpu_selector:
           values.target_scope === 'same_gpu_model'
             ? { gpu_names: values.gpu_names }
-            : {}
+            : {},
+        ...schedulePayload,
+        timezone: values.timezone || 'UTC'
       });
       setConfirmValues(null);
       onSaved();
@@ -200,6 +211,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
         >
           <Input />
         </Form.Item>
+        <ScheduleEditor allowContinuous disabled={loading || saving || dataError || Boolean(confirmValues)} />
         <>
             <Form.Item
               name="profile_id"

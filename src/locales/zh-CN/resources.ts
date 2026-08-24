@@ -561,5 +561,10 @@ export default {
   'resources.preheat.confirm.conflictRuleValue': '摘要不一致的文件会覆盖；冲突由后端按幂等与 lease 规则处理。',
   'resources.preheat.confirm.conflictRuleValue.s3_only': '同一 Artifact ID 的内容冲突会隔离或失败，不会覆盖共享 S3 Artifact。',
   'resources.preheat.confirm.conflictRuleValue.workers': '目标节点上摘要不一致的文件会按后端幂等与 lease 规则替换。',
-  'resources.preheat.confirm.conflictRuleValue.artifact': '固定 Artifact 只向目标节点安装；节点文件冲突由后端幂等与 lease 规则处理。'
+  'resources.preheat.confirm.conflictRuleValue.artifact': '固定 Artifact 只向目标节点安装；节点文件冲突由后端幂等与 lease 规则处理。',
+  'resources.storage.taskProgress': '进度', 'resources.storage.startedAt': '开始时间', 'resources.storage.finishedAt': '完成时间', 'resources.storage.taskTimeline': '阶段时间线',
+  'resources.preheat.schedule.preset.manual': '手动', 'resources.preheat.schedule.preset.hourly': '每小时', 'resources.preheat.schedule.preset.daily': '每天', 'resources.preheat.schedule.preset.weekly': '每周', 'resources.preheat.schedule.preset.custom': '自定义 Cron', 'resources.preheat.schedule.time': '执行时间', 'resources.preheat.schedule.weekday': '星期',
+  'resources.preheat.schedule.weekday.0': '星期日', 'resources.preheat.schedule.weekday.1': '星期一', 'resources.preheat.schedule.weekday.2': '星期二', 'resources.preheat.schedule.weekday.3': '星期三', 'resources.preheat.schedule.weekday.4': '星期四', 'resources.preheat.schedule.weekday.5': '星期五', 'resources.preheat.schedule.weekday.6': '星期六',
+  'resources.preheat.schedule.preset.continuous': '持续补齐', 'resources.preheat.schedule.summary.label': '计划摘要', 'resources.preheat.schedule.summary.manual': '手动执行', 'resources.preheat.schedule.summary.continuous': '持续补齐', 'resources.preheat.schedule.summary.hourly': '每小时执行', 'resources.preheat.schedule.summary.daily': '每天 {time} 执行', 'resources.preheat.schedule.summary.weekly': '每周 {weekday} {time} 执行', 'resources.preheat.schedule.summary.custom': '自定义 Cron：{cron}', 'resources.preheat.schedule.nextRuns': '未来三次执行', 'resources.preheat.schedule.nextRunsUnavailable': '无法在客户端预览',
+  'resources.storage.totalSize': '总容量', 'resources.storage.stateMessage': '状态说明', 'resources.storage.taskState.paused': '已暂停', 'resources.storage.taskState.partial': '部分完成', 'resources.storage.taskState.unknown': '未知状态', 'resources.storage.syncTask.state.running': '执行中'
 };

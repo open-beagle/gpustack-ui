@@ -56,6 +56,12 @@ import type {
   ModelStorageSyncScope
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
+import ScheduleEditor, {
+  getSchedulePayload,
+  getBrowserTimezone,
+  parseScheduleCron,
+  type ScheduleDraft
+} from './model-storage-schedule-editor';
 
 type Action = 'enable' | 'disable' | 'run' | 'delete';
 
@@ -64,7 +70,7 @@ const defaults: ModelStorageSyncPolicyCreate = {
   enabled: true,
   trigger_mode: 'manual',
   cron_expression: null,
-  timezone: 'UTC',
+  timezone: getBrowserTimezone(),
   profile_id: 0,
   scope: 'all_ready_workers',
   model_file_id: null,
@@ -91,7 +97,6 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<number>();
   const key = useRef(new IdempotencyKeyLifecycle());
   const scope = Form.useWatch('scope', form);
-  const trigger = Form.useWatch('trigger_mode', form);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,9 +139,10 @@ const ModelStorageSyncPolicies: React.FC = () => {
       setWorkers(workerItems);
       setModels(modelItems);
       const values = record
-        ? { ...record }
+        ? { ...record, ...parseScheduleCron(record.cron_expression) }
         : {
             ...defaults,
+            ...parseScheduleCron(defaults.cron_expression),
             profile_id:
               profileItems.find(
                 (item) => item.is_default && item.lifecycle_state === 'active'
@@ -170,11 +176,17 @@ const ModelStorageSyncPolicies: React.FC = () => {
   };
 
   const save = async () => {
-    const values = await form.validateFields();
+    const values = (await form.validateFields()) as ModelStorageSyncPolicyCreate & ScheduleDraft;
+    const {
+      schedule_preset: _schedulePreset,
+      schedule_time: _scheduleTime,
+      schedule_weekday: _scheduleWeekday,
+      ...formValues
+    } = values;
+    const schedulePayload = getSchedulePayload(values);
     const payload: ModelStorageSyncPolicyCreate = {
-      ...values,
-      cron_expression:
-        values.trigger_mode === 'scheduled' ? values.cron_expression : null,
+      ...formValues,
+      ...schedulePayload,
       model_file_id:
         values.scope === 'single_model' ? values.model_file_id : null,
       worker_uuids:
@@ -507,54 +519,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
           >
             <Input />
           </Form.Item>
-          <Space align="start" style={{ width: '100%' }}>
-            <Form.Item
-              name="trigger_mode"
-              label={intl.formatMessage({
-                id: 'resources.preheat.schedule.triggerMode'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                disabled={editingProfileMaintenance}
-                style={{ width: 180 }}
-                options={['manual', 'scheduled'].map((value) => ({
-                  value,
-                  label: intl.formatMessage({
-                    id: `resources.preheat.schedule.triggerMode.${value}`
-                  })
-                }))}
-              />
-            </Form.Item>
-            {trigger === 'scheduled' && (
-              <>
-                <Form.Item
-                  name="cron_expression"
-                  label={intl.formatMessage({
-                    id: 'resources.preheat.schedule.cron'
-                  })}
-                  rules={[{ required: true }]}
-                >
-                  <Input
-                    disabled={editingProfileMaintenance}
-                    style={{ width: 180 }}
-                  />
-                </Form.Item>
-                <Form.Item
-                  name="timezone"
-                  label={intl.formatMessage({
-                    id: 'resources.preheat.schedule.timezone'
-                  })}
-                  rules={[{ required: true }]}
-                >
-                  <Input
-                    disabled={editingProfileMaintenance}
-                    style={{ width: 160 }}
-                  />
-                </Form.Item>
-              </>
-            )}
-          </Space>
+          <ScheduleEditor disabled={editingProfileMaintenance} />
           <Form.Item
             name="profile_id"
             label={intl.formatMessage({

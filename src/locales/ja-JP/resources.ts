@@ -285,7 +285,12 @@ export default {
   'resources.preheat.confirm.conflictRuleValue': '異なるダイジェストのファイルは置換され、競合はサーバーが冪等性と lease 規則で処理します。',
   'resources.preheat.confirm.conflictRuleValue.s3_only': '同じ Artifact ID の内容競合は隔離または失敗となり、共有 S3 Artifact は上書きされません。',
   'resources.preheat.confirm.conflictRuleValue.workers': '対象 Worker の異なるダイジェストのファイルは、サーバーの冪等性と lease 規則で置換されます。',
-  'resources.preheat.confirm.conflictRuleValue.artifact': '固定 Artifact は対象 Worker にのみ導入され、ファイル競合はサーバーの冪等性と lease 規則で処理されます。'
+  'resources.preheat.confirm.conflictRuleValue.artifact': '固定 Artifact は対象 Worker にのみ導入され、ファイル競合はサーバーの冪等性と lease 規則で処理されます。',
+  'resources.storage.taskProgress': '進捗', 'resources.storage.startedAt': '開始時刻', 'resources.storage.finishedAt': '完了時刻', 'resources.storage.taskTimeline': 'タイムライン',
+  'resources.preheat.schedule.preset.manual': '手動', 'resources.preheat.schedule.preset.hourly': '毎時', 'resources.preheat.schedule.preset.daily': '毎日', 'resources.preheat.schedule.preset.weekly': '毎週', 'resources.preheat.schedule.preset.custom': 'カスタム Cron', 'resources.preheat.schedule.time': '実行時刻', 'resources.preheat.schedule.weekday': '曜日',
+  'resources.preheat.schedule.weekday.0': '日曜', 'resources.preheat.schedule.weekday.1': '月曜', 'resources.preheat.schedule.weekday.2': '火曜', 'resources.preheat.schedule.weekday.3': '水曜', 'resources.preheat.schedule.weekday.4': '木曜', 'resources.preheat.schedule.weekday.5': '金曜', 'resources.preheat.schedule.weekday.6': '土曜',
+  'resources.preheat.schedule.preset.continuous': '継続補充', 'resources.preheat.schedule.summary.label': 'スケジュール概要', 'resources.preheat.schedule.summary.manual': '手動実行', 'resources.preheat.schedule.summary.continuous': '継続的に調整', 'resources.preheat.schedule.summary.hourly': '毎時実行', 'resources.preheat.schedule.summary.daily': '毎日 {time} に実行', 'resources.preheat.schedule.summary.weekly': '毎週 {weekday} {time} に実行', 'resources.preheat.schedule.summary.custom': 'カスタム Cron: {cron}', 'resources.preheat.schedule.nextRuns': '次の 3 回の実行', 'resources.preheat.schedule.nextRunsUnavailable': 'クライアントではプレビューできません',
+  'resources.storage.totalSize': '合計容量', 'resources.storage.stateMessage': '状態メッセージ', 'resources.storage.taskState.paused': '一時停止', 'resources.storage.taskState.partial': '一部完了', 'resources.storage.taskState.unknown': '不明な状態', 'resources.storage.syncTask.state.running': '実行中'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

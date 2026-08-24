@@ -29,6 +29,12 @@ import type {
 import ModelRepositoryPicker from './model-repository-picker';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatCreateSummary from './model-preheat-create-summary';
+import ScheduleEditor, {
+  getSchedulePayload,
+  getBrowserTimezone,
+  parseScheduleCron,
+  type ScheduleDraft
+} from './model-storage-schedule-editor';
 
 interface Props {
   open: boolean;
@@ -42,7 +48,7 @@ const defaultValues: ModelPreheatScheduleCreate = {
   name: '',
   trigger_mode: 'scheduled',
   cron_expression: '0 1 * * *',
-  timezone: 'UTC',
+  timezone: getBrowserTimezone(),
   window_duration_minutes: 60,
   max_concurrency: 1,
   bandwidth_limit_mbps: null,
@@ -115,10 +121,20 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
           activeProfiles.find((profile) => profile.is_default) ||
           activeProfiles[0];
         const values = record
-          ? { ...defaultValues, ...record }
+          ? {
+              ...defaultValues,
+              ...record,
+              ...parseScheduleCron(record.cron_expression),
+              trigger_mode: record.trigger_mode
+            }
           : {
               ...defaultValues,
               ...initialValues,
+              ...parseScheduleCron(
+                initialValues?.trigger_mode === 'manual'
+                  ? null
+                  : initialValues?.cron_expression ?? defaultValues.cron_expression
+              ),
               target_worker_uuids:
                 initialValues?.target_worker_uuids ||
                 readyWorkers.map((worker) => worker.worker_uuid),
@@ -229,12 +245,18 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
   const confirmSave = async () => {
     if (!confirmValues) return;
     const values = confirmValues.values;
+    const scheduleValues = values as ModelPreheatScheduleCreate & ScheduleDraft;
+    const {
+      schedule_preset: _schedulePreset,
+      schedule_time: _scheduleTime,
+      schedule_weekday: _scheduleWeekday,
+      ...payloadValues
+    } = scheduleValues;
+    const schedulePayload = getSchedulePayload(scheduleValues);
     const payload = {
-      ...values,
+      ...payloadValues,
       revision: values.revision?.trim() || null,
-      cron_expression:
-        values.trigger_mode === 'scheduled' ? values.cron_expression : null
-      ,
+      ...schedulePayload,
       include_patterns:
         values.source === 'ollama_library' ? [] : values.include_patterns,
       exclude_patterns:
@@ -334,16 +356,17 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
         disabled={loading || dataError || submitting || Boolean(confirmValues)}
         onValuesChange={(_, values) =>
           {
-            if (values.source === 'ollama_library') {
+            const nextValues = values;
+            if (nextValues.source === 'ollama_library') {
               form.setFieldsValue({ include_patterns: [], exclude_patterns: [] });
               setDraft({
-                ...(values as ModelPreheatScheduleCreate),
+                ...(nextValues as ModelPreheatScheduleCreate),
                 include_patterns: [],
                 exclude_patterns: []
               });
               return;
             }
-            setDraft(values as ModelPreheatScheduleCreate);
+            setDraft(nextValues as ModelPreheatScheduleCreate);
           }
         }
       >
@@ -460,30 +483,10 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
         >
           <Switch />
         </Form.Item>}
-        <Row gutter={16}>
-          <Col xs={24} md={8}>
-            <Form.Item name="name" label={intl.formatMessage({ id: 'resources.preheat.policy.name' })} rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={8}>
-            <Form.Item name="trigger_mode" label={intl.formatMessage({ id: 'resources.preheat.schedule.triggerMode' })} rules={[{ required: true }]}>
-              <Select options={['manual', 'scheduled'].map((value) => ({ value, label: intl.formatMessage({ id: `resources.preheat.schedule.triggerMode.${value}` }) }))} />
-            </Form.Item>
-          </Col>
-          {draft.trigger_mode === 'scheduled' && <>
-            <Col xs={24} md={8}>
-              <Form.Item name="cron_expression" label={intl.formatMessage({ id: 'resources.preheat.schedule.cron' })} rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="timezone" label={intl.formatMessage({ id: 'resources.preheat.schedule.timezone' })} rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-          </>}
-        </Row>
+        <Form.Item name="name" label={intl.formatMessage({ id: 'resources.preheat.policy.name' })} rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <ScheduleEditor disabled={loading || dataError || submitting || Boolean(confirmValues)} />
         <Collapse
           items={[
             {
