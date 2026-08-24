@@ -7,6 +7,7 @@ import type {
   ModelPreheatS3ProfileWrite,
   ModelPreheatTask,
   ModelPreheatWorker,
+  ModelStorageModelSource,
   ModelStorageTransferSource
 } from './types';
 
@@ -79,7 +80,7 @@ export function getModelFileSyncActionState(
 ): ModelFileSyncActionState {
   const supported =
     model.state === 'ready' &&
-    ['model_scope', 'huggingface'].includes(model.source);
+    ['model_scope', 'huggingface', 'ollama_library'].includes(model.source);
   if (!supported) {
     return { visible: false, disabled: true, reason: 'unsupported' };
   }
@@ -98,6 +99,39 @@ export function getModelFileSyncActionState(
     };
   }
   return { visible: true, disabled: false, reason: null };
+}
+
+export function getModelFileStorageModelId(model: {
+  source: string;
+  model_scope_model_id?: string;
+  huggingface_repo_id?: string;
+  ollama_library_model_name?: string;
+  local_path?: string;
+}): string {
+  if (model.source === 'ollama_library') {
+    return model.ollama_library_model_name || '';
+  }
+  if (model.source === 'model_scope') {
+    return model.model_scope_model_id || '';
+  }
+  if (model.source === 'huggingface') {
+    return model.huggingface_repo_id || '';
+  }
+  return model.local_path || '';
+}
+
+export function getModelStorageSourceLabel(
+  source: ModelStorageModelSource
+): string {
+  switch (source) {
+    case 'model_scope':
+    case 'modelscope':
+      return 'ModelScope';
+    case 'huggingface':
+      return 'Hugging Face';
+    case 'ollama_library':
+      return 'Ollama Library';
+  }
 }
 
 export function getModelStorageTransferPresentation(

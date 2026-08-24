@@ -22,6 +22,7 @@ import {
 } from '../apis';
 import {
   getModelStorageRevisionPresentation,
+  getModelStorageSourceLabel,
   IdempotencyKeyLifecycle
 } from '../config/model-preheat';
 import type {
@@ -214,7 +215,9 @@ const ModelStorage: React.FC = () => {
                       title: intl.formatMessage({
                         id: 'resources.storage.modelSource'
                       }),
-                      dataIndex: 'source'
+                      dataIndex: 'source',
+                      render: (value: ModelStorageArtifact['source']) =>
+                        getModelStorageSourceLabel(value)
                     },
                     {
                       title: intl.formatMessage({

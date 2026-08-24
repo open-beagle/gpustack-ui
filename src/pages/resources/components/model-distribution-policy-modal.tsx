@@ -9,7 +9,10 @@ import {
   queryModelStorageSyncTasks,
   queryWorkersList
 } from '../apis';
-import { loadAllPaginated } from '../config/model-preheat';
+import {
+  getModelStorageSourceLabel,
+  loadAllPaginated
+} from '../config/model-preheat';
 import type {
   ListItem,
   ModelPreheatS3Profile,
@@ -212,7 +215,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
                 optionFilterProp="label"
                 options={artifacts.map((item) => ({
                   value: item.artifact_id,
-                  label: `${item.model_id} (${item.resolved_revision.slice(0, 12)})`
+                  label: `${getModelStorageSourceLabel(item.source)} · ${item.model_id} (${item.resolved_revision.slice(0, 12)})`
                 }))}
               />
             </Form.Item>
@@ -230,7 +233,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
               optionFilterProp="label"
               options={tasks.map((item) => ({
                 value: item.id,
-                label: `#${item.id} ${item.model_id}`
+                label: `#${item.id} ${getModelStorageSourceLabel(item.source)} · ${item.model_id}`
               }))}
             />
           </Form.Item>

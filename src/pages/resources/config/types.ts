@@ -269,9 +269,20 @@ export interface ModelStorageConnectionTestRequest {
   use_virtual_hosted_style: boolean;
 }
 
+export type ModelStorageModelSource =
+  | 'model_scope'
+  | 'modelscope'
+  | 'huggingface'
+  | 'ollama_library';
+
+export interface ModelStorageRequestIdentity extends Record<string, unknown> {
+  source: ModelStorageModelSource;
+  model_id: string;
+}
+
 export interface ModelStorageArtifact {
   artifact_id: string;
-  source: string;
+  source: ModelStorageModelSource;
   model_id: string;
   resolved_revision: string;
   manifest_digest: string;
@@ -295,7 +306,7 @@ export interface ModelStorageSyncTask {
   worker_uuid?: string;
   profile_id: number;
   profile_config_version: number;
-  source: string;
+  source: ModelStorageModelSource;
   model_id: string;
   resolved_revision: string;
   revision_kind?: 'upstream' | 'local_snapshot';
@@ -325,7 +336,7 @@ export interface ModelStorageSyncTaskDetail {
   model_file_id: number;
   worker_id: number;
   profile_config_version: number;
-  source: string;
+  source: ModelStorageModelSource;
   model_id: string;
   resolved_revision: string;
   state: 'pending' | 'scanning' | 'publishing' | 'ready' | 'error' | 'canceled';
@@ -473,7 +484,7 @@ export interface ModelPreheatDistributionPolicy {
   enabled: boolean;
   profile_id: number;
   profile_config_version: number;
-  request_identity: Record<string, unknown>;
+  request_identity: ModelStorageRequestIdentity;
   request_digest: string;
   target_scope: ModelPreheatTargetScope;
   worker_selector: Record<string, unknown>;

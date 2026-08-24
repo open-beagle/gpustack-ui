@@ -9,9 +9,11 @@ import {
   buildModelPreheatPreview,
   buildModelPreheatS3ProfilePayload,
   buildSystemManagedModelPreheatS3ProfilePayload,
+  getModelFileStorageModelId,
   getModelFileSyncActionState,
   getModelPreheatTaskActions,
   getModelStorageRevisionPresentation,
+  getModelStorageSourceLabel,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
   shouldPollModelPreheatConnectivity,
@@ -315,6 +317,40 @@ describe('节点模型同步入口', () => {
       visible: false,
       disabled: true,
       reason: 'unsupported'
+    });
+  });
+
+  it('Ollama Ready 模型无需 revision 即可同步并保留原始来源展示', () => {
+    const ollama = {
+      state: 'ready',
+      source: 'ollama_library',
+      resolved_revision: null,
+      transfer_source: null,
+      transfer_profile_id: null,
+      worker_available: true,
+      ollama_library_model_name: 'qwen3:32b'
+    };
+
+    expect(getModelFileSyncActionState(ollama, 3)).toEqual({
+      visible: true,
+      disabled: false,
+      reason: null
+    });
+    expect(getModelFileStorageModelId(ollama)).toBe('qwen3:32b');
+    expect(getModelStorageSourceLabel('ollama_library')).toBe('Ollama Library');
+    expect(
+      getModelFileSyncActionState(
+        {
+          ...ollama,
+          transfer_source: 'peer_via_s3',
+          transfer_profile_id: 3
+        },
+        3
+      )
+    ).toEqual({
+      visible: true,
+      disabled: true,
+      reason: 'already_from_default'
     });
   });
 

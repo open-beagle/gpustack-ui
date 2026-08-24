@@ -18,6 +18,8 @@ import {
   queryWorkersList
 } from '../apis';
 import {
+  getModelFileStorageModelId,
+  getModelFileSyncActionState,
   getModelStorageRevisionPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate,
@@ -41,15 +43,12 @@ const activeProfiles = (profiles: ModelPreheatS3Profile[]) =>
   profiles.filter((profile) => profile.lifecycle_state === 'active');
 
 const syncableModels = (models: ModelFile[]) =>
-  models.filter(
-    (model) =>
-      model.state === 'ready' &&
-      model.worker_available !== false &&
-      ['model_scope', 'huggingface'].includes(model.source)
-  );
+  models.filter((model) => {
+    const action = getModelFileSyncActionState(model);
+    return action.visible && !action.disabled;
+  });
 
-const modelName = (model: ModelFile) =>
-  model.model_scope_model_id || model.huggingface_repo_id || model.local_path;
+const modelName = (model: ModelFile) => getModelFileStorageModelId(model);
 
 const selectStyle = { width: 'min(420px, 100%)' };
 

@@ -9,13 +9,13 @@ import { useIntl, useNavigate } from '@umijs/max';
 import {
   Button,
   Descriptions,
+  message,
   Modal,
   Space,
   Table,
   Tag,
   Tooltip,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,7 +24,10 @@ import {
   queryModelStorageSyncTask,
   queryModelStorageSyncTasks
 } from '../apis';
-import { LatestRequestGate } from '../config/model-preheat';
+import {
+  getModelStorageSourceLabel,
+  LatestRequestGate
+} from '../config/model-preheat';
 import type {
   ModelStorageSyncTask,
   ModelStorageSyncTaskDetail
@@ -316,7 +319,7 @@ const ModelStorageSyncTasks: React.FC = () => {
                 id: 'resources.storage.modelSource'
               })}
             >
-              {detail?.source || '-'}
+              {detail ? getModelStorageSourceLabel(detail.source) : '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({

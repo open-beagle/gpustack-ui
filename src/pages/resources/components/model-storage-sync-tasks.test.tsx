@@ -467,6 +467,83 @@ describe('同步任务获取方式', () => {
     );
   });
 
+  it('批量同步选择器包含没有 revision 的 Ollama Ready 模型', async () => {
+    const user = userEvent.setup();
+    const ollama: ModelFile = {
+      id: 69,
+      source: 'ollama_library',
+      model_scope_model_id: '',
+      model_scope_file_path: '',
+      huggingface_repo_id: '',
+      huggingface_filename: '',
+      ollama_library_model_name: 'qwen3:32b',
+      local_path: '',
+      local_dir: '',
+      worker_id: 243,
+      worker_available: true,
+      size: 1024,
+      download_progress: 100,
+      resolved_paths: ['/models/ollama/qwen3-32b'],
+      state: 'ready',
+      state_message: '',
+      resolved_revision: null,
+      created_at: '',
+      updated_at: ''
+    };
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      items: [
+        {
+          id: 3,
+          name: 'default-s3',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryWorkersList.mockResolvedValue({
+      items: [{ id: 243, name: 'beagle-243', state: 'ready' }],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryModelFilesList.mockResolvedValue({
+      items: [ollama],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.createModelStorageSyncBatch.mockResolvedValue({
+      scope: 'single_model',
+      planned: 1,
+      created: [],
+      skipped: [],
+      failed: []
+    });
+
+    render(
+      <ModelStorageSyncBatchModal
+        open
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getAllByRole('combobox')[2]);
+    await user.click(await screen.findByText('beagle-243'));
+    await user.click(within(dialog).getAllByRole('combobox')[3]);
+    expect(await screen.findByText('qwen3:32b (-)')).toBeInTheDocument();
+    await user.click(screen.getByText('qwen3:32b (-)'));
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+        { profile_id: 3, scope: 'single_model', model_file_id: 69 },
+        expect.any(String)
+      )
+    );
+  });
+
   it('批量创建会加载后续页面的节点和模型，并在刷新列表后保留结果页', async () => {
     const user = userEvent.setup();
     const model: ModelFile = {

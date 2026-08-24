@@ -4,6 +4,7 @@ import { Alert, Descriptions, Modal, Select, Tooltip, Typography } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createModelStorageSyncTask } from '../apis';
 import {
+  getModelFileStorageModelId,
   getModelStorageRevisionPresentation,
   IdempotencyKeyLifecycle
 } from '../config/model-preheat';
@@ -20,9 +21,6 @@ interface Props {
   onCancel: () => void;
   onCreated: (task: ModelStorageSyncTask) => void;
 }
-
-const modelName = (model: ModelFile) =>
-  model.model_scope_model_id || model.huggingface_repo_id || model.local_path;
 
 const activeProfiles = (profiles: ModelPreheatS3Profile[]) =>
   profiles.filter((profile) => profile.lifecycle_state === 'active');
@@ -48,7 +46,7 @@ const ModelStorageSyncModal: React.FC<Props> = ({
   );
   const alreadyFromDefault =
     selected?.id === model?.transfer_profile_id &&
-    model?.transfer_source === 's3';
+    ['s3', 'peer_via_s3'].includes(model?.transfer_source || '');
   const revision = model?.resolved_revision || model?.requested_revision;
   const revisionPresentation = revision
     ? getModelStorageRevisionPresentation(revision)
@@ -108,7 +106,9 @@ const ModelStorageSyncModal: React.FC<Props> = ({
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={intl.formatMessage({ id: 'resources.storage.sync.noDefault' })}
+          message={intl.formatMessage({
+            id: 'resources.storage.sync.noDefault'
+          })}
         />
       )}
       {alreadyFromDefault && (
@@ -116,17 +116,25 @@ const ModelStorageSyncModal: React.FC<Props> = ({
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={intl.formatMessage({ id: 'resources.storage.sync.alreadyFromDefault' })}
+          message={intl.formatMessage({
+            id: 'resources.storage.sync.alreadyFromDefault'
+          })}
         />
       )}
       <Descriptions column={1} size="small">
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.model' })}>
-          {model ? modelName(model) : '-'}
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.model' })}
+        >
+          {model ? getModelFileStorageModelId(model) : '-'}
         </Descriptions.Item>
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.sourceWorker' })}>
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.sourceWorker' })}
+        >
           {model?.worker_id || '-'}
         </Descriptions.Item>
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.version' })}>
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.version' })}
+        >
           {revisionPresentation ? (
             <Tooltip title={revisionPresentation.full}>
               <Typography.Text copyable={{ text: revisionPresentation.full }}>
@@ -142,13 +150,19 @@ const ModelStorageSyncModal: React.FC<Props> = ({
             '-'
           )}
         </Descriptions.Item>
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.fileCount' })}>
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.fileCount' })}
+        >
           {model?.resolved_paths?.length || 0}
         </Descriptions.Item>
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.capacity' })}>
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.capacity' })}
+        >
           {model?.size || 0}
         </Descriptions.Item>
-        <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.targetProfile' })}>
+        <Descriptions.Item
+          label={intl.formatMessage({ id: 'resources.storage.targetProfile' })}
+        >
           <Select
             style={{ width: '100%' }}
             value={profileId}

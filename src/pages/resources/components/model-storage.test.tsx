@@ -136,4 +136,27 @@ describe('统一模型存储交互', () => {
     expect(api.refreshModelStorageArtifacts).toHaveBeenCalledWith(3);
     await waitFor(() => expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3));
   });
+
+  it('S3 模型库保留 Ollama Artifact 的原始来源展示', async () => {
+    const user = userEvent.setup();
+    api.queryModelStorageArtifacts.mockResolvedValue([
+      {
+        artifact_id: 'ollama-artifact',
+        source: 'ollama_library',
+        model_id: 'qwen3:32b',
+        resolved_revision: 'local-snapshot-1234567890abcdef',
+        manifest_digest: 'digest',
+        manifest_state: 'valid',
+        file_count: 3,
+        total_size: 1024,
+        last_verified_at: ''
+      }
+    ]);
+
+    render(<ModelStorage />);
+    await user.click(await screen.findByText('resources.storage.artifacts'));
+
+    expect(await screen.findByText('Ollama Library')).toBeInTheDocument();
+    expect(screen.getByText('qwen3:32b')).toBeInTheDocument();
+  });
 });
