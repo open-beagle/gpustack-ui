@@ -265,20 +265,29 @@ export async function runModelStorageSyncPolicyNow(
   );
 }
 
+export interface ModelStorageArtifactListParams extends Global.SearchParams {
+  source?: ModelStorageArtifact['source'];
+  manifest_state?: string;
+}
+
 export async function queryModelStorageArtifacts(
   profileId: number,
-  params: Global.SearchParams = { page: 1, perPage: 100 }
+  params: ModelStorageArtifactListParams = { page: 1, perPage: 100 },
+  options?: { signal?: AbortSignal }
 ) {
   return request<Global.PageResponse<ModelStorageArtifact>>(
     `/model-storage-profiles/${profileId}/artifacts`,
-    { method: 'GET', params }
+    { method: 'GET', params, signal: options?.signal }
   );
 }
 
-export async function refreshModelStorageArtifacts(profileId: number) {
+export async function refreshModelStorageArtifacts(
+  profileId: number,
+  options?: { signal?: AbortSignal }
+) {
   return request<{ job_id: number }>(
     `/model-storage-profiles/${profileId}/artifacts/refresh`,
-    { method: 'POST' }
+    { method: 'POST', signal: options?.signal }
   );
 }
 

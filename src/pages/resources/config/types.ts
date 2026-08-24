@@ -206,6 +206,7 @@ export interface ModelPreheatS3ProfileBase {
   tls_verify?: boolean;
   region?: string | null;
   use_virtual_hosted_style?: boolean;
+  inventory_refresh_interval_seconds?: number | null;
   source_fallback_enabled?: boolean;
   default_slot?: string | null;
 }
@@ -233,6 +234,11 @@ export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
   connectivity_state: ModelPreheatS3ConnectivityState;
   last_connectivity_check_id: number | null;
   last_connectivity_checked_at: string | null;
+  inventory_refresh_interval_seconds?: number | null;
+  inventory_last_attempt_at?: string | null;
+  inventory_last_success_at?: string | null;
+  inventory_last_scan_count?: number;
+  inventory_last_error_code?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -285,11 +291,17 @@ export interface ModelStorageArtifact {
   source: ModelStorageModelSource;
   model_id: string;
   resolved_revision: string;
+  include_patterns: string[];
+  exclude_patterns: string[];
   manifest_digest: string;
+  manifest_path: string;
   manifest_state: string;
   file_count: number;
   total_size: number;
-  last_verified_at: string;
+  last_verified_at: string | null;
+  created_by_task_id: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ModelStorageTransferSource =

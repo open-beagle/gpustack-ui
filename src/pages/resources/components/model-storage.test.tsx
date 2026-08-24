@@ -87,8 +87,14 @@ describe('统一模型存储交互', () => {
     cleanup();
     api.queryModelPreheatS3Profiles.mockResolvedValue({ ...page, items: [maintenance, profile], pagination: { ...page.pagination, total: 2 } });
     render(<ModelStorage />);
-    await user.click(await screen.findByText('resources.storage.artifacts'));
-    await user.click(screen.getByRole('combobox'));
+    await user.click(
+      await screen.findByRole('tab', { name: 'resources.storage.artifacts' })
+    );
+    const artifactProfileSelect = screen
+      .getAllByRole('combobox')
+      .find((element) => !element.closest('[aria-hidden="true"]'));
+    expect(artifactProfileSelect).toBeDefined();
+    await user.click(artifactProfileSelect!);
     expect(await screen.findByRole('option', { name: profile.name })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: maintenance.name })).not.toBeInTheDocument();
 
@@ -100,8 +106,9 @@ describe('统一模型存储交互', () => {
   it('编辑态测试连接要求重新输入凭据，并使用后端严格请求字段', async () => {
     const user = userEvent.setup();
     render(<ModelPreheatS3ProfileModal open record={profile} onCancel={vi.fn()} onSaved={vi.fn()} />);
-    await user.click(await screen.findByRole('button', { name: 'resources.storage.testConnection' }));
-    expect(api.testModelStorageConnection).not.toHaveBeenCalled();
+    const testButton = await screen.findByRole('button', { name: 'resources.storage.testConnection' });
+    expect(testButton).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'resources.storage.updateCredentials' }));
     const passwords = screen.getAllByLabelText(/resources\.preheat\.profile\.(accessKey|secretKey)/);
     await user.type(passwords[0], 'access');
     await user.type(passwords[1], 'secret');
@@ -109,32 +116,73 @@ describe('统一模型存储交互', () => {
     expect(api.testModelStorageConnection).toHaveBeenCalledWith(expect.objectContaining({ endpoint: profile.endpoint, bucket: profile.bucket, access_key: 'access', secret_key: 'secret', tls_enabled: true }));
   });
 
-  it('节点检测通过居中确认发起 Worker API 并展示检测结果', async () => {
+  it('节点检测直接发起 Worker API 并展示检测结果', async () => {
     const user = userEvent.setup();
     api.createModelPreheatConnectivityCheck.mockResolvedValue({ id: 22, profile_id: 3, profile_config_version: 1, state: 'available', summary: { success: 1, failed: 0, not_checked: 0 }, workers: [], created_at: '', updated_at: '', started_at: '', finished_at: '' });
     render(<ModelStorage />);
     await user.click(await screen.findByText('resources.storage.connectivity'));
     await user.click(screen.getByRole('button', { name: 'resources.storage.checkWorkers' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog.closest('.ant-modal-wrap')).toHaveClass('ant-modal-centered');
-    await user.click(within(dialog).getByRole('button', { name: 'resources.storage.checkWorkers' }));
-    expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledWith(3, expect.any(String));
+    await waitFor(() =>
+      expect(api.createModelPreheatConnectivityCheck).toHaveBeenCalledWith(
+        3,
+        expect.any(String)
+      )
+    );
     expect((await screen.findAllByText('resources.preheat.connectivity.status')).length).toBeGreaterThan(0);
   });
 
-  it('库存刷新在后端同步扫描完成后立即回拉 Artifact 列表', async () => {
+  it('库存扫描直接执行并在后端同步完成后立即回拉 Artifact 列表', async () => {
     const user = userEvent.setup();
     api.refreshModelStorageArtifacts.mockResolvedValue({ job_id: 71 });
     render(<ModelStorage />);
-    await screen.findByText('resources.storage.artifacts');
-    await user.click(screen.getByText('resources.storage.artifacts'));
+    await screen.findByRole('tab', { name: 'resources.storage.artifacts' });
+    await user.click(
+      screen.getByRole('tab', { name: 'resources.storage.artifacts' })
+    );
     await waitFor(() => expect(api.queryModelStorageArtifacts).toHaveBeenCalledTimes(1));
     api.queryModelStorageArtifacts.mockClear();
     await user.click(screen.getByRole('button', { name: /resources\.storage\.refresh/ }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: /resources\.storage\.refresh/ }));
-    expect(api.refreshModelStorageArtifacts).toHaveBeenCalledWith(3);
-    await waitFor(() => expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3));
+    await waitFor(() =>
+      expect(api.refreshModelStorageArtifacts).toHaveBeenCalledWith(3, expect.any(Object))
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(
+        3,
+        { page: 1, perPage: 20 },
+        { signal: expect.any(AbortSignal) }
+      )
+    );
+  });
+
+  it('切换 Profile 后忽略旧扫描的成功回拉', async () => {
+    const user = userEvent.setup();
+    const backup = { ...profile, id: 4, name: '备份模型库', is_default: false };
+    const refreshA = deferred<{ job_id: number }>();
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      ...page,
+      items: [profile, backup],
+      pagination: { ...page.pagination, total: 2 }
+    });
+    api.queryModelStorageArtifacts
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    api.refreshModelStorageArtifacts.mockReturnValue(refreshA.promise);
+    render(<ModelStorage />);
+    await user.click(await screen.findByRole('tab', { name: 'resources.storage.artifacts' }));
+    await waitFor(() => expect(api.queryModelStorageArtifacts).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: /resources\.storage\.refresh/ }));
+    await waitFor(() => expect(api.refreshModelStorageArtifacts).toHaveBeenCalledWith(3, expect.any(Object)));
+    const artifactProfileSelect = screen
+      .getAllByRole('combobox')
+      .find((element) => !element.closest('[aria-hidden="true"]'));
+    expect(artifactProfileSelect).toBeDefined();
+    await user.click(artifactProfileSelect!);
+    await user.click(await screen.findByRole('option', { name: backup.name }));
+    refreshA.resolve({ job_id: 71 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.queryModelStorageArtifacts).toHaveBeenCalledTimes(2);
   });
 
   it('S3 模型库保留 Ollama Artifact 的原始来源展示', async () => {
@@ -154,7 +202,9 @@ describe('统一模型存储交互', () => {
     ]);
 
     render(<ModelStorage />);
-    await user.click(await screen.findByText('resources.storage.artifacts'));
+    await user.click(
+      await screen.findByRole('tab', { name: 'resources.storage.artifacts' })
+    );
 
     expect(await screen.findByText('Ollama Library')).toBeInTheDocument();
     expect(screen.getByText('qwen3:32b')).toBeInTheDocument();

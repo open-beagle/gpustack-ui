@@ -20,7 +20,8 @@ import {
 } from '../apis';
 import {
   IdempotencyKeyLifecycle,
-  LatestRequestGate
+  LatestRequestGate,
+  getModelStorageErrorPresentation
 } from '../config/model-preheat';
 import type {
   ModelPreheatConnectivityCheck,
@@ -30,7 +31,7 @@ import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatConnectivity from './model-preheat-connectivity';
 import ModelPreheatS3ProfileModal from './model-preheat-s3-profile-modal';
 
-type ConfirmAction = 'delete' | 'check' | 'default' | 'maintenance' | 'restore';
+type ConfirmAction = 'delete' | 'default' | 'maintenance' | 'restore';
 
 const connectivityColors: Record<string, string> = {
   available: 'success',
@@ -102,6 +103,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
   const [connectivity, setConnectivity] =
     useState<ModelPreheatConnectivityCheck | null>(null);
   const [connectivityLoading, setConnectivityLoading] = useState(false);
+  const [checkingProfileId, setCheckingProfileId] = useState<number>();
 
   const loadProfiles = useCallback(async () => {
     setLoading(true);
@@ -215,13 +217,31 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
     action: ConfirmAction,
     profile: ModelPreheatS3Profile
   ) => {
-    if (action === 'check') connectivityKeys.current.start();
     setConfirm({ action, profile });
   };
 
   const closeConfirm = () => {
-    if (confirm?.action === 'check') connectivityKeys.current.abandon();
     setConfirm(null);
+  };
+
+  const runCheck = async (profile: ModelPreheatS3Profile) => {
+    connectivityKeys.current.start();
+    setCheckingProfileId(profile.id);
+    try {
+      const result = await createModelPreheatConnectivityCheck(
+        profile.id,
+        connectivityKeys.current.current()
+      );
+      connectivityKeys.current.complete();
+      setConnectivityProfile({
+        ...profile,
+        last_connectivity_check_id: result.id
+      });
+      setConnectivity(result);
+      await loadProfiles();
+    } finally {
+      setCheckingProfileId(undefined);
+    }
   };
 
   const deleteContentId = (profile: ModelPreheatS3Profile) => {
@@ -269,19 +289,6 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         onProfilesChanged?.();
         return;
       }
-      const result = await createModelPreheatConnectivityCheck(
-        confirm.profile.id,
-        connectivityKeys.current.current()
-      );
-      connectivityKeys.current.complete();
-      const nextProfile = {
-        ...confirm.profile,
-        last_connectivity_check_id: result.id
-      };
-      setConfirm(null);
-      setConnectivityProfile(nextProfile);
-      setConnectivity(result);
-      await loadProfiles();
     } catch {
       return;
     } finally {
@@ -290,6 +297,27 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
   };
 
   const columns = [
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.profile.lifecycle' }),
+      dataIndex: 'lifecycle_state',
+      width: 120,
+      render: (value: string) => (
+        <Tag color={value === 'active' ? 'success' : 'orange'}>
+          {intl.formatMessage({ id: `resources.preheat.profile.${value}` })}
+        </Tag>
+      )
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.profile.default' }),
+      dataIndex: 'is_default',
+      width: 100,
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="blue">
+            {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
+          </Tag>
+        ) : '-'
+    },
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.name' }),
       dataIndex: 'name',
@@ -381,6 +409,26 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
     },
     {
+      title: intl.formatMessage({ id: 'resources.storage.artifacts' }),
+      key: 'inventory',
+      width: 180,
+      render: (_: unknown, record: ModelPreheatS3Profile) => {
+        const error = getModelStorageErrorPresentation(record.inventory_last_error_code);
+        const errorText = record.inventory_last_error_code
+          ? intl.formatMessage({ id: error.messageId })
+          : undefined;
+        return (
+          <Tooltip title={errorText}>
+            <span>
+              {record.inventory_last_attempt_at && `${intl.formatMessage({ id: 'resources.storage.scanAttemptAt' })}: ${dayjs(record.inventory_last_attempt_at).format('YYYY-MM-DD HH:mm:ss')}`}
+              {record.inventory_last_success_at && <><br />{`${intl.formatMessage({ id: 'resources.storage.scanSucceededAt' })}: ${dayjs(record.inventory_last_success_at).format('YYYY-MM-DD HH:mm:ss')}`}<br />{intl.formatMessage({ id: 'resources.storage.scanResult.success' }, { count: record.inventory_last_scan_count || 0 })}</>}
+              {!record.inventory_last_attempt_at && '-'}
+            </span>
+          </Tooltip>
+        );
+      }
+    },
+    {
       title: intl.formatMessage({ id: 'common.table.operation' }),
       key: 'operation',
       width: 220,
@@ -391,6 +439,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
             <Button
               type="text"
               icon={<EditOutlined />}
+              aria-label={intl.formatMessage({ id: 'common.button.edit' })}
               onClick={() => {
                 setEditing(record);
                 setFormOpen(true);
@@ -405,12 +454,19 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
             <Button
               type="text"
               icon={<CloudSyncOutlined />}
+              aria-label={intl.formatMessage({ id: 'resources.preheat.connectivity.detail' })}
               disabled={!record.last_connectivity_check_id}
               onClick={() => openConnectivity(record)}
             />
           </Tooltip>
           <Tooltip title={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}>
-            <Button type="text" icon={<ReloadOutlined />} onClick={() => openConfirm('check', record)} />
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
+              aria-label={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
+              loading={checkingProfileId === record.id}
+              onClick={() => void runCheck(record)}
+            />
           </Tooltip>
           {isActiveProfile(record) && !record.is_default && (
             <Tooltip title={intl.formatMessage({ id: 'resources.storage.setDefault' })}>
@@ -434,7 +490,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           )}
           {!record.ever_used_at && (
             <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
-              <Button danger type="text" icon={<DeleteOutlined />} onClick={() => openConfirm('delete', record)} />
+              <Button aria-label={intl.formatMessage({ id: 'common.button.delete' })} danger type="text" icon={<DeleteOutlined />} onClick={() => openConfirm('delete', record)} />
             </Tooltip>
           )}
         </Space>
@@ -476,7 +532,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
         columns={columns}
         dataSource={profiles}
         loading={loading}
-        scroll={{ x: 1240 }}
+        scroll={{ x: 1550 }}
         pagination={{
           current: page,
           pageSize,
@@ -511,9 +567,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 ? 'resources.storage.setDefaultConfirm'
                 : confirm?.action === 'maintenance'
                   ? 'resources.preheat.profile.maintenanceConfirm'
-                  : confirm?.action === 'restore'
-                    ? 'resources.preheat.profile.restoreConfirm'
-                    : 'resources.preheat.connectivity.recheckConfirm'
+                    : 'resources.preheat.profile.restoreConfirm'
         })}
         content={intl.formatMessage(
           {
@@ -524,9 +578,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                   ? 'resources.storage.setDefaultContent'
                   : confirm?.action === 'maintenance'
                     ? 'resources.preheat.profile.maintenanceContent'
-                    : confirm?.action === 'restore'
-                      ? 'resources.preheat.profile.restoreContent'
-                      : 'resources.preheat.connectivity.recheckContent'
+                    : 'resources.preheat.profile.restoreContent'
           },
           { name: confirm?.profile.name || '' }
         )}
@@ -538,9 +590,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 ? 'resources.storage.setDefault'
                 : confirm?.action === 'maintenance'
                   ? 'resources.preheat.profile.maintenanceAction'
-                  : confirm?.action === 'restore'
-                    ? 'resources.preheat.profile.restoreAction'
-                    : 'resources.storage.checkWorkers'
+                    : 'resources.preheat.profile.restoreAction'
         })}
         danger={confirm?.action === 'delete'}
         loading={confirmLoading}

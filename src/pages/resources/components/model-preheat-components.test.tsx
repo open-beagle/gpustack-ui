@@ -40,22 +40,69 @@ describe('预热组件回归', () => {
     expect(within(dialog).queryByRole('button', { name: 'Close' })).toBeNull();
   });
 
-  it('编辑 Profile 时不回显凭据，留空保存不回传凭据字段', async () => {
+  it('编辑 Profile 时默认掩码凭据，未显式更新时不回传凭据字段', async () => {
     const user = userEvent.setup();
     api.updateModelPreheatS3Profile.mockResolvedValue(profile);
     render(<ModelPreheatS3ProfileModal open record={profile} onCancel={vi.fn()} onSaved={vi.fn()} />);
-    expect(await screen.findByLabelText(/profile\.accessKey/)).toHaveValue('');
+    expect(await screen.findByRole('button', { name: 'resources.storage.updateCredentials' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'common.button.save' }));
     await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalled());
     expect(api.updateModelPreheatS3Profile.mock.calls[0][1]).not.toMatchObject({ access_key: expect.anything(), secret_key: expect.anything() });
   });
 
-  it('手工 Profile 不显示 Prefix，编辑保存时不清空既有 Prefix', async () => {
+  it('显式更新凭据通过居中业务确认后才提交', async () => {
+    const user = userEvent.setup();
+    api.updateModelPreheatS3Profile.mockResolvedValue(profile);
+    render(<ModelPreheatS3ProfileModal open record={profile} onCancel={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: 'resources.storage.updateCredentials' }));
+    const passwords = screen.getAllByLabelText(/profile\.(accessKey|secretKey)/);
+    await user.type(passwords[0], 'next-access');
+    await user.type(passwords[1], 'next-secret');
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+
+    const dialogs = await screen.findAllByRole('dialog');
+    const confirm = dialogs[dialogs.length - 1];
+    expect(confirm.closest('.ant-modal-wrap')).toHaveClass('ant-modal-centered');
+    await user.click(
+      within(confirm).getByRole('button', {
+        name: 'resources.storage.updateCredentials'
+      })
+    );
+    await waitFor(() =>
+      expect(api.updateModelPreheatS3Profile).toHaveBeenCalledWith(
+        profile.id,
+        expect.objectContaining({
+          access_key: 'next-access',
+          secret_key: 'next-secret'
+        })
+      )
+    );
+  });
+
+  it('更新凭据提交期间保留确认框并锁定关闭，失败后可重试', async () => {
+    const user = userEvent.setup();
+    const request = new Promise<typeof profile>(() => {});
+    api.updateModelPreheatS3Profile.mockReturnValueOnce(request);
+    render(<ModelPreheatS3ProfileModal open record={profile} onCancel={vi.fn()} onSaved={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'resources.storage.updateCredentials' }));
+    const passwords = screen.getAllByLabelText(/profile\.(accessKey|secretKey)/);
+    await user.type(passwords[0], 'next-access');
+    await user.type(passwords[1], 'next-secret');
+    await user.click(screen.getByRole('button', { name: 'common.button.save' }));
+    const confirm = (await screen.findAllByRole('dialog')).at(-1)!;
+    await user.click(within(confirm).getByRole('button', { name: 'resources.storage.updateCredentials' }));
+    expect(confirm).toBeInTheDocument();
+    expect(within(confirm).getByRole('button', { name: 'common.button.cancel' })).toBeDisabled();
+    expect(within(confirm).queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
+  it('手工 Profile 将 Prefix 只读展示，编辑保存时不清空既有 Prefix', async () => {
     const user = userEvent.setup();
     const legacyProfile = { ...profile, prefix: 'legacy-prefix' };
     api.updateModelPreheatS3Profile.mockResolvedValue(legacyProfile);
     render(<ModelPreheatS3ProfileModal open record={legacyProfile} onCancel={vi.fn()} onSaved={vi.fn()} />);
-    expect(screen.queryByLabelText('resources.preheat.profile.prefix')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('resources.preheat.profile.prefix')).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'common.button.save' }));
     await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalled());
     expect(api.updateModelPreheatS3Profile.mock.calls[0][1]).not.toHaveProperty('prefix');
@@ -71,9 +118,10 @@ describe('预热组件回归', () => {
     expect(await screen.findByLabelText('resources.preheat.profile.name')).toBeDisabled();
     expect(screen.getByLabelText('resources.preheat.profile.endpoint')).toBeDisabled();
     expect(screen.getByLabelText('resources.preheat.profile.bucket')).toBeDisabled();
-    expect(screen.getByLabelText('resources.preheat.profile.accessKey')).toBeDisabled();
+    expect(screen.queryByLabelText('resources.preheat.profile.accessKey')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'resources.storage.testConnection' })).not.toBeInTheDocument();
     expect(screen.queryByText('resources.storage.connectionScope')).not.toBeInTheDocument();
+    await user.click(screen.getByText('resources.form.advanced'));
     const tlsEnabled = screen.getByRole('switch', { name: /resources\.preheat\.profile\.tlsEnabled/ });
     const tlsVerify = screen.getByRole('switch', { name: /resources\.preheat\.profile\.tlsVerify/ });
     const virtualHosted = screen.getByRole('switch', { name: /resources\.preheat\.profile\.virtualHosted/ });
@@ -117,9 +165,7 @@ describe('预热组件回归', () => {
     expect(nameCell?.querySelector('.model-preheat-profile-name-tags')).toContainElement(
       screen.getByText('resources.storage.systemProfile')
     );
-    expect(nameCell?.querySelector('.model-preheat-profile-name-tags')).toContainElement(
-      screen.getByText('resources.preheat.profile.default')
-    );
+    expect(nameCell?.querySelectorAll('.ant-tag')).toHaveLength(2);
     expect(name.closest('.model-preheat-profile-name-tags')).toBeNull();
   });
 

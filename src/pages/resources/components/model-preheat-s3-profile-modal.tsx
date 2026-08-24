@@ -1,7 +1,7 @@
 import ModalFooter from '@/components/modal-footer';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
-import { Alert, Button, Col, Descriptions, Form, Input, Modal, Row, Switch, Tooltip } from 'antd';
+import { Alert, Button, Col, Collapse, Descriptions, Form, Input, InputNumber, Modal, Row, Switch, Tooltip } from 'antd';
 import React, { useEffect, useState } from 'react';
 import {
   createModelPreheatS3Profile,
@@ -16,6 +16,7 @@ import type {
   ModelStorageConnectionTestRequest,
   ModelStorageConnectionTest
 } from '../config/types';
+import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 
 interface Props {
   open: boolean;
@@ -36,6 +37,10 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
   const [testing, setTesting] = useState(false);
   const [encryptionAvailable, setEncryptionAvailable] = useState(true);
   const [testResult, setTestResult] = useState<ModelStorageConnectionTest | null>(null);
+  const [updatingCredentials, setUpdatingCredentials] = useState(false);
+  const [credentialConfirmOpen, setCredentialConfirmOpen] = useState(false);
+  const [pendingValues, setPendingValues] =
+    useState<ModelPreheatS3ProfileWrite | null>(null);
   const editing = Boolean(record);
   const systemManaged = record?.system_managed === true;
 
@@ -48,6 +53,8 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       bucket: record?.bucket || '',
       prefix: record?.prefix || '',
       region: record?.region || '',
+      inventory_refresh_interval_seconds:
+        record?.inventory_refresh_interval_seconds ?? null,
       tls_enabled: record?.tls_enabled ?? true,
       tls_verify: record?.tls_verify ?? true,
       use_virtual_hosted_style: record?.use_virtual_hosted_style ?? true,
@@ -56,6 +63,9 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       access_key: '',
       secret_key: ''
     });
+    setUpdatingCredentials(!record);
+    setCredentialConfirmOpen(false);
+    setPendingValues(null);
   }, [form, open, record]);
 
   useEffect(() => {
@@ -108,9 +118,8 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     };
   };
 
-  const handleSubmit = async () => {
+  const save = async (values: ModelPreheatS3ProfileWrite) => {
     try {
-      const values = await validatePayload();
       setLoading(true);
       const payload = systemManaged
         ? buildSystemManagedModelPreheatS3ProfilePayload({ ...values, default_slot: record?.default_slot ?? null })
@@ -121,6 +130,20 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       onSaved(result);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const values = await validatePayload();
+      if (editing && !systemManaged && updatingCredentials) {
+        setPendingValues(values);
+        setCredentialConfirmOpen(true);
+        return;
+      }
+      await save(values);
+    } catch {
+      // 校验错误已由表单展示，避免业务 Modal Footer 产生未处理拒绝。
     }
   };
 
@@ -137,6 +160,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
   };
 
   const busy = loading || testing;
+  const credentialsRequiredForTest = editing && !updatingCredentials;
   const switchLabel = (labelId: string, hintId: string) => <span>{intl.formatMessage({ id: labelId })}<Tooltip title={intl.formatMessage({ id: hintId })}><span aria-label={intl.formatMessage({ id: hintId })} style={{ marginLeft: 6, color: 'rgba(0, 0, 0, 0.45)', cursor: 'help' }} tabIndex={0}><QuestionCircleOutlined /></span></Tooltip></span>;
 
   return (
@@ -149,7 +173,7 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
           ? 'resources.preheat.profile.edit'
           : 'resources.preheat.profile.create'
       })}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
       keyboard={false}
       closable={!busy}
@@ -161,7 +185,17 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
           loading={loading}
           okBtnProps={{ disabled: busy || !encryptionAvailable }}
           cancelBtnProps={{ disabled: busy }}
-          extra={!systemManaged && <Button onClick={handleTest} loading={testing} disabled={busy || !encryptionAvailable}>{intl.formatMessage({ id: 'resources.storage.testConnection' })}</Button>}
+          extra={!systemManaged && (
+            <Tooltip title={credentialsRequiredForTest ? intl.formatMessage({ id: 'resources.storage.testCredentialsRequiredHint' }) : undefined}>
+              <Button
+                onClick={handleTest}
+                loading={testing}
+                disabled={busy || !encryptionAvailable || credentialsRequiredForTest}
+              >
+                {intl.formatMessage({ id: 'resources.storage.testConnection' })}
+              </Button>
+            </Tooltip>
+          )}
         />
       }
     >
@@ -204,63 +238,42 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               <Input disabled={systemManaged} />
             </Form.Item>
           </Col>
-          {systemManaged && (
+          <Col xs={24} md={12}>
+            <Form.Item
+              name="prefix"
+              label={intl.formatMessage({
+                id: 'resources.preheat.profile.prefix'
+              })}
+            >
+              <Input disabled />
+            </Form.Item>
+          </Col>
+        </Row>
+        {!systemManaged && (updatingCredentials || !editing) ? (
+          <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item
-                name="prefix"
-                label={intl.formatMessage({
-                  id: 'resources.preheat.profile.prefix'
-                })}
-              >
-                <Input disabled />
+              <Form.Item name="access_key" label={intl.formatMessage({ id: 'resources.preheat.profile.accessKey' })} rules={[{ required: true }]}>
+                <Input.Password autoComplete="new-password" />
               </Form.Item>
             </Col>
-          )}
-        </Row>
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="access_key"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.accessKey'
-              })}
-              rules={[{ required: !editing }]}
-            >
-              <Input.Password
-                disabled={systemManaged}
-                autoComplete="new-password"
-                placeholder={
-                  editing
-                    ? intl.formatMessage({
-                        id: 'resources.preheat.profile.credentialUnchanged'
-                      })
-                    : undefined
-                }
-              />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="secret_key"
-              label={intl.formatMessage({
-                id: 'resources.preheat.profile.secretKey'
-              })}
-              rules={[{ required: !editing }]}
-            >
-              <Input.Password
-                disabled={systemManaged}
-                autoComplete="new-password"
-                placeholder={
-                  editing
-                    ? intl.formatMessage({
-                        id: 'resources.preheat.profile.credentialUnchanged'
-                      })
-                    : undefined
-                }
-              />
-            </Form.Item>
-          </Col>
-        </Row>
+            <Col xs={24} md={12}>
+              <Form.Item name="secret_key" label={intl.formatMessage({ id: 'resources.preheat.profile.secretKey' })} rules={[{ required: true }]}>
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+            </Col>
+          </Row>
+        ) : !systemManaged ? (
+          <Button type="link" onClick={() => setUpdatingCredentials(true)}>
+            {intl.formatMessage({ id: 'resources.storage.updateCredentials' })}
+          </Button>
+        ) : null}
+        <Collapse
+          items={[
+            {
+              key: 'advanced',
+              label: intl.formatMessage({ id: 'resources.form.advanced' }),
+              forceRender: true,
+              children: <>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -320,7 +333,21 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               <Switch />
             </Form.Item>
           </Col>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="inventory_refresh_interval_seconds"
+              label={intl.formatMessage({
+                id: 'resources.storage.inventoryRefreshInterval'
+              })}
+            >
+              <InputNumber min={60} precision={0} disabled={systemManaged} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
         </Row>
+              </>
+            }
+          ]}
+        />
       </Form>
       {testResult && <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }} title={intl.formatMessage({ id: 'resources.storage.testResult' })}>
         <Descriptions.Item label="scope">{testResult.scope}</Descriptions.Item>
@@ -330,6 +357,24 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
         <Descriptions.Item label="read">{testResult.read.ok ? 'OK' : testResult.read.error_code || '-'}</Descriptions.Item>
         <Descriptions.Item label="delete">{testResult.delete.ok ? 'OK' : testResult.delete.error_code || '-'}</Descriptions.Item>
       </Descriptions>}
+      <ModelPreheatConfirmModal
+        open={credentialConfirmOpen}
+        title={intl.formatMessage({ id: 'resources.storage.updateCredentials' })}
+        content={intl.formatMessage({ id: 'resources.storage.updateCredentialsContent' })}
+        okText={intl.formatMessage({ id: 'resources.storage.updateCredentials' })}
+        loading={loading}
+        onCancel={loading ? undefined : () => setCredentialConfirmOpen(false)}
+        onOk={async () => {
+          if (!pendingValues) return;
+          try {
+            await save(pendingValues);
+            setCredentialConfirmOpen(false);
+            setPendingValues(null);
+          } catch {
+            // 保留确认框与输入值，用户可在失败后直接重试。
+          }
+        }}
+      />
     </Modal>
   );
 };

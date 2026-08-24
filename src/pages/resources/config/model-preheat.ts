@@ -607,6 +607,8 @@ export function buildModelPreheatS3ProfilePayload(
     tls_enabled: values.tls_enabled ?? true,
     tls_verify: values.tls_verify ?? true,
     region: values.region?.trim() || '',
+    inventory_refresh_interval_seconds:
+      values.inventory_refresh_interval_seconds ?? null,
     use_virtual_hosted_style: values.use_virtual_hosted_style ?? true,
     source_fallback_enabled: values.source_fallback_enabled ?? true,
     default_slot: values.default_slot ?? null

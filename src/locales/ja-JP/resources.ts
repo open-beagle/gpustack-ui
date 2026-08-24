@@ -227,7 +227,31 @@ export default {
   'resources.storage.loadMore': 'さらに読み込む', 'resources.storage.artifact.profileRequired': '先に S3 設定を選択してください。', 'resources.storage.distributionTasks.unavailable': 'このサーバーは配布実行記録を提供していません。', 'resources.storage.repository.advanced': '詳細設定',
   'resources.storage.flow.workerToProfile': '{worker} -> {profile}', 'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
   'resources.storage.status.pending': '待機中', 'resources.storage.status.running': '実行中', 'resources.storage.status.ready': '完了', 'resources.storage.status.error': '失敗', 'resources.storage.status.canceled': 'キャンセル済み', 'resources.storage.status.valid': '有効', 'resources.storage.status.invalid': '無効', 'resources.storage.status.missing': '欠落', 'resources.storage.status.stale': '期限切れ', 'resources.storage.status.unknown': '不明な状態',
-  'resources.storage.error.artifactNotReady': 'モデルはまだ準備できていません', 'resources.storage.error.profileMaintenance': 'S3 設定はメンテナンス中です', 'resources.storage.error.objectConflict': 'S3 オブジェクトの競合', 'resources.storage.error.manifestInvalid': 'モデルマニフェストが無効です', 'resources.storage.error.workerUnavailable': 'ノードを利用できません', 'resources.storage.error.workerExecutionFailed': 'ノード実行に失敗しました', 'resources.storage.error.unknown': '不明なエラー'
+  'resources.storage.error.artifactNotReady': 'モデルはまだ準備できていません', 'resources.storage.error.profileMaintenance': 'S3 設定はメンテナンス中です', 'resources.storage.error.objectConflict': 'S3 オブジェクトの競合', 'resources.storage.error.manifestInvalid': 'モデルマニフェストが無効です', 'resources.storage.error.workerUnavailable': 'ノードを利用できません', 'resources.storage.error.workerExecutionFailed': 'ノード実行に失敗しました', 'resources.storage.error.unknown': '不明なエラー',
+  'resources.storage.updateCredentials': '認証情報を更新',
+  'resources.storage.updateCredentialsContent': '現在の S3 アクセス認証情報を置き換えます。',
+  'resources.storage.artifactDetail': 'モデル詳細',
+  'resources.preheat.profile.lifecycle': 'ライフサイクル',
+  'resources.preheat.profile.active': '使用中',
+  'resources.storage.inventoryRefreshInterval': '自動スキャン間隔（秒）',
+  'resources.storage.inventorySource': '在庫の取得元',
+  'resources.storage.inventorySource.task': 'ローカルタスク',
+  'resources.storage.inventorySource.scan': 'S3 スキャンで検出',
+  'resources.storage.lastVerifiedAt': '最終検証日時',
+  'resources.storage.lastScan': '最終スキャン',
+  'resources.storage.scanAttemptAt': '最終試行',
+  'resources.storage.scanSucceededAt': '最終成功',
+  'resources.storage.scanResult': '結果',
+  'resources.storage.scanResult.success': '{count} 件のモデルをスキャン',
+  'resources.storage.artifactId': 'モデル ID',
+  'resources.storage.manifestDigest': 'マニフェストダイジェスト',
+  'resources.storage.manifestPath': 'マニフェストパス',
+  'resources.storage.includePatterns': '含めるパターン',
+  'resources.storage.excludePatterns': '除外パターン',
+  'resources.storage.createdAt': '作成日時',
+  'resources.storage.updatedAt': '更新日時',
+  'resources.storage.profile': 'S3 プロファイル',
+  'resources.storage.testCredentialsRequiredHint': '接続をテストする前に、認証情報を更新して両方のキーを入力してください。'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

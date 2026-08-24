@@ -48,7 +48,7 @@ const ArtifactSelect: React.FC<Props> = ({ profileId, value, onChange, disabled,
     }
   };
   useEffect(() => { requestId.current += 1; setItems([]); setSearch(''); setPage(1); setTotal(0); setError(undefined); }, [profileId]);
-  return <ModelStorageAsyncState data={items} loading={loading} refreshing={loading && Boolean(items.length)} error={error} query={search} disabledReason={effectiveDisabledReason} onRetry={() => void load(search)}>
+  return <ModelStorageAsyncState data={items} loading={loading} refreshing={loading && Boolean(items.length)} error={error} hasFilters={Boolean(search)} disabledReason={effectiveDisabledReason} onRetry={() => void load(search)}>
     <Select showSearch allowClear filterOption={false} value={value} disabled={disabled || !profileId} onSearch={(nextSearch) => void load(nextSearch, 1)} onChange={(nextValue) => onChange?.(nextValue, items.find((item) => item.artifact_id === nextValue))} options={items.map((item) => ({ value: item.artifact_id, disabled: item.manifest_state !== 'valid', label: `${getModelStorageSourceLabel(item.source)} · ${item.model_id} · ${getModelStorageRevisionPresentation(item.resolved_revision).short}` }))} />
     {items.length < total && <Button type="link" loading={loading} onMouseDown={(event) => event.preventDefault()} onClick={() => void load(search, page + 1, true)}>{intl.formatMessage({ id: 'resources.storage.loadMore' })}</Button>}
   </ModelStorageAsyncState>;

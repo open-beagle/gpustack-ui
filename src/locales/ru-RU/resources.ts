@@ -225,7 +225,31 @@ export default {
   'resources.storage.loadMore': 'Загрузить ещё', 'resources.storage.artifact.profileRequired': 'Сначала выберите конфигурацию S3.', 'resources.storage.distributionTasks.unavailable': 'Сервер не предоставляет записи выполнения распространения.', 'resources.storage.repository.advanced': 'Расширенные настройки',
   'resources.storage.flow.workerToProfile': '{worker} -> {profile}', 'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
   'resources.storage.status.pending': 'Ожидание', 'resources.storage.status.running': 'Выполняется', 'resources.storage.status.ready': 'Готово', 'resources.storage.status.error': 'Ошибка', 'resources.storage.status.canceled': 'Отменено', 'resources.storage.status.valid': 'Действительно', 'resources.storage.status.invalid': 'Недействительно', 'resources.storage.status.missing': 'Отсутствует', 'resources.storage.status.stale': 'Устарело', 'resources.storage.status.unknown': 'Неизвестное состояние',
-  'resources.storage.error.artifactNotReady': 'Модель ещё не готова', 'resources.storage.error.profileMaintenance': 'Конфигурация S3 на обслуживании', 'resources.storage.error.objectConflict': 'Конфликт объекта S3', 'resources.storage.error.manifestInvalid': 'Недействительный манифест модели', 'resources.storage.error.workerUnavailable': 'Узел недоступен', 'resources.storage.error.workerExecutionFailed': 'Сбой выполнения на узле', 'resources.storage.error.unknown': 'Неизвестная ошибка'
+  'resources.storage.error.artifactNotReady': 'Модель ещё не готова', 'resources.storage.error.profileMaintenance': 'Конфигурация S3 на обслуживании', 'resources.storage.error.objectConflict': 'Конфликт объекта S3', 'resources.storage.error.manifestInvalid': 'Недействительный манифест модели', 'resources.storage.error.workerUnavailable': 'Узел недоступен', 'resources.storage.error.workerExecutionFailed': 'Сбой выполнения на узле', 'resources.storage.error.unknown': 'Неизвестная ошибка',
+  'resources.storage.updateCredentials': 'Обновить учетные данные',
+  'resources.storage.updateCredentialsContent': 'Текущие учетные данные доступа к S3 будут заменены.',
+  'resources.storage.artifactDetail': 'Сведения об артефакте',
+  'resources.preheat.profile.lifecycle': 'Жизненный цикл',
+  'resources.preheat.profile.active': 'Активен',
+  'resources.storage.inventoryRefreshInterval': 'Интервал автоматического сканирования (секунды)',
+  'resources.storage.inventorySource': 'Источник инвентаря',
+  'resources.storage.inventorySource.task': 'Локальная задача',
+  'resources.storage.inventorySource.scan': 'Обнаружено сканированием S3',
+  'resources.storage.lastVerifiedAt': 'Последняя проверка',
+  'resources.storage.lastScan': 'Последнее сканирование',
+  'resources.storage.scanAttemptAt': 'Последняя попытка',
+  'resources.storage.scanSucceededAt': 'Последний успех',
+  'resources.storage.scanResult': 'Результат',
+  'resources.storage.scanResult.success': 'Просканировано моделей: {count}',
+  'resources.storage.artifactId': 'ID модели',
+  'resources.storage.manifestDigest': 'Хеш манифеста',
+  'resources.storage.manifestPath': 'Путь манифеста',
+  'resources.storage.includePatterns': 'Включаемые шаблоны',
+  'resources.storage.excludePatterns': 'Исключаемые шаблоны',
+  'resources.storage.createdAt': 'Создано',
+  'resources.storage.updatedAt': 'Обновлено',
+  'resources.storage.profile': 'Профиль S3',
+  'resources.storage.testCredentialsRequiredHint': 'Перед проверкой подключения обновите учетные данные и заполните оба ключа.'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

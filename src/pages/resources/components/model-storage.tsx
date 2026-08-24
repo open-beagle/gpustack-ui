@@ -1,17 +1,22 @@
 import { convertFileSize } from '@/utils';
-import { ReloadOutlined } from '@ant-design/icons';
+import { EyeOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
   Alert,
   Button,
+  Descriptions,
+  Input,
   message,
+  Modal,
   Select,
   Space,
   Spin,
   Table,
   Tabs,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd';
+import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createModelPreheatConnectivityCheck,
@@ -22,6 +27,7 @@ import {
 } from '../apis';
 import {
   getModelStorageRevisionPresentation,
+  getModelStorageErrorPresentation,
   getModelStorageSourceLabel,
   IdempotencyKeyLifecycle
 } from '../config/model-preheat';
@@ -30,25 +36,39 @@ import type {
   ModelPreheatS3Profile,
   ModelStorageArtifact
 } from '../config/types';
-import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatConnectivity from './model-preheat-connectivity';
 import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
+import ModelDistributionPolicyModal from './model-distribution-policy-modal';
+import ModelStorageAsyncState from './model-storage-async-state';
 
 const ModelStorage: React.FC = () => {
   const intl = useIntl();
   const connectivityKey = useRef(new IdempotencyKeyLifecycle());
+  const artifactRequest = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
+  const refreshRequest = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
   const [allProfiles, setAllProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const [artifactProfileId, setArtifactProfileId] = useState<number>();
   const [connectivityProfileId, setConnectivityProfileId] = useState<number>();
   const [artifacts, setArtifacts] = useState<ModelStorageArtifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [confirmRefresh, setConfirmRefresh] = useState(false);
-  const [confirmCheck, setConfirmCheck] = useState(false);
+  const [artifactError, setArtifactError] = useState<unknown>();
+  const [artifactPage, setArtifactPage] = useState(1);
+  const [artifactSearchInput, setArtifactSearchInput] = useState('');
+  const [artifactSearch, setArtifactSearch] = useState('');
+  const [artifactSource, setArtifactSource] = useState<string>();
+  const [artifactState, setArtifactState] = useState<string>();
+  const [artifactTotal, setArtifactTotal] = useState(0);
+  const [artifactDetail, setArtifactDetail] =
+    useState<ModelStorageArtifact | null>(null);
+  const [distributionArtifact, setDistributionArtifact] =
+    useState<ModelStorageArtifact | null>(null);
   const [checking, setChecking] = useState(false);
   const [connectivityOpen, setConnectivityOpen] = useState(false);
   const [connectivity, setConnectivity] =
     useState<ModelPreheatConnectivityCheck | null>(null);
+  const artifactProfileIdRef = useRef<number>();
+  artifactProfileIdRef.current = artifactProfileId;
   const activeProfiles = allProfiles.filter(
     (profile) => profile.lifecycle_state === 'active'
   );
@@ -57,6 +77,23 @@ const ModelStorage: React.FC = () => {
   );
   const selectedConnectivity = allProfiles.find(
     (profile) => profile.id === connectivityProfileId
+  );
+  const scanError = getModelStorageErrorPresentation(
+    selectedArtifact?.inventory_last_error_code
+  );
+  const scanSummary = selectedArtifact && (
+    <span>
+      {intl.formatMessage({ id: 'resources.storage.lastScan' })}: {' '}
+      {selectedArtifact.inventory_last_attempt_at
+        ? dayjs(selectedArtifact.inventory_last_attempt_at).format('YYYY-MM-DD HH:mm:ss')
+        : '-'}
+      {selectedArtifact.inventory_last_success_at && (
+        <> · {intl.formatMessage({ id: 'resources.storage.scanResult' })}: {intl.formatMessage({ id: 'resources.storage.scanResult.success' }, { count: selectedArtifact.inventory_last_scan_count || 0 })}</>
+      )}
+      {selectedArtifact.inventory_last_error_code && (
+        <> · {intl.formatMessage({ id: 'resources.storage.scanResult' })}: {intl.formatMessage({ id: scanError.messageId })}</>
+      )}
+    </span>
   );
 
   const loadProfiles = useCallback(async () => {
@@ -80,16 +117,39 @@ const ModelStorage: React.FC = () => {
   }, []);
 
   const loadArtifacts = useCallback(async () => {
-    if (!artifactProfileId) return setArtifacts([]);
+    const generation = ++artifactRequest.current.generation;
+    artifactRequest.current.controller?.abort();
+    const controller = new AbortController();
+    artifactRequest.current.controller = controller;
+    if (!artifactProfileId) {
+      setArtifacts([]);
+      setArtifactTotal(0);
+      return;
+    }
     setLoading(true);
+    setArtifactError(undefined);
     try {
-      const result = await queryModelStorageArtifacts(artifactProfileId);
+      const result = await queryModelStorageArtifacts(artifactProfileId, {
+        page: artifactPage,
+        perPage: 20,
+        ...(artifactSearch ? { search: artifactSearch } : {}),
+        ...(artifactSource ? { source: artifactSource } : {}),
+        ...(artifactState ? { manifest_state: artifactState } : {})
+      }, { signal: controller.signal });
+      if (generation !== artifactRequest.current.generation) return;
       // 兼容历史测试桩；真实服务始终返回 PaginatedList。
       setArtifacts(Array.isArray(result) ? result : result.items);
+      setArtifactTotal(Array.isArray(result) ? result.length : result.pagination.total);
+    } catch (error) {
+      if (generation === artifactRequest.current.generation && !controller.signal.aborted) {
+        setArtifactError(error);
+      }
     } finally {
-      setLoading(false);
+      if (generation === artifactRequest.current.generation) setLoading(false);
     }
-  }, [artifactProfileId]);
+  }, [artifactPage, artifactProfileId, artifactSearch, artifactSource, artifactState]);
+  const loadArtifactsRef = useRef(loadArtifacts);
+  loadArtifactsRef.current = loadArtifacts;
 
   useEffect(() => {
     void loadProfiles().catch(() => undefined);
@@ -97,19 +157,63 @@ const ModelStorage: React.FC = () => {
   useEffect(() => {
     void loadArtifacts().catch(() => undefined);
   }, [loadArtifacts]);
+  useEffect(() => () => {
+    artifactRequest.current.generation += 1;
+    artifactRequest.current.controller?.abort();
+    refreshRequest.current.generation += 1;
+    refreshRequest.current.controller?.abort();
+  }, []);
+
+  useEffect(() => {
+    refreshRequest.current.generation += 1;
+    refreshRequest.current.controller?.abort();
+    setRefreshing(false);
+    if (artifactProfileId) return;
+    artifactRequest.current.generation += 1;
+    artifactRequest.current.controller?.abort();
+    setLoading(false);
+    setArtifactError(undefined);
+    setArtifacts([]);
+    setArtifactTotal(0);
+    setArtifactPage(1);
+  }, [artifactProfileId]);
 
   const refresh = async () => {
-    if (!artifactProfileId) return;
+    const profileId = artifactProfileId;
+    if (!profileId) return;
+    const generation = ++refreshRequest.current.generation;
+    refreshRequest.current.controller?.abort();
+    const controller = new AbortController();
+    refreshRequest.current.controller = controller;
     setRefreshing(true);
+    setArtifactError(undefined);
     try {
-      await refreshModelStorageArtifacts(artifactProfileId);
-      setConfirmRefresh(false);
-      await loadArtifacts();
+      await refreshModelStorageArtifacts(profileId, { signal: controller.signal });
+      if (
+        controller.signal.aborted ||
+        generation !== refreshRequest.current.generation ||
+        artifactProfileIdRef.current !== profileId
+      ) return;
+      await loadArtifactsRef.current();
+      if (
+        controller.signal.aborted ||
+        generation !== refreshRequest.current.generation ||
+        artifactProfileIdRef.current !== profileId
+      ) return;
       message.success(
         intl.formatMessage({ id: 'resources.storage.refreshCompleted' })
       );
+    } catch (error) {
+      if (
+        !controller.signal.aborted &&
+        generation === refreshRequest.current.generation &&
+        artifactProfileIdRef.current === profileId
+      ) setArtifactError(error);
     } finally {
-      setRefreshing(false);
+      if (
+        generation === refreshRequest.current.generation &&
+        artifactProfileIdRef.current === profileId
+      ) setRefreshing(false);
     }
   };
 
@@ -122,7 +226,6 @@ const ModelStorage: React.FC = () => {
         connectivityKey.current.current()
       );
       connectivityKey.current.complete();
-      setConfirmCheck(false);
       setConnectivity(check);
       setConnectivityOpen(true);
       await loadProfiles();
@@ -185,7 +288,12 @@ const ModelStorage: React.FC = () => {
                 <Space style={{ marginBottom: 16 }} wrap>
                   <Select
                     value={artifactProfileId}
-                    onChange={setArtifactProfileId}
+                    onChange={(value) => {
+                      refreshRequest.current.generation += 1;
+                      refreshRequest.current.controller?.abort();
+                      setArtifactProfileId(value);
+                      setArtifactPage(1);
+                    }}
                     style={{ minWidth: 220 }}
                     options={activeProfiles.map((profile) => ({
                       value: profile.id,
@@ -194,19 +302,102 @@ const ModelStorage: React.FC = () => {
                   />
                   <Button
                     icon={<ReloadOutlined />}
-                    onClick={() => setConfirmRefresh(true)}
+                    onClick={() => void refresh()}
                     disabled={!selectedArtifact || refreshing}
                   >
                     {intl.formatMessage({ id: 'resources.storage.refresh' })}
                   </Button>
                   {refreshing && <Spin size="small" />}
+                  <Input.Search
+                    allowClear
+                    value={artifactSearchInput}
+                    placeholder={intl.formatMessage({
+                      id: 'resources.storage.model'
+                    })}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setArtifactSearchInput(value);
+                      setArtifactSearch(value);
+                      setArtifactPage(1);
+                    }}
+                    onSearch={(value) => {
+                      setArtifactSearchInput(value);
+                      setArtifactSearch(value);
+                      setArtifactPage(1);
+                    }}
+                    style={{ width: 220 }}
+                  />
+                  <Select
+                    allowClear
+                    value={artifactSource}
+                    placeholder={intl.formatMessage({
+                      id: 'resources.storage.modelSource'
+                    })}
+                    onChange={(value) => {
+                      setArtifactSource(value);
+                      setArtifactPage(1);
+                    }}
+                    style={{ width: 150 }}
+                    options={['modelscope', 'huggingface', 'ollama_library'].map(
+                      (value) => ({
+                        value,
+                        label: getModelStorageSourceLabel(value as ModelStorageArtifact['source'])
+                      })
+                    )}
+                  />
+                  <Select
+                    allowClear
+                    value={artifactState}
+                    placeholder={intl.formatMessage({
+                      id: 'resources.preheat.connectivity.status'
+                    })}
+                    onChange={(value) => {
+                      setArtifactState(value);
+                      setArtifactPage(1);
+                    }}
+                    style={{ width: 130 }}
+                    options={['valid', 'invalid', 'missing', 'stale'].map(
+                      (value) => ({
+                        value,
+                        label: intl.formatMessage({
+                          id: `resources.storage.status.${value}`
+                        })
+                      })
+                    )}
+                  />
                 </Space>
-                <Table
-                  rowKey="artifact_id"
+                {scanSummary && <div style={{ marginBottom: 16 }}>{scanSummary}</div>}
+                <ModelStorageAsyncState
+                  data={artifacts}
                   loading={loading}
-                  dataSource={artifacts}
-                  scroll={{ x: 860 }}
-                  columns={[
+                  refreshing={refreshing}
+                  error={artifactError}
+                  hasFilters={Boolean(artifactProfileId && (artifactSearch || artifactSource || artifactState))}
+                  onRetry={() => void loadArtifacts()}
+                >
+                  <Table
+                    rowKey="artifact_id"
+                    loading={loading}
+                    dataSource={artifacts}
+                    scroll={{ x: 1040 }}
+                    pagination={{
+                      current: artifactPage,
+                      pageSize: 20,
+                      total: artifactTotal,
+                      showSizeChanger: false,
+                      onChange: setArtifactPage
+                    }}
+                    columns={[
+                    {
+                      title: intl.formatMessage({
+                        id: 'resources.preheat.connectivity.status'
+                      }),
+                      dataIndex: 'manifest_state',
+                      render: (value: string) =>
+                        intl.formatMessage({
+                          id: `resources.storage.status.${value}`
+                        })
+                    },
                     {
                       title: intl.formatMessage({
                         id: 'resources.storage.model'
@@ -230,11 +421,19 @@ const ModelStorage: React.FC = () => {
                         const revision =
                           getModelStorageRevisionPresentation(value);
                         return (
-                          <Tooltip title={revision.full}>
-                            {revision.short}
-                          </Tooltip>
+                          <Typography.Text style={{ wordBreak: 'break-all' }} copyable={{ text: revision.full }} ellipsis={{ tooltip: revision.full }}>{revision.short}</Typography.Text>
                         );
                       }
+                    },
+                    {
+                      title: intl.formatMessage({ id: 'resources.storage.inventorySource' }),
+                      key: 'inventory_source',
+                      render: (_: unknown, record: ModelStorageArtifact) => intl.formatMessage({ id: record.created_by_task_id ? 'resources.storage.inventorySource.task' : 'resources.storage.inventorySource.scan' })
+                    },
+                    {
+                      title: intl.formatMessage({ id: 'resources.storage.lastVerifiedAt' }),
+                      dataIndex: 'last_verified_at',
+                      render: (value: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
                     },
                     {
                       title: intl.formatMessage({
@@ -248,9 +447,25 @@ const ModelStorage: React.FC = () => {
                       }),
                       dataIndex: 'total_size',
                       render: (value: number) => convertFileSize(value, 1, true)
+                    },
+                    {
+                      title: intl.formatMessage({ id: 'common.table.operation' }),
+                      key: 'operation',
+                      fixed: 'right',
+                      render: (_: unknown, record: ModelStorageArtifact) => (
+                        <Space size={4}>
+                          <Tooltip title={intl.formatMessage({ id: 'resources.storage.artifactDetail' })}>
+                            <Button aria-label={intl.formatMessage({ id: 'resources.storage.artifactDetail' })} type="text" icon={<EyeOutlined />} onClick={() => setArtifactDetail(record)} />
+                          </Tooltip>
+                          <Tooltip title={record.manifest_state === 'valid' ? intl.formatMessage({ id: 'resources.storage.distributionPolicy.create' }) : intl.formatMessage({ id: 'resources.storage.error.artifactNotReady' })}>
+                            <Button aria-label={intl.formatMessage({ id: 'resources.storage.distributionPolicy.create' })} type="text" icon={<SendOutlined />} disabled={record.manifest_state !== 'valid'} onClick={() => setDistributionArtifact(record)} />
+                          </Tooltip>
+                        </Space>
+                      )
                     }
-                  ]}
-                />
+                    ]}
+                  />
+                </ModelStorageAsyncState>
               </>
             )
           },
@@ -269,9 +484,10 @@ const ModelStorage: React.FC = () => {
                   }))}
                 />
                 <Button
+                  loading={checking}
                   onClick={() => {
                     connectivityKey.current.start();
-                    setConfirmCheck(true);
+                    void runCheck();
                   }}
                   disabled={!selectedConnectivity}
                 >
@@ -288,31 +504,38 @@ const ModelStorage: React.FC = () => {
           }
         ]}
       />
-      <ModelPreheatConfirmModal
-        open={confirmRefresh}
-        title={intl.formatMessage({ id: 'resources.storage.refreshConfirm' })}
-        content={intl.formatMessage({ id: 'resources.storage.refreshContent' })}
-        okText={intl.formatMessage({ id: 'resources.storage.refresh' })}
-        loading={refreshing}
-        onOk={refresh}
-        onCancel={() => setConfirmRefresh(false)}
-      />
-      <ModelPreheatConfirmModal
-        open={confirmCheck}
-        title={intl.formatMessage({
-          id: 'resources.storage.checkWorkersConfirm'
-        })}
-        content={intl.formatMessage(
-          { id: 'resources.storage.checkWorkersContent' },
-          { name: selectedConnectivity?.name || '' }
-        )}
-        okText={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
-        loading={checking}
-        onOk={runCheck}
-        onCancel={() => {
-          connectivityKey.current.abandon();
-          setConfirmCheck(false);
-        }}
+      <Modal
+        open={Boolean(artifactDetail)}
+        centered
+        width={720}
+        title={intl.formatMessage({ id: 'resources.storage.artifactDetail' })}
+        footer={null}
+        onCancel={() => setArtifactDetail(null)}
+      >
+        <Descriptions bordered size="small" column={1}>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.profile' })}>{selectedArtifact?.name || '-'}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.model' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.model_id}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.modelSource' })}>{artifactDetail && getModelStorageSourceLabel(artifactDetail.source)}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.version' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.resolved_revision}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.artifactId' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.artifact_id}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.manifestDigest' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.manifest_digest}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.manifestPath' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.manifest_path}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.includePatterns' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.include_patterns?.join(', ') || '-'}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.excludePatterns' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.exclude_patterns?.join(', ') || '-'}</Typography.Text></Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.inventorySource' })}>{intl.formatMessage({ id: artifactDetail?.created_by_task_id ? 'resources.storage.inventorySource.task' : 'resources.storage.inventorySource.scan' })}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.lastVerifiedAt' })}>{artifactDetail?.last_verified_at ? dayjs(artifactDetail.last_verified_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.fileCount' })}>{artifactDetail?.file_count}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.capacity' })}>{artifactDetail && convertFileSize(artifactDetail.total_size, 1, true)}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.createdAt' })}>{artifactDetail?.created_at ? dayjs(artifactDetail.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.updatedAt' })}>{artifactDetail?.updated_at ? dayjs(artifactDetail.updated_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+        </Descriptions>
+      </Modal>
+      <ModelDistributionPolicyModal
+        open={Boolean(distributionArtifact)}
+        initialProfileId={artifactProfileId}
+        initialArtifactId={distributionArtifact?.artifact_id}
+        onCancel={() => setDistributionArtifact(null)}
+        onSaved={() => setDistributionArtifact(null)}
       />
     </>
   );

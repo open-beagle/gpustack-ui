@@ -8,7 +8,7 @@ interface Props<T> {
   error?: unknown;
   loading: boolean;
   refreshing: boolean;
-  query?: string;
+  hasFilters?: boolean;
   disabledReason?: string;
   onRetry?: () => void;
 }
@@ -20,7 +20,7 @@ const ModelStorageAsyncState = <T,>({
   error,
   loading,
   refreshing,
-  query,
+  hasFilters,
   disabledReason,
   onRetry
 }: Props<T>) => {
@@ -57,7 +57,7 @@ const ModelStorageAsyncState = <T,>({
       {isEmpty && (
         <Empty
           description={message(
-            query
+            hasFilters
               ? 'resources.storage.state.noMatch'
               : 'resources.storage.state.empty'
           )}

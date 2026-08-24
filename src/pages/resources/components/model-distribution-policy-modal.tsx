@@ -22,6 +22,8 @@ import ArtifactSelect from './artifact-select';
 interface Props {
   open: boolean;
   initialSyncTaskId?: number;
+  initialProfileId?: number;
+  initialArtifactId?: string;
   onCancel: () => void;
   onSaved: () => void;
 }
@@ -29,6 +31,8 @@ interface Props {
 const ModelDistributionPolicyModal: React.FC<Props> = ({
   open,
   initialSyncTaskId,
+  initialProfileId,
+  initialArtifactId,
   onCancel,
   onSaved
 }) => {
@@ -72,18 +76,22 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
           source_type: initialSyncTaskId ? 'sync_task' : 'artifact',
           sync_task_id: initialSyncTaskId,
           profile_id:
+            initialProfileId ||
             activeProfiles.find((item) => item.is_default)?.id ||
             activeProfiles[0]?.id,
+          artifact_id: initialArtifactId,
           target_scope: 'selected_workers',
           worker_uuids: []
         });
       })
       .finally(() => setLoading(false));
-  }, [form, initialSyncTaskId, open]);
+  }, [form, initialArtifactId, initialProfileId, initialSyncTaskId, open]);
 
   useEffect(() => {
+    if (!open) return;
+    if (sourceType === 'artifact' && initialArtifactId && profileId === initialProfileId) return;
     form.setFieldValue('artifact_id', undefined);
-  }, [form, profileId, sourceType]);
+  }, [form, initialArtifactId, initialProfileId, open, profileId, sourceType]);
 
   const gpuNames = useMemo(
     () =>
