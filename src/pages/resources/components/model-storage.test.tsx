@@ -173,6 +173,41 @@ describe('统一模型存储交互', () => {
     );
   });
 
+  it('库存扫描失败时保留旧数据并展示可重试错误', async () => {
+    const user = userEvent.setup();
+    api.queryModelStorageArtifacts.mockResolvedValue([
+      {
+        artifact_id: 'existing-artifact',
+        source: 'modelscope',
+        model_id: 'team/existing-model',
+        resolved_revision: 'revision-1',
+        manifest_digest: 'digest',
+        manifest_state: 'valid',
+        file_count: 1,
+        total_size: 1024,
+        last_verified_at: ''
+      }
+    ]);
+    api.refreshModelStorageArtifacts.mockRejectedValue(
+      new Error('inventory_scan_failed')
+    );
+
+    render(<ModelStorage />);
+    await user.click(
+      await screen.findByRole('tab', { name: 'resources.storage.artifacts' })
+    );
+    expect(await screen.findByText('team/existing-model')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /resources\.storage\.refresh/ })
+    );
+
+    expect(await screen.findByText('resources.storage.state.error')).toBeInTheDocument();
+    expect(screen.getByText('team/existing-model')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'resources.storage.retry' })
+    ).toBeInTheDocument();
+  });
+
   it('切换 Profile 后忽略旧扫描的成功回拉', async () => {
     const user = userEvent.setup();
     const backup = { ...profile, id: 4, name: '备份模型库', is_default: false };
