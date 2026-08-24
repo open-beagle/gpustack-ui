@@ -75,11 +75,10 @@ import {
   ModelPreheatS3Profile,
   ListItem as WorkerListItem
 } from '../config/types';
-import ModelPreheatTasks from './model-preheat-tasks';
 import ModelStorage from './model-storage';
 import ModelStorageSyncModal from './model-storage-sync-modal';
-import ModelStorageSyncTasks from './model-storage-sync-tasks';
 import ModelTaskPolicies from './model-task-policies';
+import ModelTaskRecords from './model-task-records';
 
 const { Paragraph } = Typography;
 
@@ -862,13 +861,7 @@ const ModelFiles = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const requestedTab = new URLSearchParams(location.search).get('tab');
-  const tabKeys = [
-    'local',
-    'storage',
-    'sync-tasks',
-    'preheat-tasks',
-    'policies'
-  ];
+  const tabKeys = ['local', 'storage', 'tasks', 'policies'];
   const activeTab = tabKeys.includes(requestedTab || '')
     ? requestedTab || 'local'
     : 'local';
@@ -921,14 +914,9 @@ const ModelFiles = () => {
             children: <ModelStorage />
           },
           {
-            key: 'sync-tasks',
-            label: intl.formatMessage({ id: 'resources.storage.syncTasks' }),
-            children: <ModelStorageSyncTasks />
-          },
-          {
-            key: 'preheat-tasks',
-            label: intl.formatMessage({ id: 'resources.storage.preheatTasks' }),
-            children: <ModelPreheatTasks />
+            key: 'tasks',
+            label: intl.formatMessage({ id: 'resources.storage.taskRecords' }),
+            children: <ModelTaskRecords />
           },
           {
             key: 'policies',

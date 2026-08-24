@@ -487,5 +487,22 @@ export default {
   'resources.storage.syncTask.state.ready': 'Completed',
   'resources.storage.syncTask.state.error': 'Failed',
   'resources.storage.syncTask.state.canceled': 'Canceled',
-  'resources.storage.createStrategy': 'Create Strategy from This Sync Record'
+  'resources.storage.createStrategy': 'Create Strategy from This Sync Record',
+  'resources.storage.taskRecords': 'Task Records',
+  'resources.storage.distributionTasks': 'Distribution Records',
+  'resources.storage.retry': 'Retry',
+  'resources.storage.repository.exactInput': 'Enter exact model name',
+  'resources.storage.state.loading': 'Loading',
+  'resources.storage.state.refreshing': 'Refreshing, keeping current data',
+  'resources.storage.state.error': 'Unable to load. Retry.',
+  'resources.storage.state.empty': 'No data',
+  'resources.storage.state.noMatch': 'No matching results',
+  'resources.storage.loadMore': 'Load more',
+  'resources.storage.artifact.profileRequired': 'Select an S3 profile first.',
+  'resources.storage.distributionTasks.unavailable': 'This server does not expose distribution execution records.',
+  'resources.storage.repository.advanced': 'Advanced settings',
+  'resources.storage.flow.workerToProfile': '{worker} -> {profile}',
+  'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
+  'resources.storage.status.pending': 'Pending', 'resources.storage.status.running': 'Running', 'resources.storage.status.ready': 'Ready', 'resources.storage.status.error': 'Error', 'resources.storage.status.canceled': 'Canceled', 'resources.storage.status.valid': 'Valid', 'resources.storage.status.invalid': 'Invalid', 'resources.storage.status.missing': 'Missing', 'resources.storage.status.stale': 'Stale', 'resources.storage.status.unknown': 'Unknown status',
+  'resources.storage.error.artifactNotReady': 'Artifact is not ready', 'resources.storage.error.profileMaintenance': 'S3 profile is in maintenance', 'resources.storage.error.objectConflict': 'S3 object conflict', 'resources.storage.error.manifestInvalid': 'Invalid manifest', 'resources.storage.error.workerUnavailable': 'Worker unavailable', 'resources.storage.error.workerExecutionFailed': 'Worker execution failed', 'resources.storage.error.unknown': 'Unknown error'
 };

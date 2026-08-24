@@ -29,7 +29,7 @@ describe('任务策略页签和同步策略差量更新', () => {
   it('同步记录深链进入预热/分发页签', () => {
     expect(
       taskPolicyTabFromSearch('?tab=policies&strategy=create&sync_task=12')
-    ).toBe('preheat-distribution');
+    ).toBe('distribution');
     expect(taskPolicyTabFromSearch('?tab=policies')).toBe('sync');
   });
 

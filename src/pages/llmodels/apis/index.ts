@@ -256,7 +256,8 @@ export async function queryHuggingfaceModels(
   for await (const model of listModels({
     ...params,
     ...options,
-    limit: 500,
+    // 旧部署搜索保持 500 条上限；轻量仓库选择器显式传入分页窗口。
+    limit: options?.limit || 500,
     additionalFields: ['sha', 'tags'],
     fetch(_url: string, config: any) {
       const url = params.search.sort

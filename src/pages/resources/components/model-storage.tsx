@@ -83,7 +83,9 @@ const ModelStorage: React.FC = () => {
     if (!artifactProfileId) return setArtifacts([]);
     setLoading(true);
     try {
-      setArtifacts(await queryModelStorageArtifacts(artifactProfileId));
+      const result = await queryModelStorageArtifacts(artifactProfileId);
+      // 兼容历史测试桩；真实服务始终返回 PaginatedList。
+      setArtifacts(Array.isArray(result) ? result : result.items);
     } finally {
       setLoading(false);
     }

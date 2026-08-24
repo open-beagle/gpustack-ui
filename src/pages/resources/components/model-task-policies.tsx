@@ -16,9 +16,7 @@ const ModelTaskPolicies: React.FC = () => {
   );
 
   useEffect(() => {
-    if (taskPolicyTabFromSearch(location.search) === 'preheat-distribution') {
-      setActiveTab('preheat-distribution');
-    }
+    setActiveTab(taskPolicyTabFromSearch(location.search));
   }, [location.search]);
 
   return (
@@ -34,11 +32,18 @@ const ModelTaskPolicies: React.FC = () => {
           children: <ModelStorageSyncPolicies />
         },
         {
-          key: 'preheat-distribution',
+          key: 'preheat',
           label: intl.formatMessage({
-            id: 'resources.storage.preheatDistributionPolicy.tab'
+            id: 'resources.storage.preheatPolicy.tab'
           }),
-          children: <ModelPreheatPolicies />
+          children: <ModelPreheatPolicies mode="preheat" />
+        },
+        {
+          key: 'distribution',
+          label: intl.formatMessage({
+            id: 'resources.storage.distributionPolicy.tab'
+          }),
+          children: <ModelPreheatPolicies mode="distribution" />
         }
       ]}
     />

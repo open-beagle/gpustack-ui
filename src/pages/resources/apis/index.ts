@@ -265,10 +265,13 @@ export async function runModelStorageSyncPolicyNow(
   );
 }
 
-export async function queryModelStorageArtifacts(profileId: number) {
-  return request<ModelStorageArtifact[]>(
+export async function queryModelStorageArtifacts(
+  profileId: number,
+  params: Global.SearchParams = { page: 1, perPage: 100 }
+) {
+  return request<Global.PageResponse<ModelStorageArtifact>>(
     `/model-storage-profiles/${profileId}/artifacts`,
-    { method: 'GET' }
+    { method: 'GET', params }
   );
 }
 

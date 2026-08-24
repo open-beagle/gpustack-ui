@@ -3,12 +3,12 @@ import type {
   ModelStorageSyncPolicyCreate
 } from './types';
 
-export type TaskPolicyTab = 'sync' | 'preheat-distribution';
+export type TaskPolicyTab = 'sync' | 'preheat' | 'distribution';
 
 export const taskPolicyTabFromSearch = (search: string): TaskPolicyTab => {
   const query = new URLSearchParams(search);
   return query.get('strategy') === 'create' && query.has('sync_task')
-    ? 'preheat-distribution'
+    ? 'distribution'
     : 'sync';
 };
 

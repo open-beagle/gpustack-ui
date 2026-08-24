@@ -5,7 +5,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   createModelPreheatPolicy,
   queryModelPreheatS3Profiles,
-  queryModelStorageArtifacts,
   queryModelStorageSyncTasks,
   queryWorkersList
 } from '../apis';
@@ -16,9 +15,9 @@ import {
 import type {
   ListItem,
   ModelPreheatS3Profile,
-  ModelStorageArtifact,
   ModelStorageSyncTask
 } from '../config/types';
+import ArtifactSelect from './artifact-select';
 
 interface Props {
   open: boolean;
@@ -38,7 +37,6 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
   const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const [workers, setWorkers] = useState<ListItem[]>([]);
   const [tasks, setTasks] = useState<ModelStorageSyncTask[]>([]);
-  const [artifacts, setArtifacts] = useState<ModelStorageArtifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const sourceType = Form.useWatch('source_type', form);
@@ -84,13 +82,8 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
   }, [form, initialSyncTaskId, open]);
 
   useEffect(() => {
-    setArtifacts([]);
     form.setFieldValue('artifact_id', undefined);
-    if (!open || sourceType !== 'artifact' || !profileId) return;
-    void queryModelStorageArtifacts(profileId).then((items) =>
-      setArtifacts(items.filter((item) => item.manifest_state === 'valid'))
-    );
-  }, [form, open, profileId, sourceType]);
+  }, [form, profileId, sourceType]);
 
   const gpuNames = useMemo(
     () =>
@@ -210,14 +203,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
               })}
               rules={[{ required: true }]}
             >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                options={artifacts.map((item) => ({
-                  value: item.artifact_id,
-                  label: `${getModelStorageSourceLabel(item.source)} · ${item.model_id} (${item.resolved_revision.slice(0, 12)})`
-                }))}
-              />
+              <ArtifactSelect profileId={profileId} />
             </Form.Item>
           </>
         ) : (

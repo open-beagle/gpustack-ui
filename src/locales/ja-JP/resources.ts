@@ -214,7 +214,20 @@ export default {
   'resources.preheat.schedule.disableConfirm': 'スケジュールポリシーを無効化',
   'resources.preheat.schedule.runConfirm': 'スケジュールポリシーを今すぐ実行',
   'resources.preheat.schedule.deleteConfirm': 'スケジュールポリシーを削除',
-  'resources.preheat.schedule.actionContent': 'スケジュールポリシー「{name}」にこの操作を実行しますか？'
+  'resources.preheat.schedule.actionContent': 'スケジュールポリシー「{name}」にこの操作を実行しますか？',
+  'resources.storage.taskRecords': 'タスク記録',
+  'resources.storage.distributionTasks': '配布記録',
+  'resources.storage.retry': '再試行',
+  'resources.storage.repository.exactInput': '正確なモデル名を入力',
+  'resources.storage.state.loading': '読み込み中',
+  'resources.storage.state.refreshing': '現在のデータを保持して更新中',
+  'resources.storage.state.error': '読み込みに失敗しました。再試行してください。',
+  'resources.storage.state.empty': 'データがありません',
+  'resources.storage.state.noMatch': '一致する結果がありません',
+  'resources.storage.loadMore': 'さらに読み込む', 'resources.storage.artifact.profileRequired': '先に S3 設定を選択してください。', 'resources.storage.distributionTasks.unavailable': 'このサーバーは配布実行記録を提供していません。', 'resources.storage.repository.advanced': '詳細設定',
+  'resources.storage.flow.workerToProfile': '{worker} -> {profile}', 'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
+  'resources.storage.status.pending': '待機中', 'resources.storage.status.running': '実行中', 'resources.storage.status.ready': '完了', 'resources.storage.status.error': '失敗', 'resources.storage.status.canceled': 'キャンセル済み', 'resources.storage.status.valid': '有効', 'resources.storage.status.invalid': '無効', 'resources.storage.status.missing': '欠落', 'resources.storage.status.stale': '期限切れ', 'resources.storage.status.unknown': '不明な状態',
+  'resources.storage.error.artifactNotReady': 'モデルはまだ準備できていません', 'resources.storage.error.profileMaintenance': 'S3 設定はメンテナンス中です', 'resources.storage.error.objectConflict': 'S3 オブジェクトの競合', 'resources.storage.error.manifestInvalid': 'モデルマニフェストが無効です', 'resources.storage.error.workerUnavailable': 'ノードを利用できません', 'resources.storage.error.workerExecutionFailed': 'ノード実行に失敗しました', 'resources.storage.error.unknown': '不明なエラー'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

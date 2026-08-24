@@ -134,6 +134,70 @@ export function getModelStorageSourceLabel(
   }
 }
 
+const STORAGE_STATUS_IDS: Record<string, string> = {
+  pending: 'resources.storage.status.pending',
+  running: 'resources.storage.status.running',
+  ready: 'resources.storage.status.ready',
+  error: 'resources.storage.status.error',
+  canceled: 'resources.storage.status.canceled',
+  valid: 'resources.storage.status.valid',
+  invalid: 'resources.storage.status.invalid',
+  missing: 'resources.storage.status.missing',
+  stale: 'resources.storage.status.stale'
+};
+
+const STORAGE_ERROR_IDS: Record<string, string> = {
+  artifact_not_ready: 'resources.storage.error.artifactNotReady',
+  s3_profile_in_maintenance: 'resources.storage.error.profileMaintenance',
+  s3_object_conflict: 'resources.storage.error.objectConflict',
+  manifest_invalid: 'resources.storage.error.manifestInvalid',
+  worker_not_current: 'resources.storage.error.workerUnavailable',
+  worker_execution_failed: 'resources.storage.error.workerExecutionFailed'
+};
+
+export function getModelStorageFlowPresentation(
+  sourceWorker: string | null | undefined,
+  profile: string | null | undefined,
+  targetWorker?: string | null
+) {
+  return {
+    messageId: targetWorker
+      ? 'resources.storage.flow.workerToProfileToWorker'
+      : 'resources.storage.flow.workerToProfile',
+    values: {
+      worker: sourceWorker || '',
+      profile: profile || '',
+      targetWorker: targetWorker || ''
+    }
+  };
+}
+
+export function getModelStorageStatusPresentation(status?: string | null) {
+  const value = status || 'unknown';
+  return {
+    value,
+    messageId: STORAGE_STATUS_IDS[value] || 'resources.storage.status.unknown'
+  };
+}
+
+export function getModelStorageErrorPresentation(errorCode?: string | null) {
+  const value = errorCode || 'unknown';
+  return {
+    value,
+    messageId: STORAGE_ERROR_IDS[value] || 'resources.storage.error.unknown'
+  };
+}
+
+export function mergeModelStoragePage<T>(
+  current: T[],
+  incoming: T[],
+  key: (item: T) => string | number
+) {
+  const merged = new Map(current.map((item) => [key(item), item]));
+  incoming.forEach((item) => merged.set(key(item), item));
+  return Array.from(merged.values());
+}
+
 export function getModelStorageTransferPresentation(
   source: ModelStorageTransferSource | null
 ): ModelStorageTransferPresentation {

@@ -12,7 +12,10 @@ import {
   getModelFileStorageModelId,
   getModelFileSyncActionState,
   getModelPreheatTaskActions,
+  getModelStorageErrorPresentation,
+  getModelStorageFlowPresentation,
   getModelStorageRevisionPresentation,
+  getModelStorageStatusPresentation,
   getModelStorageSourceLabel,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
@@ -244,6 +247,39 @@ describe('预热配置逻辑', () => {
       }
     ]);
     expect(preview.rows[0].connectivity).toBeNull();
+  });
+});
+
+describe('模型存储展示映射', () => {
+  it('仅映射已知状态和错误码，未知值回退到通用文案', () => {
+    expect(getModelStorageStatusPresentation('ready')).toEqual({
+      value: 'ready',
+      messageId: 'resources.storage.status.ready'
+    });
+    expect(getModelStorageStatusPresentation('future_state')).toEqual({
+      value: 'future_state',
+      messageId: 'resources.storage.status.unknown'
+    });
+    expect(getModelStorageErrorPresentation('artifact_not_ready')).toEqual({
+      value: 'artifact_not_ready',
+      messageId: 'resources.storage.error.artifactNotReady'
+    });
+    expect(getModelStorageErrorPresentation('future_error')).toEqual({
+      value: 'future_error',
+      messageId: 'resources.storage.error.unknown'
+    });
+  });
+
+  it('流转展示只返回国际化键和值，不硬编码界面文案', () => {
+    expect(getModelStorageFlowPresentation('节点 A', '中心 S3')).toEqual({
+      messageId: 'resources.storage.flow.workerToProfile',
+      values: { worker: '节点 A', profile: '中心 S3', targetWorker: '' }
+    });
+    expect(
+      getModelStorageFlowPresentation('节点 A', '中心 S3', '节点 B')
+    ).toMatchObject({
+      messageId: 'resources.storage.flow.workerToProfileToWorker'
+    });
   });
 });
 

@@ -212,7 +212,20 @@ export default {
   'resources.preheat.schedule.disableConfirm': 'Отключить стратегию по расписанию',
   'resources.preheat.schedule.runConfirm': 'Выполнить стратегию по расписанию сейчас',
   'resources.preheat.schedule.deleteConfirm': 'Удалить стратегию по расписанию',
-  'resources.preheat.schedule.actionContent': 'Выполнить это действие для стратегии по расписанию «{name}»?'
+  'resources.preheat.schedule.actionContent': 'Выполнить это действие для стратегии по расписанию «{name}»?',
+  'resources.storage.taskRecords': 'Записи задач',
+  'resources.storage.distributionTasks': 'Записи распространения',
+  'resources.storage.retry': 'Повторить',
+  'resources.storage.repository.exactInput': 'Введите точное имя модели',
+  'resources.storage.state.loading': 'Загрузка',
+  'resources.storage.state.refreshing': 'Обновление с сохранением текущих данных',
+  'resources.storage.state.error': 'Не удалось загрузить данные. Повторите попытку.',
+  'resources.storage.state.empty': 'Нет данных',
+  'resources.storage.state.noMatch': 'Нет совпадений',
+  'resources.storage.loadMore': 'Загрузить ещё', 'resources.storage.artifact.profileRequired': 'Сначала выберите конфигурацию S3.', 'resources.storage.distributionTasks.unavailable': 'Сервер не предоставляет записи выполнения распространения.', 'resources.storage.repository.advanced': 'Расширенные настройки',
+  'resources.storage.flow.workerToProfile': '{worker} -> {profile}', 'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
+  'resources.storage.status.pending': 'Ожидание', 'resources.storage.status.running': 'Выполняется', 'resources.storage.status.ready': 'Готово', 'resources.storage.status.error': 'Ошибка', 'resources.storage.status.canceled': 'Отменено', 'resources.storage.status.valid': 'Действительно', 'resources.storage.status.invalid': 'Недействительно', 'resources.storage.status.missing': 'Отсутствует', 'resources.storage.status.stale': 'Устарело', 'resources.storage.status.unknown': 'Неизвестное состояние',
+  'resources.storage.error.artifactNotReady': 'Модель ещё не готова', 'resources.storage.error.profileMaintenance': 'Конфигурация S3 на обслуживании', 'resources.storage.error.objectConflict': 'Конфликт объекта S3', 'resources.storage.error.manifestInvalid': 'Недействительный манифест модели', 'resources.storage.error.workerUnavailable': 'Узел недоступен', 'resources.storage.error.workerExecutionFailed': 'Сбой выполнения на узле', 'resources.storage.error.unknown': 'Неизвестная ошибка'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

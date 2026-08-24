@@ -54,8 +54,9 @@ import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
 type ScheduleAction = 'enable' | 'disable' | 'run' | 'delete';
 type StrategyKind = 'continuous' | 'manual' | 'scheduled';
+type PolicyMode = 'preheat' | 'distribution';
 
-const ModelPreheatPolicies: React.FC = () => {
+const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const intl = useIntl();
   const location = useLocation();
   const navigate = useNavigate();
@@ -145,7 +146,8 @@ const ModelPreheatPolicies: React.FC = () => {
     const syncTaskId = Number(query.get('sync_task'));
     if (Number.isInteger(syncTaskId) && syncTaskId > 0) {
       setDistributionSyncTaskId(syncTaskId);
-      setContinuousOpen(true);
+      if (mode === 'preheat') setScheduleOpen(true);
+      else setContinuousOpen(true);
       navigate(`${location.pathname}?tab=policies`, { replace: true });
       return;
     }
@@ -159,9 +161,11 @@ const ModelPreheatPolicies: React.FC = () => {
         ? { s3_profile_id: profileId }
         : {})
     });
-    setCreateChooserOpen(true);
+    if (mode === 'distribution') setContinuousOpen(true);
+    else if (mode === 'preheat') setScheduleOpen(true);
+    else setCreateChooserOpen(true);
     navigate(`${location.pathname}?tab=policies`, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search, mode, navigate]);
 
   const scheduleInitialValues = useMemo(
     () => ({
@@ -520,7 +524,9 @@ const ModelPreheatPolicies: React.FC = () => {
           icon={<PlusOutlined />}
           onClick={() => {
             setPrefill({});
-            setCreateChooserOpen(true);
+            if (mode === 'distribution') setContinuousOpen(true);
+            else if (mode === 'preheat') setScheduleOpen(true);
+            else setCreateChooserOpen(true);
           }}
         >
           {intl.formatMessage({ id: 'resources.preheat.policy.create' })}
@@ -528,7 +534,8 @@ const ModelPreheatPolicies: React.FC = () => {
       </Space>
       <Tabs
         items={[
-          {
+          ...(mode !== 'preheat'
+            ? [{
             key: 'continuous',
             label: intl.formatMessage({
               id: 'resources.preheat.policy.continuous'
@@ -553,8 +560,10 @@ const ModelPreheatPolicies: React.FC = () => {
                 }}
               />
             )
-          },
-          {
+          }]
+            : []),
+          ...(mode !== 'distribution'
+            ? [{
             key: 'schedule',
             label: intl.formatMessage({
               id: 'resources.preheat.policy.scheduled'
@@ -581,10 +590,11 @@ const ModelPreheatPolicies: React.FC = () => {
                 }}
               />
             )
-          }
+          }]
+            : [])
         ]}
       />
-      <Modal
+      {!mode && <Modal
         open={createChooserOpen}
         centered
         maskClosable={false}
@@ -622,7 +632,7 @@ const ModelPreheatPolicies: React.FC = () => {
             </Radio>
           </Space>
         </Radio.Group>
-      </Modal>
+      </Modal>}
       <ModelDistributionPolicyModal
         open={continuousOpen}
         initialSyncTaskId={distributionSyncTaskId}
