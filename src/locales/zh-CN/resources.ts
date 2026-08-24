@@ -198,19 +198,28 @@ export default {
   'resources.preheat.profile.virtualHosted': '虚拟主机寻址',
   'resources.preheat.profile.default': '默认',
   'resources.preheat.profile.maintenance': '维护中',
-  'resources.preheat.profile.maintenanceHint': '生命周期独立于连接健康。维护中的配置不会出现在新下载、同步、预热、策略或 Schedule 的选择中。',
+  'resources.preheat.profile.maintenanceHint':
+    '生命周期独立于连接健康。维护中的配置不会出现在新下载、同步、预热、策略或 Schedule 的选择中。',
   'resources.preheat.profile.maintenanceAction': '进入维护',
-  'resources.preheat.profile.maintenanceActionHint': '停止将此配置用于新的业务任务，不会删除 S3 数据。',
+  'resources.preheat.profile.maintenanceActionHint':
+    '停止将此配置用于新的业务任务，不会删除 S3 数据。',
   'resources.preheat.profile.restoreAction': '恢复使用',
-  'resources.preheat.profile.restoreActionHint': '恢复后可重新用于新任务，但不会自动设为默认。',
+  'resources.preheat.profile.restoreActionHint':
+    '恢复后可重新用于新任务，但不会自动设为默认。',
   'resources.preheat.profile.maintenanceConfirm': '进入维护模式',
-  'resources.preheat.profile.maintenanceContent': '确定将 S3 配置“{name}”进入维护吗？它将不再出现在下载、同步、预热、策略和 Schedule 的选择中，不会删除 S3 数据，已有任务仍按固定配置继续执行。',
+  'resources.preheat.profile.maintenanceContent':
+    '确定将 S3 配置“{name}”进入维护吗？它将不再出现在下载、同步、预热、策略和 Schedule 的选择中，不会删除 S3 数据，已有任务仍按固定配置继续执行。',
   'resources.preheat.profile.restoreConfirm': '恢复 S3 配置使用',
-  'resources.preheat.profile.restoreContent': '确定恢复 S3 配置“{name}”的使用吗？恢复后不会自动设为默认。',
-  'resources.preheat.profile.credentialUnavailableHint': '连接不可用时，请在手工配置中更新 Access Key 和 Secret Key；这不会自动进入维护。',
-  'resources.preheat.profile.systemCredentialUnavailableHint': '连接不可用时，请通过启动参数更新系统配置的凭据并重启；这不会自动进入维护。',
-  'resources.preheat.profile.connectivityUnavailableHint': '连接失败可能与 DNS、TLS、网络、认证或 Bucket 有关。请打开连接详情确认失败阶段；手工配置可据此更新凭据、TLS 或寻址，失败不会自动进入维护。',
-  'resources.preheat.profile.systemConnectivityUnavailableHint': '连接失败可能与 DNS、TLS、网络、认证或 Bucket 有关。请打开连接详情确认失败阶段；托管字段请通过启动参数更新并重启，可编辑运行开关可在此页面调整，失败不会自动进入维护。',
+  'resources.preheat.profile.restoreContent':
+    '确定恢复 S3 配置“{name}”的使用吗？恢复后不会自动设为默认。',
+  'resources.preheat.profile.credentialUnavailableHint':
+    '连接不可用时，请在手工配置中更新 Access Key 和 Secret Key；这不会自动进入维护。',
+  'resources.preheat.profile.systemCredentialUnavailableHint':
+    '连接不可用时，请通过启动参数更新系统配置的凭据并重启；这不会自动进入维护。',
+  'resources.preheat.profile.connectivityUnavailableHint':
+    '连接失败可能与 DNS、TLS、网络、认证或 Bucket 有关。请打开连接详情确认失败阶段；手工配置可据此更新凭据、TLS 或寻址，失败不会自动进入维护。',
+  'resources.preheat.profile.systemConnectivityUnavailableHint':
+    '连接失败可能与 DNS、TLS、网络、认证或 Bucket 有关。请打开连接详情确认失败阶段；托管字段请通过启动参数更新并重启，可编辑运行开关可在此页面调整，失败不会自动进入维护。',
   'resources.preheat.profile.version': '配置版本',
   'resources.preheat.profile.deleteConfirm': '删除 S3 配置',
   'resources.preheat.profile.deleteContent':
@@ -267,8 +276,8 @@ export default {
     '确定对同步策略“{name}”执行此操作吗？现有节点缓存不会被删除。',
   'resources.preheat.policy.create': '新建策略',
   'resources.preheat.policy.createContinuous': '创建持续策略',
-  'resources.preheat.policy.continuous': '持续补齐',
-  'resources.preheat.policy.scheduled': '定时策略',
+  'resources.preheat.policy.continuous': '分发策略（持续补齐）',
+  'resources.preheat.policy.scheduled': '预热策略（手动 / Cron）',
   'resources.preheat.schedule.create': '新建定时策略',
   'resources.preheat.schedule.edit': '编辑定时策略',
   'resources.preheat.schedule.triggerMode': '触发方式',
@@ -286,7 +295,8 @@ export default {
   'resources.preheat.schedule.disableConfirm': '禁用定时策略',
   'resources.preheat.schedule.runConfirm': '立即执行定时策略',
   'resources.preheat.schedule.deleteConfirm': '删除定时策略',
-  'resources.preheat.schedule.actionContent': '确定对定时策略“{name}”执行此操作吗？',
+  'resources.preheat.schedule.actionContent':
+    '确定对定时策略“{name}”执行此操作吗？',
   'resources.preheat.block.profile_required': '请选择有效的 S3 配置。',
   'resources.preheat.block.target_workers_required': '请至少选择一个目标节点。',
   'resources.preheat.block.seed_worker_not_ready': '请选择在线的 Seed 节点。',
@@ -309,12 +319,33 @@ export default {
   'resources.preheat.block.worker_connectivity_unavailable':
     '目标节点“{worker}”未通过 S3 读、写、删除检测。',
   'resources.storage.title': '模型存储',
-  'resources.storage.description': '节点模型已下载并校验，S3 模型库集中保存可信模型，供同步、普通下载和预热共同复用。',
+  'resources.storage.description':
+    '节点模型已下载并校验，S3 模型库集中保存可信模型，供同步、普通下载和预热共同复用。',
   'resources.storage.nodeModels': '节点模型',
   'resources.storage.library': 'S3 模型库',
   'resources.storage.syncTasks': '同步任务',
   'resources.storage.preheatTasks': '预热任务',
-  'resources.storage.policies': '分发策略',
+  'resources.storage.policies': '任务策略',
+  'resources.storage.workerUnavailable': '原节点已不可用，无法同步或部署。',
+  'resources.storage.deletedWorker': '原节点已删除（Worker #{id}）',
+  'resources.storage.syncPolicy.create': '新建同步策略',
+  'resources.storage.syncPolicy.tab': '同步策略（Worker → S3）',
+  'resources.storage.preheatDistributionPolicy.tab': '预热 / 分发策略',
+  'resources.storage.syncPolicy.edit': '编辑同步策略',
+  'resources.storage.syncPolicy.confirmTitle': '确认同步策略操作',
+  'resources.storage.syncPolicy.confirmContent':
+    '确定对同步策略“{name}”执行此操作吗？',
+  'resources.storage.syncPolicy.maintenanceReadonly':
+    '当前 S3 配置处于维护模式，仅可修改策略名称；停用后不能重新启用或立即执行。',
+  'resources.storage.distributionPolicy.tab': '分发策略（持续补齐）',
+  'resources.storage.preheatPolicy.tab': '预热策略（手动 / Cron）',
+  'resources.storage.distributionPolicy.kind': '分发已有 S3 模型',
+  'resources.storage.distributionPolicy.create': '新建分发策略',
+  'resources.storage.distributionPolicy.hint':
+    '分发策略只使用 S3 中已有且清单有效的模型，负责向目标节点持续补齐。',
+  'resources.storage.distributionPolicy.source': 'S3 模型来源',
+  'resources.storage.distributionPolicy.artifact': 'S3 模型',
+  'resources.storage.distributionPolicy.syncTask': '已完成同步记录',
   'resources.storage.profiles': 'S3 配置',
   'resources.storage.artifacts': '已同步模型',
   'resources.storage.connectivity': '节点连通性',
@@ -328,21 +359,28 @@ export default {
   'resources.storage.sync': '同步到 S3 模型库',
   'resources.storage.sync.confirmTitle': '同步到 S3 模型库',
   'resources.storage.sync.submit': '开始同步',
-  'resources.storage.sync.noDefault': '当前没有可用的默认 S3 配置，请先在 S3 配置中设为默认。',
-  'resources.storage.sync.alreadyFromDefault': '该模型已来自默认 S3 模型库，无需重复同步。',
-  'resources.storage.sync.missingRevision': '该旧模型缺少可信版本信息，请重新下载后再同步到 S3。',
+  'resources.storage.sync.noDefault':
+    '当前没有可用的默认 S3 配置，请先在 S3 配置中设为默认。',
+  'resources.storage.sync.alreadyFromDefault':
+    '该模型已来自默认 S3 模型库，无需重复同步。',
+  'resources.storage.sync.missingRevision':
+    '该旧模型缺少可信版本信息，请重新下载后再同步到 S3。',
   'resources.storage.revision.modelscopeFilelist': '文件清单指纹 {fingerprint}',
   'resources.storage.syncBatch.create': '新建同步任务',
   'resources.storage.syncBatch.scope': '同步范围',
   'resources.storage.syncBatch.scope.single_model': '单个模型',
   'resources.storage.syncBatch.scope.selected_workers': '指定节点',
   'resources.storage.syncBatch.scope.all_ready_workers': '全部就绪节点',
-  'resources.storage.syncBatch.description.single_model': '将所选 Ready 节点上的一个已有模型上传到目标 S3，不会向其他节点分发。',
-  'resources.storage.syncBatch.description.selected_workers': '将所选 Ready 节点已有模型上传到目标 S3，不会向其他节点分发。',
-  'resources.storage.syncBatch.description.all_ready_workers': '将全部 Ready 节点已有模型上传到目标 S3，不会向其他节点分发。',
+  'resources.storage.syncBatch.description.single_model':
+    '将所选 Ready 节点上的一个已有模型上传到目标 S3，不会向其他节点分发。',
+  'resources.storage.syncBatch.description.selected_workers':
+    '将所选 Ready 节点已有模型上传到目标 S3，不会向其他节点分发。',
+  'resources.storage.syncBatch.description.all_ready_workers':
+    '将全部 Ready 节点已有模型上传到目标 S3，不会向其他节点分发。',
   'resources.storage.syncBatch.selectWorker': '选择节点',
   'resources.storage.syncBatch.selectModel': '选择模型',
-  'resources.storage.syncBatch.noSyncableModels': '该节点没有可同步的 Ready 模型。',
+  'resources.storage.syncBatch.noSyncableModels':
+    '该节点没有可同步的 Ready 模型。',
   'resources.storage.syncBatch.planned': '计划处理',
   'resources.storage.syncBatch.created': '已创建',
   'resources.storage.syncBatch.skipped': '已跳过',
@@ -351,35 +389,45 @@ export default {
   'resources.storage.syncBatch.reason': '原因',
   'resources.storage.syncBatch.reason.model_file_not_ready': '模型未就绪',
   'resources.storage.syncBatch.reason.worker_not_ready': '节点未就绪',
-  'resources.storage.syncBatch.reason.duplicate_artifact_identity': '相同模型版本已由其他 Ready 节点规划',
-  'resources.storage.syncBatch.reason.active_task_exists': '已有进行中的同步任务',
+  'resources.storage.syncBatch.reason.duplicate_artifact_identity':
+    '相同模型版本已由其他 Ready 节点规划',
+  'resources.storage.syncBatch.reason.active_task_exists':
+    '已有进行中的同步任务',
   'resources.storage.syncBatch.reason.model_file_not_found': '模型不存在',
   'resources.storage.syncBatch.reason.no_ready_workers': '没有 Ready 节点',
   'resources.storage.refresh': '刷新库存',
   'resources.storage.refreshConfirm': '刷新 S3 库存',
-  'resources.storage.refreshContent': '确认扫描当前 S3 配置中具有有效 Manifest 的模型？',
+  'resources.storage.refreshContent':
+    '确认扫描当前 S3 配置中具有有效 Manifest 的模型？',
   'resources.storage.cancelSync': '取消同步',
   'resources.storage.cancelSyncConfirm': '取消同步任务',
   'resources.storage.cancelSyncContent': '确认取消同步任务 #{id}？',
   'resources.storage.deleteSync': '删除同步记录',
   'resources.storage.deleteSyncConfirm': '删除同步记录',
-  'resources.storage.deleteSyncContent': '确认删除同步记录 #{id}？删除后无法恢复。',
+  'resources.storage.deleteSyncContent':
+    '确认删除同步记录 #{id}？删除后无法恢复。',
   'resources.storage.systemProfile': '系统配置',
   'resources.storage.setDefault': '设为默认',
   'resources.storage.setDefaultConfirm': '切换默认 S3 配置',
-  'resources.storage.setDefaultContent': '只影响新下载和新任务；运行中的任务继续使用原配置。',
+  'resources.storage.setDefaultContent':
+    '只影响新下载和新任务；运行中的任务继续使用原配置。',
   'resources.storage.checkWorkers': '检测节点',
-  'resources.storage.connectionScope': '测试连接仅验证 Server 到 S3；检测节点验证 Worker 到 S3。',
+  'resources.storage.connectionScope':
+    '测试连接仅验证 Server 到 S3；检测节点验证 Worker 到 S3。',
   'resources.storage.testConnection': '测试连接',
   'resources.storage.testResult': 'Server 连接测试结果',
-  'resources.storage.encryptionUnavailable': '服务端凭据加密不可用，请联系管理员检查数据目录或密钥配置',
+  'resources.storage.encryptionUnavailable':
+    '服务端凭据加密不可用，请联系管理员检查数据目录或密钥配置',
   'resources.storage.endpointTlsMismatch': 'Endpoint 协议与 TLS 开关不一致。',
   'resources.storage.sourceFallback': '未命中时允许从模型源下载',
-  'resources.storage.sourceFallbackHint': '仅当此配置为默认配置时，该开关才影响普通模型下载。',
-  'resources.storage.testCredentialsRequired': '测试连接前请重新输入 Access Key 和 Secret Key。',
+  'resources.storage.sourceFallbackHint':
+    '仅当此配置为默认配置时，该开关才影响普通模型下载。',
+  'resources.storage.testCredentialsRequired':
+    '测试连接前请重新输入 Access Key 和 Secret Key。',
   'resources.storage.refreshSubmitted': '库存刷新已提交，正在等待扫描结果。',
   'resources.storage.checkWorkersConfirm': '检测节点连通性',
-  'resources.storage.checkWorkersContent': '确认检测 Worker 到 S3 配置“{name}”的连通性？',
+  'resources.storage.checkWorkersContent':
+    '确认检测 Worker 到 S3 配置“{name}”的连通性？',
   'resources.preheat.noReadyWorkers': '当前没有就绪节点，无法进行连通性检测。',
   'resources.storage.transferMethod': '获取方式',
   'resources.storage.syncTaskDetail': '同步任务详情',
@@ -394,22 +442,31 @@ export default {
   'resources.storage.syncTask.state.canceled': '已取消',
   'resources.storage.createStrategy': '基于此同步记录创建策略',
   'resources.storage.syncTask.errorCode': '失败原因',
-  'resources.storage.syncTask.error.worker_execution_failed': '节点执行同步失败',
+  'resources.storage.syncTask.error.worker_execution_failed':
+    '节点执行同步失败',
   'resources.storage.syncTask.error.manifest_invalid': '模型清单无效',
   'resources.storage.syncTask.error.s3_object_conflict': 'S3 中的模型对象冲突',
   'resources.storage.refreshCompleted': '库存刷新完成。',
   'resources.storage.refreshFailed': '库存刷新失败。',
   'resources.storage.transfer.current_node': '当前节点（{worker}）',
-  'resources.storage.transfer.peer_via_s3': '其他节点（{worker}，经 S3 模型库 {profile}）',
+  'resources.storage.transfer.peer_via_s3':
+    '其他节点（{worker}，经 S3 模型库 {profile}）',
   'resources.storage.transfer.s3': 'S3 模型库（{profile}）',
   'resources.storage.transfer.modelscope': '从 ModelScope 获取',
   'resources.storage.transfer.huggingface': '从 Hugging Face 获取',
   'resources.storage.transfer.unknown': '未知获取方式',
-  'resources.storage.tlsEnabledHint': '控制与 S3 的传输是否使用 TLS 加密。关闭后将使用未加密连接。',
-  'resources.storage.tlsVerifyHint': '仅在私有 CA 或自签名证书场景下关闭。关闭后不会校验证书，存在中间人攻击风险。',
-  'resources.storage.virtualHostedHint': '启用时使用 bucket.endpoint 形式的虚拟主机寻址；关闭时使用 endpoint/bucket 路径寻址。请按 S3 服务兼容性选择。',
-  'resources.storage.sourceFallbackDetail': '仅当此配置为默认配置时生效。S3 中没有缓存模型时，开启后允许继续从原模型源下载；关闭后该下载会失败。',
-  'resources.preheat.profile.deleteContent.default': '确定删除 S3 配置“{name}”吗？删除后，新下载将直接从模型源获取，直到重新设置默认 S3 配置。',
-  'resources.preheat.profile.deleteContent.system': '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。',
-  'resources.preheat.profile.deleteContent.systemDefault': '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3，新下载将直接从模型源获取，直到重新设置默认 S3 配置。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。'
+  'resources.storage.tlsEnabledHint':
+    '控制与 S3 的传输是否使用 TLS 加密。关闭后将使用未加密连接。',
+  'resources.storage.tlsVerifyHint':
+    '仅在私有 CA 或自签名证书场景下关闭。关闭后不会校验证书，存在中间人攻击风险。',
+  'resources.storage.virtualHostedHint':
+    '启用时使用 bucket.endpoint 形式的虚拟主机寻址；关闭时使用 endpoint/bucket 路径寻址。请按 S3 服务兼容性选择。',
+  'resources.storage.sourceFallbackDetail':
+    '仅当此配置为默认配置时生效。S3 中没有缓存模型时，开启后允许继续从原模型源下载；关闭后该下载会失败。',
+  'resources.preheat.profile.deleteContent.default':
+    '确定删除 S3 配置“{name}”吗？删除后，新下载将直接从模型源获取，直到重新设置默认 S3 配置。',
+  'resources.preheat.profile.deleteContent.system':
+    '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。',
+  'resources.preheat.profile.deleteContent.systemDefault':
+    '确定删除 S3 配置“{name}”吗？删除后当前系统将不再使用此 S3，新下载将直接从模型源获取，直到重新设置默认 S3 配置。若 Server 或 Docker 启动参数仍配置本地 S3，服务重启后会重新生成此配置。'
 };

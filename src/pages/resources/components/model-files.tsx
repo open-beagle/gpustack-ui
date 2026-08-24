@@ -31,9 +31,8 @@ import {
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
-  ConfigProvider,
   Button,
-  Descriptions,
+  ConfigProvider,
   Empty,
   Table,
   Tabs,
@@ -76,11 +75,11 @@ import {
   ModelPreheatS3Profile,
   ListItem as WorkerListItem
 } from '../config/types';
-import ModelPreheatPolicies from './model-preheat-policies';
 import ModelPreheatTasks from './model-preheat-tasks';
 import ModelStorage from './model-storage';
 import ModelStorageSyncModal from './model-storage-sync-modal';
 import ModelStorageSyncTasks from './model-storage-sync-tasks';
+import ModelTaskPolicies from './model-task-policies';
 
 const { Paragraph } = Typography;
 
@@ -502,7 +501,9 @@ const LocalModelFiles = () => {
 
   const openSync = async (record: ListItem) => {
     const result = await queryModelPreheatS3Profiles({ page: 1, perPage: 100 });
-    setProfiles(result.items.filter((profile) => profile.lifecycle_state === 'active'));
+    setProfiles(
+      result.items.filter((profile) => profile.lifecycle_state === 'active')
+    );
     setSyncRecord(record);
   };
 
@@ -559,7 +560,11 @@ const LocalModelFiles = () => {
       }
       return ['retry', 'delete'].includes(item.key);
     });
-    return actions;
+    return actions.map((item) =>
+      item.key === 'deploy' && record.worker_available === false
+        ? { ...item, disabled: true }
+        : item
+    );
   };
 
   const handleDeployModalCancel = () => {
@@ -652,9 +657,18 @@ const LocalModelFiles = () => {
         showTitle: false
       },
       render: (text: string, record: ListItem) => {
+        const workerName =
+          record.worker_name ||
+          record.worker_name_snapshot ||
+          (record.worker_available === false
+            ? intl.formatMessage(
+                { id: 'resources.storage.deletedWorker' },
+                { id: record.worker_id }
+              )
+            : getWorkerName(record.worker_id, workersList));
         return (
           <AutoTooltip ghost>
-            <span>{getWorkerName(record.worker_id, workersList)}</span>
+            <span>{workerName}</span>
           </AutoTooltip>
         );
       }
@@ -718,9 +732,9 @@ const LocalModelFiles = () => {
           defaultSyncProfileId
         );
         const syncTooltip =
-          syncAction.reason === 'missing_revision'
+          syncAction.reason === 'worker_unavailable'
             ? intl.formatMessage({
-                id: 'resources.storage.sync.missingRevision'
+                id: 'resources.storage.workerUnavailable'
               })
             : syncAction.reason === 'already_from_default'
               ? intl.formatMessage({
@@ -736,21 +750,23 @@ const LocalModelFiles = () => {
               whiteSpace: 'nowrap'
             }}
           >
-          {syncAction.visible && (
-            <Tooltip title={syncTooltip}>
-              <Button
-                type="text"
-                icon={<SyncOutlined />}
-                aria-label={intl.formatMessage({ id: 'resources.storage.sync' })}
-                disabled={syncAction.disabled}
-                onClick={() => void openSync(record)}
-              />
-            </Tooltip>
-          )}
-          <DropdownButtons
-            items={setActionList(record)}
-            onSelect={(val) => handleSelect(val, record)}
-          ></DropdownButtons>
+            {syncAction.visible && (
+              <Tooltip title={syncTooltip}>
+                <Button
+                  type="text"
+                  icon={<SyncOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'resources.storage.sync'
+                  })}
+                  disabled={syncAction.disabled}
+                  onClick={() => void openSync(record)}
+                />
+              </Tooltip>
+            )}
+            <DropdownButtons
+              items={setActionList(record)}
+              onSelect={(val) => handleSelect(val, record)}
+            ></DropdownButtons>
           </div>
         );
       }
@@ -827,7 +843,16 @@ const LocalModelFiles = () => {
         initialValues={openDeployModal.initialValues}
         isGGUF={openDeployModal.isGGUF}
       ></DeployModal>
-      <ModelStorageSyncModal open={Boolean(syncRecord)} model={syncRecord} profiles={profiles} onCancel={() => setSyncRecord(null)} onCreated={() => { setSyncRecord(null); navigate('/resources/modelfiles?tab=sync-tasks'); }} />
+      <ModelStorageSyncModal
+        open={Boolean(syncRecord)}
+        model={syncRecord}
+        profiles={profiles}
+        onCancel={() => setSyncRecord(null)}
+        onCreated={() => {
+          setSyncRecord(null);
+          navigate('/resources/modelfiles?tab=sync-tasks');
+        }}
+      />
     </>
   );
 };
@@ -908,7 +933,7 @@ const ModelFiles = () => {
           {
             key: 'policies',
             label: intl.formatMessage({ id: 'resources.storage.policies' }),
-            children: <ModelPreheatPolicies />
+            children: <ModelTaskPolicies />
           }
         ]}
       />

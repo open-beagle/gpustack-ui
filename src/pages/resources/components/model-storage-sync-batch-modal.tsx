@@ -1,6 +1,15 @@
 import ModalFooter from '@/components/modal-footer';
 import { useIntl } from '@umijs/max';
-import { Alert, Button, Descriptions, Modal, Select, Space, Table, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Typography
+} from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createModelStorageSyncBatch,
@@ -15,12 +24,11 @@ import {
   loadAllPaginated
 } from '../config/model-preheat';
 import type {
-  ListItem as Worker,
   ModelFile,
   ModelPreheatS3Profile,
-  ModelStorageSyncBatchItem,
   ModelStorageSyncBatchResult,
-  ModelStorageSyncScope
+  ModelStorageSyncScope,
+  ListItem as Worker
 } from '../config/types';
 
 interface Props {
@@ -36,7 +44,7 @@ const syncableModels = (models: ModelFile[]) =>
   models.filter(
     (model) =>
       model.state === 'ready' &&
-      Boolean(model.resolved_revision) &&
+      model.worker_available !== false &&
       ['model_scope', 'huggingface'].includes(model.source)
   );
 
@@ -65,7 +73,9 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<ModelStorageSyncBatchResult | null>(null);
+  const [result, setResult] = useState<ModelStorageSyncBatchResult | null>(
+    null
+  );
 
   const readyWorkers = useMemo(
     () => workers.filter((worker) => worker.state === 'ready'),
@@ -114,7 +124,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
         },
         () => setLoading(false)
       )
-      .catch(() => undefined)
+      .catch(() => undefined);
     return () => dependencyRequests.current.invalidate();
   }, [open]);
 
@@ -131,14 +141,16 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
       .run(
         () =>
           loadAllPaginated<ModelFile>((page, perPage) =>
-            queryModelFilesList(
-              { page, perPage, worker_id: workerId } as Global.SearchParams
-            )
+            queryModelFilesList({
+              page,
+              perPage,
+              worker_id: workerId
+            } as Global.SearchParams)
           ),
         (items) => setModels(syncableModels(items)),
         () => setModelsLoading(false)
       )
-      .catch(() => undefined)
+      .catch(() => undefined);
     return () => modelRequests.current.invalidate();
   }, [open, scope, workerId]);
 
@@ -215,45 +227,123 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
     >
       {result ? (
         <>
-          <Descriptions column={4} size="small" title={intl.formatMessage({ id: 'resources.storage.syncBatch.result' })}>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.syncBatch.planned' })}>{result.planned}</Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.syncBatch.created' })}>{result.created.length}</Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.syncBatch.skipped' })}>{result.skipped.length}</Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.syncBatch.failed' })}>{result.failed.length}</Descriptions.Item>
+          <Descriptions
+            column={4}
+            size="small"
+            title={intl.formatMessage({
+              id: 'resources.storage.syncBatch.result'
+            })}
+          >
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.syncBatch.planned'
+              })}
+            >
+              {result.planned}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.syncBatch.created'
+              })}
+            >
+              {result.created.length}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.syncBatch.skipped'
+              })}
+            >
+              {result.skipped.length}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.syncBatch.failed'
+              })}
+            >
+              {result.failed.length}
+            </Descriptions.Item>
           </Descriptions>
           <Table
-            rowKey={(item) => `${item.status}-${item.model_file_id}-${item.worker_id}-${item.task_id}-${item.reason}`}
+            rowKey={(item) =>
+              `${item.status}-${item.model_file_id}-${item.worker_id}-${item.task_id}-${item.reason}`
+            }
             size="small"
             dataSource={rows}
             pagination={false}
             scroll={{ x: 600 }}
             columns={[
-              { title: intl.formatMessage({ id: 'common.table.status' }), dataIndex: 'status', render: (status: string) => intl.formatMessage({ id: `resources.storage.syncBatch.${status}` }) },
-              { title: intl.formatMessage({ id: 'resources.storage.model' }), dataIndex: 'model_file_id', render: (value: number | null) => value || '-' },
-              { title: 'Worker ID', dataIndex: 'worker_id', render: (value: number | null) => value || '-' },
-              { title: 'Task ID', dataIndex: 'task_id', render: (value: number | null) => value || '-' },
-              { title: intl.formatMessage({ id: 'resources.storage.syncBatch.reason' }), dataIndex: 'reason', render: (reason: string | null) => reason ? intl.formatMessage({ id: `resources.storage.syncBatch.reason.${reason}`, defaultMessage: reason }) : '-' }
+              {
+                title: intl.formatMessage({ id: 'common.table.status' }),
+                dataIndex: 'status',
+                render: (status: string) =>
+                  intl.formatMessage({
+                    id: `resources.storage.syncBatch.${status}`
+                  })
+              },
+              {
+                title: intl.formatMessage({ id: 'resources.storage.model' }),
+                dataIndex: 'model_file_id',
+                render: (value: number | null) => value || '-'
+              },
+              {
+                title: 'Worker ID',
+                dataIndex: 'worker_id',
+                render: (value: number | null) => value || '-'
+              },
+              {
+                title: 'Task ID',
+                dataIndex: 'task_id',
+                render: (value: number | null) => value || '-'
+              },
+              {
+                title: intl.formatMessage({
+                  id: 'resources.storage.syncBatch.reason'
+                }),
+                dataIndex: 'reason',
+                render: (reason: string | null) =>
+                  reason
+                    ? intl.formatMessage({
+                        id: `resources.storage.syncBatch.reason.${reason}`,
+                        defaultMessage: reason
+                      })
+                    : '-'
+              }
             ]}
           />
         </>
       ) : (
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
           {!defaultProfile && (
-            <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.storage.sync.noDefault' })} />
+            <Alert
+              type="info"
+              showIcon
+              message={intl.formatMessage({
+                id: 'resources.storage.sync.noDefault'
+              })}
+            />
           )}
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <Typography.Text>{intl.formatMessage({ id: 'resources.storage.targetProfile' })}</Typography.Text>
+            <Typography.Text>
+              {intl.formatMessage({ id: 'resources.storage.targetProfile' })}
+            </Typography.Text>
             <Select
               style={selectStyle}
               value={profileId}
               loading={loading}
-              placeholder={intl.formatMessage({ id: 'resources.storage.targetProfile' })}
+              placeholder={intl.formatMessage({
+                id: 'resources.storage.targetProfile'
+              })}
               onChange={setProfileId}
-              options={activeProfiles(profiles).map((profile) => ({ value: profile.id, label: profile.name }))}
+              options={activeProfiles(profiles).map((profile) => ({
+                value: profile.id,
+                label: profile.name
+              }))}
             />
           </Space>
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <Typography.Text>{intl.formatMessage({ id: 'resources.storage.syncBatch.scope' })}</Typography.Text>
+            <Typography.Text>
+              {intl.formatMessage({ id: 'resources.storage.syncBatch.scope' })}
+            </Typography.Text>
             <Select
               style={selectStyle}
               value={scope}
@@ -263,10 +353,27 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
                 setWorkerIds([]);
                 setModelFileId(undefined);
               }}
-              options={(['single_model', 'selected_workers', 'all_ready_workers'] as ModelStorageSyncScope[]).map((value) => ({ value, label: intl.formatMessage({ id: `resources.storage.syncBatch.scope.${value}` }) }))}
+              options={(
+                [
+                  'single_model',
+                  'selected_workers',
+                  'all_ready_workers'
+                ] as ModelStorageSyncScope[]
+              ).map((value) => ({
+                value,
+                label: intl.formatMessage({
+                  id: `resources.storage.syncBatch.scope.${value}`
+                })
+              }))}
             />
           </Space>
-          <Alert type="info" showIcon message={intl.formatMessage({ id: `resources.storage.syncBatch.description.${scope}` })} />
+          <Alert
+            type="info"
+            showIcon
+            message={intl.formatMessage({
+              id: `resources.storage.syncBatch.description.${scope}`
+            })}
+          />
           {scope === 'single_model' && (
             <>
               <Select
@@ -274,12 +381,23 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
                 showSearch
                 optionFilterProp="label"
                 value={workerId}
-                placeholder={intl.formatMessage({ id: 'resources.storage.syncBatch.selectWorker' })}
+                placeholder={intl.formatMessage({
+                  id: 'resources.storage.syncBatch.selectWorker'
+                })}
                 onChange={setWorkerId}
-                options={readyWorkers.map((worker) => ({ value: worker.id, label: worker.name }))}
+                options={readyWorkers.map((worker) => ({
+                  value: worker.id,
+                  label: worker.name
+                }))}
               />
               {workerId && !modelsLoading && !models.length ? (
-                <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.storage.syncBatch.noSyncableModels' })} />
+                <Alert
+                  type="info"
+                  showIcon
+                  message={intl.formatMessage({
+                    id: 'resources.storage.syncBatch.noSyncableModels'
+                  })}
+                />
               ) : (
                 <Select
                   style={selectStyle}
@@ -288,11 +406,13 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
                   value={modelFileId}
                   loading={modelsLoading}
                   disabled={!workerId}
-                  placeholder={intl.formatMessage({ id: 'resources.storage.syncBatch.selectModel' })}
+                  placeholder={intl.formatMessage({
+                    id: 'resources.storage.syncBatch.selectModel'
+                  })}
                   onChange={setModelFileId}
                   options={models.map((model) => ({
                     value: model.id,
-                    label: `${modelName(model)} (${getModelStorageRevisionPresentation(model.resolved_revision || '').short})`
+                    label: `${modelName(model)} (${getModelStorageRevisionPresentation(model.resolved_revision || model.requested_revision || '').short || '-'})`
                   }))}
                 />
               )}
@@ -305,13 +425,24 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
               showSearch
               optionFilterProp="label"
               value={workerIds}
-              placeholder={intl.formatMessage({ id: 'resources.storage.syncBatch.selectWorker' })}
+              placeholder={intl.formatMessage({
+                id: 'resources.storage.syncBatch.selectWorker'
+              })}
               onChange={setWorkerIds}
-              options={readyWorkers.map((worker) => ({ value: worker.id, label: worker.name }))}
+              options={readyWorkers.map((worker) => ({
+                value: worker.id,
+                label: worker.name
+              }))}
             />
           )}
           {scope === 'all_ready_workers' && !readyWorkers.length && (
-            <Alert type="info" showIcon message={intl.formatMessage({ id: 'resources.preheat.noReadyWorkers' })} />
+            <Alert
+              type="info"
+              showIcon
+              message={intl.formatMessage({
+                id: 'resources.preheat.noReadyWorkers'
+              })}
+            />
           )}
         </Space>
       )}

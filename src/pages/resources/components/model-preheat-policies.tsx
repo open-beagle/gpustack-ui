@@ -47,8 +47,8 @@ import type {
   ModelPreheatDistributionPolicy,
   ModelPreheatSchedule
 } from '../config/types';
+import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
-import ModelPreheatModal from './model-preheat-modal';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
@@ -78,6 +78,8 @@ const ModelPreheatPolicies: React.FC = () => {
   const [createChooserOpen, setCreateChooserOpen] = useState(false);
   const [strategyKind, setStrategyKind] = useState<StrategyKind>('continuous');
   const [continuousOpen, setContinuousOpen] = useState(false);
+  const [distributionSyncTaskId, setDistributionSyncTaskId] =
+    useState<number>();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
     useState<ModelPreheatSchedule | null>(null);
@@ -140,6 +142,13 @@ const ModelPreheatPolicies: React.FC = () => {
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     if (query.get('strategy') !== 'create') return;
+    const syncTaskId = Number(query.get('sync_task'));
+    if (Number.isInteger(syncTaskId) && syncTaskId > 0) {
+      setDistributionSyncTaskId(syncTaskId);
+      setContinuousOpen(true);
+      navigate(`${location.pathname}?tab=policies`, { replace: true });
+      return;
+    }
     const source = query.get('source');
     const profileId = Number(query.get('profile'));
     setPrefill({
@@ -163,9 +172,7 @@ const ModelPreheatPolicies: React.FC = () => {
       ...(prefill.source ? { source: prefill.source } : {}),
       ...(prefill.model_id ? { model_id: prefill.model_id } : {}),
       ...(prefill.revision ? { revision: prefill.revision } : {}),
-      ...(prefill.s3_profile_id
-        ? { s3_profile_id: prefill.s3_profile_id }
-        : {})
+      ...(prefill.s3_profile_id ? { s3_profile_id: prefill.s3_profile_id } : {})
     }),
     [prefill, strategyKind]
   );
@@ -600,7 +607,7 @@ const ModelPreheatPolicies: React.FC = () => {
           <Space direction="vertical">
             <Radio value="continuous">
               {intl.formatMessage({
-                id: 'resources.preheat.policy.continuous'
+                id: 'resources.storage.distributionPolicy.kind'
               })}
             </Radio>
             <Radio value="manual">
@@ -616,18 +623,17 @@ const ModelPreheatPolicies: React.FC = () => {
           </Space>
         </Radio.Group>
       </Modal>
-      <ModelPreheatModal
+      <ModelDistributionPolicyModal
         open={continuousOpen}
-        initialValues={prefill}
-        forceKeepNewWorkersInSync
-        titleId="resources.preheat.policy.createContinuous"
-        submitId="resources.preheat.policy.createContinuous"
+        initialSyncTaskId={distributionSyncTaskId}
         onCancel={() => {
           setContinuousOpen(false);
+          setDistributionSyncTaskId(undefined);
           setPrefill({});
         }}
-        onCreated={() => {
+        onSaved={() => {
           setContinuousOpen(false);
+          setDistributionSyncTaskId(undefined);
           setPrefill({});
           void loadPolicies();
         }}

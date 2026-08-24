@@ -108,6 +108,10 @@ export interface ModelFile {
   local_path: string;
   local_dir: string;
   worker_id: number;
+  worker_uuid_snapshot?: string | null;
+  worker_name_snapshot?: string | null;
+  worker_name?: string | null;
+  worker_available?: boolean;
   size: number;
   download_progress: number;
   resolved_paths: string[];
@@ -288,11 +292,15 @@ export interface ModelStorageSyncTask {
   id: number;
   model_file_id: number;
   worker_id: number;
+  worker_uuid?: string;
   profile_id: number;
   profile_config_version: number;
   source: string;
   model_id: string;
   resolved_revision: string;
+  revision_kind?: 'upstream' | 'local_snapshot';
+  request_digest?: string;
+  artifact_id?: string | null;
   state: 'pending' | 'scanning' | 'publishing' | 'ready' | 'error' | 'canceled';
   state_message: string | null;
   error_code: string | null;
@@ -471,9 +479,56 @@ export interface ModelPreheatDistributionPolicy {
   worker_selector: Record<string, unknown>;
   gpu_selector: Record<string, unknown>;
   created_by_task_id: number | null;
+  source_artifact_id?: number | null;
+  source_artifact?: string | null;
+  source_sync_task_id?: number | null;
+  profile_version_stale?: boolean;
   last_reconciled_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type ModelStorageSyncPolicyTriggerMode = 'manual' | 'scheduled';
+
+export interface ModelStorageSyncPolicyCreate {
+  name: string;
+  enabled: boolean;
+  trigger_mode: ModelStorageSyncPolicyTriggerMode;
+  cron_expression: string | null;
+  timezone: string;
+  profile_id: number;
+  scope: ModelStorageSyncScope;
+  model_file_id: number | null;
+  worker_uuids: string[];
+}
+
+export interface ModelStorageSyncPolicy extends ModelStorageSyncPolicyCreate {
+  id: number;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelStorageSyncPolicyRun {
+  id: number;
+  policy_id: number;
+  trigger: 'manual' | 'scheduled';
+  state: 'pending' | 'ready' | 'error';
+  error_code: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModelPreheatDistributionPolicyCreate {
+  name: string;
+  profile_id?: number;
+  artifact_id?: string;
+  sync_task_id?: number;
+  target_scope: ModelPreheatTargetScope;
+  worker_selector: { worker_uuids?: string[] };
+  gpu_selector: { gpu_names?: string[] };
 }
 
 export type ModelPreheatScheduleRunState =

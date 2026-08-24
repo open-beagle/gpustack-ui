@@ -253,10 +253,7 @@ const ModelStorageSyncTasks: React.FC = () => {
                         const query = new URLSearchParams({
                           tab: 'policies',
                           strategy: 'create',
-                          source: task.source,
-                          model: task.model_id,
-                          revision: task.resolved_revision,
-                          profile: String(task.profile_id)
+                          sync_task: String(task.id)
                         });
                         navigate(`/resources/modelfiles?${query.toString()}`);
                       }}

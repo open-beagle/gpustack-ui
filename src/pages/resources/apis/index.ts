@@ -6,6 +6,7 @@ import {
   ModelPreheatConnectivityCheck,
   ModelPreheatCreate,
   ModelPreheatDistributionPolicy,
+  ModelPreheatDistributionPolicyCreate,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
   ModelPreheatSchedule,
@@ -18,6 +19,9 @@ import {
   ModelStorageConnectionTestRequest,
   ModelStorageSyncBatchCreate,
   ModelStorageSyncBatchResult,
+  ModelStorageSyncPolicy,
+  ModelStorageSyncPolicyCreate,
+  ModelStorageSyncPolicyRun,
   ModelStorageSyncTask,
   ModelStorageSyncTaskDetail
 } from '../config/types';
@@ -28,6 +32,7 @@ export const MODEL_FILES_API = '/model-files';
 export const MODEL_PREHEAT_S3_PROFILES_API = '/model-preheat-s3-profiles';
 export const MODEL_STORAGE_API = '/model-storage';
 export const MODEL_STORAGE_SYNC_TASKS_API = '/model-storage-sync-tasks';
+export const MODEL_STORAGE_SYNC_POLICIES_API = '/model-storage-sync-policies';
 export const MODEL_PREHEATS_API = '/model-preheats';
 export const MODEL_PREHEAT_POLICIES_API =
   '/model-preheat-distribution-policies';
@@ -213,6 +218,53 @@ export async function deleteModelStorageSyncTask(id: number) {
   return request(`${MODEL_STORAGE_SYNC_TASKS_API}/${id}`, { method: 'DELETE' });
 }
 
+export async function queryModelStorageSyncPolicies(
+  params: Global.SearchParams
+) {
+  return request<Global.PageResponse<ModelStorageSyncPolicy>>(
+    MODEL_STORAGE_SYNC_POLICIES_API,
+    { method: 'GET', params }
+  );
+}
+
+export async function createModelStorageSyncPolicy(
+  data: ModelStorageSyncPolicyCreate
+) {
+  return request<ModelStorageSyncPolicy>(MODEL_STORAGE_SYNC_POLICIES_API, {
+    method: 'POST',
+    data
+  });
+}
+
+export async function updateModelStorageSyncPolicy(
+  id: number,
+  data: Partial<ModelStorageSyncPolicyCreate>
+) {
+  return request<ModelStorageSyncPolicy>(
+    `${MODEL_STORAGE_SYNC_POLICIES_API}/${id}`,
+    {
+      method: 'PATCH',
+      data
+    }
+  );
+}
+
+export async function deleteModelStorageSyncPolicy(id: number) {
+  return request<{ ok: boolean }>(`${MODEL_STORAGE_SYNC_POLICIES_API}/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function runModelStorageSyncPolicyNow(
+  id: number,
+  idempotencyKey: string
+) {
+  return request<ModelStorageSyncPolicyRun>(
+    `${MODEL_STORAGE_SYNC_POLICIES_API}/${id}/run-now`,
+    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }
+  );
+}
+
 export async function queryModelStorageArtifacts(profileId: number) {
   return request<ModelStorageArtifact[]>(
     `/model-storage-profiles/${profileId}/artifacts`,
@@ -288,6 +340,15 @@ export async function queryModelPreheatPolicies(params: Global.SearchParams) {
     MODEL_PREHEAT_POLICIES_API,
     { method: 'GET', params }
   );
+}
+
+export async function createModelPreheatPolicy(
+  data: ModelPreheatDistributionPolicyCreate
+) {
+  return request<ModelPreheatDistributionPolicy>(MODEL_PREHEAT_POLICIES_API, {
+    method: 'POST',
+    data
+  });
 }
 
 export async function updateModelPreheatPolicy(

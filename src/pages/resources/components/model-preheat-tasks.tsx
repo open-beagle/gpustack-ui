@@ -276,8 +276,6 @@ const ModelPreheatTasks: React.FC = () => {
     <>
       <Space
         style={{
-          width: '100%',
-          justifyContent: 'space-between',
           marginBottom: 16
         }}
       >

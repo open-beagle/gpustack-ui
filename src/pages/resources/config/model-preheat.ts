@@ -20,7 +20,7 @@ export interface ModelStorageTransferPresentation {
 
 export type ModelFileSyncActionReason =
   | 'unsupported'
-  | 'missing_revision'
+  | 'worker_unavailable'
   | 'already_from_default';
 
 export interface ModelFileSyncActionState {
@@ -36,16 +36,27 @@ export interface ModelStorageRevisionPresentation {
 }
 
 const MODELSCOPE_FILELIST_REVISION_PREFIX = 'modelscope-filelist-v1-';
+const LOCAL_SNAPSHOT_REVISION_PREFIX = 'local-snapshot-';
 
 export function getModelStorageRevisionPresentation(
   revision: string
 ): ModelStorageRevisionPresentation {
   if (revision.startsWith(MODELSCOPE_FILELIST_REVISION_PREFIX)) {
-    const fingerprint = revision.slice(MODELSCOPE_FILELIST_REVISION_PREFIX.length);
+    const fingerprint = revision.slice(
+      MODELSCOPE_FILELIST_REVISION_PREFIX.length
+    );
     return {
       full: revision,
       short: fingerprint.slice(0, 12),
       kind: 'modelscope_filelist'
+    };
+  }
+  if (revision.startsWith(LOCAL_SNAPSHOT_REVISION_PREFIX)) {
+    const fingerprint = revision.slice(LOCAL_SNAPSHOT_REVISION_PREFIX.length);
+    return {
+      full: revision,
+      short: fingerprint.slice(0, 12),
+      kind: 'revision'
     };
   }
   return {
@@ -62,6 +73,7 @@ export function getModelFileSyncActionState(
     resolved_revision?: string | null;
     transfer_source?: ModelStorageTransferSource | null;
     transfer_profile_id?: number | null;
+    worker_available?: boolean;
   },
   defaultProfileId?: number
 ): ModelFileSyncActionState {
@@ -71,8 +83,8 @@ export function getModelFileSyncActionState(
   if (!supported) {
     return { visible: false, disabled: true, reason: 'unsupported' };
   }
-  if (!model.resolved_revision) {
-    return { visible: true, disabled: true, reason: 'missing_revision' };
+  if (model.worker_available === false) {
+    return { visible: true, disabled: true, reason: 'worker_unavailable' };
   }
   if (
     defaultProfileId !== undefined &&
@@ -93,17 +105,41 @@ export function getModelStorageTransferPresentation(
 ): ModelStorageTransferPresentation {
   switch (source) {
     case 'current_node':
-      return { messageId: 'resources.storage.transfer.current_node', includeProfile: false, includeWorker: true };
+      return {
+        messageId: 'resources.storage.transfer.current_node',
+        includeProfile: false,
+        includeWorker: true
+      };
     case 'peer_via_s3':
-      return { messageId: 'resources.storage.transfer.peer_via_s3', includeProfile: true, includeWorker: true };
+      return {
+        messageId: 'resources.storage.transfer.peer_via_s3',
+        includeProfile: true,
+        includeWorker: true
+      };
     case 's3':
-      return { messageId: 'resources.storage.transfer.s3', includeProfile: true, includeWorker: false };
+      return {
+        messageId: 'resources.storage.transfer.s3',
+        includeProfile: true,
+        includeWorker: false
+      };
     case 'modelscope':
-      return { messageId: 'resources.storage.transfer.modelscope', includeProfile: false, includeWorker: false };
+      return {
+        messageId: 'resources.storage.transfer.modelscope',
+        includeProfile: false,
+        includeWorker: false
+      };
     case 'huggingface':
-      return { messageId: 'resources.storage.transfer.huggingface', includeProfile: false, includeWorker: false };
+      return {
+        messageId: 'resources.storage.transfer.huggingface',
+        includeProfile: false,
+        includeWorker: false
+      };
     default:
-      return { messageId: 'resources.storage.transfer.unknown', includeProfile: false, includeWorker: false };
+      return {
+        messageId: 'resources.storage.transfer.unknown',
+        includeProfile: false,
+        includeWorker: false
+      };
   }
 }
 
@@ -492,7 +528,16 @@ export function buildModelPreheatS3ProfilePayload(
   return payload;
 }
 
-export function buildSystemManagedModelPreheatS3ProfilePayload(values: ModelPreheatS3ProfileWrite): Pick<ModelPreheatS3ProfileWrite, 'default_slot' | 'tls_enabled' | 'tls_verify' | 'use_virtual_hosted_style' | 'source_fallback_enabled'> {
+export function buildSystemManagedModelPreheatS3ProfilePayload(
+  values: ModelPreheatS3ProfileWrite
+): Pick<
+  ModelPreheatS3ProfileWrite,
+  | 'default_slot'
+  | 'tls_enabled'
+  | 'tls_verify'
+  | 'use_virtual_hosted_style'
+  | 'source_fallback_enabled'
+> {
   return {
     default_slot: values.default_slot ?? null,
     tls_enabled: values.tls_enabled ?? true,
