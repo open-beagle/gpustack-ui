@@ -14,15 +14,19 @@ import type {
   ModelPreheatDistributionPolicy,
   ModelPreheatS3Profile,
   ModelPreheatTask,
-  ModelPreheatWorker
+  ModelPreheatWorker,
+  ModelStorageArtifact
 } from '../config/types';
+import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatModal from './model-preheat-modal';
 import ModelPreheatPolicies from './model-preheat-policies';
 import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
+import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 import ModelPreheatTasks from './model-preheat-tasks';
 
 const api = vi.hoisted(() => ({
   createModelPreheatConnectivityCheck: vi.fn(),
+  createModelPreheatPolicy: vi.fn(),
   createModelPreheatSchedule: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
@@ -31,7 +35,16 @@ const api = vi.hoisted(() => ({
   queryModelPreheatS3Profiles: vi.fn(),
   queryModelPreheatTask: vi.fn(),
   queryModelPreheatTasks: vi.fn(),
+  queryModelStorageArtifacts: vi.fn(),
+  queryModelStorageCapabilities: vi.fn(),
+  queryModelStorageSyncTask: vi.fn(),
   queryWorkersList: vi.fn()
+}));
+const repositoryApi = vi.hoisted(() => ({
+  queryModelScopeModels: vi.fn(),
+  queryHuggingfaceModels: vi.fn(),
+  queryModelScopeModelFiles: vi.fn(),
+  queryHuggingfaceModelFiles: vi.fn()
 }));
 
 vi.mock('@umijs/max', () => ({
@@ -52,6 +65,11 @@ vi.mock('@umijs/max', () => ({
 vi.mock('../apis', async () => ({
   ...(await vi.importActual('../apis')),
   ...api
+}));
+
+vi.mock('../../llmodels/apis', async () => ({
+  ...(await vi.importActual('../../llmodels/apis')),
+  ...repositoryApi
 }));
 
 const profile: ModelPreheatS3Profile = {
@@ -240,7 +258,9 @@ const installPollScheduler = (delay: number) => {
   return {
     pending: () => timeouts.size + (interval ? 1 : 0),
     runNext: () => {
-      const entry = timeouts.entries().next().value as [number, Callback] | undefined;
+      const entry = timeouts.entries().next().value as
+        | [number, Callback]
+        | undefined;
       if (entry) timeouts.delete(entry[0]);
       const callback = entry?.[1] || interval;
       if (!callback) throw new Error(`没有 ${delay}ms 轮询回调`);
@@ -259,8 +279,99 @@ beforeEach(() => {
   api.createModelPreheatSchedule.mockResolvedValue({ id: 1 });
   api.createModelPreheatConnectivityCheck.mockResolvedValue({ id: 23 });
   api.queryModelPreheatTasks.mockResolvedValue(page([]));
+  api.queryModelStorageCapabilities.mockResolvedValue({
+    credential_encryption_available: true,
+    model_preheat_enabled: true
+  });
   api.queryModelPreheatTask.mockResolvedValue(task());
   api.queryWorkersList.mockResolvedValue(page([worker]));
+  repositoryApi.queryModelScopeModels.mockResolvedValue({
+    Data: {
+      Model: {
+        Models: [{ Path: 'team', Name: 'model', Revision: 'master' }],
+        TotalCount: 1
+      }
+    }
+  });
+  repositoryApi.queryModelScopeModelFiles.mockResolvedValue({
+    Data: { Files: [] }
+  });
+  repositoryApi.queryHuggingfaceModelFiles.mockResolvedValue([]);
+});
+
+describe('同步任务快捷创建分发策略', () => {
+  it('按同步任务详情预填 Profile 和 Artifact', async () => {
+    const user = userEvent.setup();
+    const backupProfile = {
+      ...profile,
+      id: 4,
+      name: 'backup-profile',
+      is_default: false
+    };
+    const artifact: ModelStorageArtifact = {
+      artifact_id: 'artifact-from-task',
+      source: 'huggingface',
+      model_id: 'org/model',
+      resolved_revision: 'revision-a',
+      include_patterns: ['weights/model-Q4_K_M.gguf'],
+      exclude_patterns: [],
+      manifest_digest: 'digest',
+      manifest_path: 'manifests/artifact-from-task.json',
+      manifest_state: 'valid',
+      file_count: 1,
+      total_size: 1024,
+      last_verified_at: null,
+      created_by_task_id: 41,
+      created_at: '',
+      updated_at: ''
+    };
+    api.queryModelStorageSyncTask.mockResolvedValue({
+      id: 41,
+      state: 'ready',
+      artifact_id: artifact.artifact_id,
+      profile: { id: profile.id, name: profile.name }
+    });
+    api.queryModelPreheatS3Profiles.mockResolvedValue(
+      page([profile, backupProfile])
+    );
+    api.queryModelStorageArtifacts.mockImplementation((profileId: number) =>
+      Promise.resolve(page(profileId === profile.id ? [artifact] : []))
+    );
+
+    render(
+      <ModelDistributionPolicyModal
+        open
+        initialSyncTaskId={41}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncTask).toHaveBeenCalledWith(41)
+    );
+    expect(
+      await screen.findByText('Hugging Face · org/model')
+    ).toBeInTheDocument();
+    expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(profile.id, {
+      page: 1,
+      perPage: 20
+    });
+
+    const profileSelect = screen
+      .getByText('resources.storage.targetProfile')
+      .closest('.ant-form-item')!
+      .querySelector('[role="combobox"]')!;
+    await user.click(profileSelect);
+    await user.click(await screen.findByText(backupProfile.name));
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(
+        backupProfile.id,
+        { page: 1, perPage: 20 }
+      )
+    );
+    expect(screen.queryByText('Hugging Face · org/model')).toBeNull();
+  });
 });
 
 afterEach(() => {
@@ -294,9 +405,11 @@ describe('手动预热连接检测', () => {
     });
     await waitFor(() => expect(submitTask).toBeEnabled());
     await user.click(submitTask);
-    const recheck = (await screen.findAllByRole('button', {
-      name: 'resources.preheat.connectivity.recheck'
-    })).at(-1)!;
+    const recheck = (
+      await screen.findAllByRole('button', {
+        name: 'resources.preheat.connectivity.recheck'
+      })
+    ).at(-1)!;
     await user.click(recheck);
     const checkDialog = (await screen.findAllByRole('dialog')).at(-1)!;
     const submit = within(checkDialog).getByRole('button', {
@@ -337,7 +450,9 @@ describe('手动预热连接检测', () => {
       'false'
     );
     await user.click(advanced);
-    expect(await screen.findByLabelText('resources.preheat.revision')).toHaveValue('main');
+    expect(
+      await screen.findByLabelText('resources.preheat.revision')
+    ).toHaveValue('main');
   });
 });
 
@@ -375,31 +490,26 @@ describe('策略分页请求代次', () => {
 describe('定时策略', () => {
   it('从统一入口创建定时策略并使用节点 UUID', async () => {
     const user = userEvent.setup();
-    render(<ModelPreheatPolicies />);
-    await user.click(
-      await screen.findByRole('tab', {
-        name: 'resources.preheat.policy.scheduled'
-      })
-    );
-    await user.click(
-      (await screen.findByText('resources.preheat.policy.create')).closest(
-        'button'
-      )!
+    render(
+      <ModelPreheatScheduleModal
+        open
+        initialValues={{ model_id: 'team/model' }}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
     );
     await screen.findByText('resources.preheat.schedule.create');
     await user.type(
       screen.getByLabelText('resources.preheat.policy.name'),
       'nightly-model'
     );
-    await user.type(
-      screen.getByLabelText('resources.preheat.model'),
-      'team/model'
-    );
     await user.click(
       screen.getByRole('button', { name: 'common.button.save' })
     );
     await user.click(
-      (await screen.findAllByRole('button', { name: 'common.button.save' })).at(-1)!
+      (await screen.findAllByRole('button', { name: 'common.button.save' })).at(
+        -1
+      )!
     );
 
     await waitFor(() =>
@@ -430,9 +540,7 @@ describe('连通性串行轮询', () => {
     const row = await screen
       .findByText(profile.name)
       .then((cell) => cell.closest('tr')!);
-    fireEvent.click(
-      row.querySelector('.anticon-cloud-sync')!.closest('button')!
-    );
+    fireEvent.click(row.querySelector('.anticon-eye')!.closest('button')!);
     await waitFor(() =>
       expect(api.queryModelPreheatConnectivityCheck).toHaveBeenCalledTimes(1)
     );
@@ -468,9 +576,7 @@ describe('连通性串行轮询', () => {
     const row = await screen
       .findByText(profile.name)
       .then((cell) => cell.closest('tr')!);
-    fireEvent.click(
-      row.querySelector('.anticon-cloud-sync')!.closest('button')!
-    );
+    fireEvent.click(row.querySelector('.anticon-eye')!.closest('button')!);
     await waitFor(() => expect(scheduler.pending()).toBe(1));
     act(() => scheduler.runNext());
 
@@ -612,10 +718,14 @@ describe('任务发现与串行轮询', () => {
     await screen.findByText('scheduled/model');
     expect(scheduler.pending()).toBe(0);
     fireEvent.click(screen.getByText('common.button.refresh'));
-    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2)
+    );
     await waitFor(() => expect(scheduler.pending()).toBe(1));
     act(() => scheduler.runNext());
-    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+      expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(3)
+    );
   });
 
   it('活动任务手动刷新会替换旧 timer，始终只保留一条轮询链', async () => {
@@ -626,7 +736,9 @@ describe('任务发现与串行轮询', () => {
     await screen.findByText('scheduled/model');
     await waitFor(() => expect(scheduler.pending()).toBe(1));
     fireEvent.click(screen.getByText('common.button.refresh'));
-    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(2)
+    );
     await waitFor(() => expect(scheduler.pending()).toBe(1));
   });
 
@@ -636,7 +748,9 @@ describe('任务发现与串行轮询', () => {
     api.queryModelPreheatTasks.mockReturnValueOnce(slowPage.promise);
     const view = render(<ModelPreheatTasks />);
 
-    await waitFor(() => expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(api.queryModelPreheatTasks).toHaveBeenCalledTimes(1)
+    );
     view.unmount();
     slowPage.resolve(page([task()]));
     await act(async () => {

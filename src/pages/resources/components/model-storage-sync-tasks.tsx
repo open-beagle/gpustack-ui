@@ -3,7 +3,8 @@ import {
   EyeOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SendOutlined
+  SendOutlined,
+  StopOutlined
 } from '@ant-design/icons';
 import { useIntl, useNavigate } from '@umijs/max';
 import {
@@ -27,9 +28,9 @@ import {
   queryModelStorageSyncTasks
 } from '../apis';
 import {
-  getModelStorageSourceLabel,
   getModelStorageErrorPresentation,
   getModelStorageRevisionPresentation,
+  getModelStorageSourceLabel,
   getModelStorageTaskStatusPresentation,
   LatestRequestGate
 } from '../config/model-preheat';
@@ -61,7 +62,9 @@ const ModelStorageSyncTasks: React.FC = () => {
   } | null>(null);
   const [detail, setDetail] = useState<ModelStorageSyncTaskDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailTask, setDetailTask] = useState<ModelStorageSyncTask | null>(null);
+  const [detailTask, setDetailTask] = useState<ModelStorageSyncTask | null>(
+    null
+  );
   const [detailError, setDetailError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -98,18 +101,21 @@ const ModelStorageSyncTasks: React.FC = () => {
     return task.source_worker_name || `Worker #${workerId}`;
   };
 
-  const load = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    return taskRequests.current.run(
-      () => queryModelStorageSyncTasks({ page, perPage: pageSize }),
-      (result) => {
-        setTasks(result.items);
-        setTotal(result.pagination.total);
-        setLoadError(false);
-      },
-      () => setLoading(false)
-    );
-  }, [page, pageSize]);
+  const load = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) setLoading(true);
+      return taskRequests.current.run(
+        () => queryModelStorageSyncTasks({ page, perPage: pageSize }),
+        (result) => {
+          setTasks(result.items);
+          setTotal(result.pagination.total);
+          setLoadError(false);
+        },
+        () => setLoading(false)
+      );
+    },
+    [page, pageSize]
+  );
 
   useEffect(() => {
     void load().catch(() => setLoadError(true));
@@ -262,7 +268,9 @@ const ModelStorageSyncTasks: React.FC = () => {
                         : 'processing'
                 }
               >
-                {intl.formatMessage({ id: getModelStorageTaskStatusPresentation(state).messageId })}
+                {intl.formatMessage({
+                  id: getModelStorageTaskStatusPresentation(state).messageId
+                })}
               </Tag>
             )
           },
@@ -281,7 +289,9 @@ const ModelStorageSyncTasks: React.FC = () => {
                     aria-label={intl.formatMessage({
                       id: 'common.button.detail'
                     })}
-                    onClick={() => void openDetail(task).catch(() => setDetailError(true))}
+                    onClick={() =>
+                      void openDetail(task).catch(() => setDetailError(true))
+                    }
                   />
                 </Tooltip>
                 {task.state === 'ready' && (
@@ -316,7 +326,7 @@ const ModelStorageSyncTasks: React.FC = () => {
                     <Button
                       danger
                       type="text"
-                      icon={<DeleteOutlined />}
+                      icon={<StopOutlined />}
                       aria-label={intl.formatMessage({
                         id: 'resources.storage.cancelSync'
                       })}
@@ -386,13 +396,27 @@ const ModelStorageSyncTasks: React.FC = () => {
         footer={null}
         title={intl.formatMessage({ id: 'resources.storage.syncTaskDetail' })}
       >
-        {detailError && <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message={intl.formatMessage({ id: 'resources.storage.state.error' })}
-          action={<Button size="small" onClick={() => detailTask && void openDetail(detailTask).catch(() => setDetailError(true))}>{intl.formatMessage({ id: 'common.button.retry' })}</Button>}
-        />}
+        {detailError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={intl.formatMessage({
+              id: 'resources.storage.state.error'
+            })}
+            action={
+              <Button
+                size="small"
+                onClick={() =>
+                  detailTask &&
+                  void openDetail(detailTask).catch(() => setDetailError(true))
+                }
+              >
+                {intl.formatMessage({ id: 'common.button.retry' })}
+              </Button>
+            }
+          />
+        )}
         {detailLoading ? (
           <Typography.Text>...</Typography.Text>
         ) : (
@@ -405,22 +429,40 @@ const ModelStorageSyncTasks: React.FC = () => {
               {detail ? getModelStorageSourceLabel(detail.source) : '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Artifact ID">
-              <Typography.Text copyable={Boolean(detail?.artifact_id)}>{detail?.artifact_id || '-'}</Typography.Text>
+              <Typography.Text copyable={Boolean(detail?.artifact_id)}>
+                {detail?.artifact_id || '-'}
+              </Typography.Text>
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.fileCount' })}>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.fileCount' })}
+            >
               {detail?.file_count ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.totalSize' })}>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.totalSize' })}
+            >
               {detail ? numeral(detail.total_size).format('0.00 b') : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.createdAt' })}>
-              {detail?.created_at ? dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.createdAt' })}
+            >
+              {detail?.created_at
+                ? dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss')
+                : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.startedAt' })}>
-              {detail?.started_at ? dayjs(detail.started_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.startedAt' })}
+            >
+              {detail?.started_at
+                ? dayjs(detail.started_at).format('YYYY-MM-DD HH:mm:ss')
+                : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.finishedAt' })}>
-              {detail?.finished_at ? dayjs(detail.finished_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.finishedAt' })}
+            >
+              {detail?.finished_at
+                ? dayjs(detail.finished_at).format('YYYY-MM-DD HH:mm:ss')
+                : '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({
@@ -439,9 +481,18 @@ const ModelStorageSyncTasks: React.FC = () => {
             <Descriptions.Item
               label={intl.formatMessage({ id: 'common.table.status' })}
             >
-              {detail ? intl.formatMessage({ id: getModelStorageTaskStatusPresentation(detail.state).messageId }) : '-'}
+              {detail
+                ? intl.formatMessage({
+                    id: getModelStorageTaskStatusPresentation(detail.state)
+                      .messageId
+                  })
+                : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.stateMessage' })}>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.stateMessage'
+              })}
+            >
               {detail?.state_message || '-'}
             </Descriptions.Item>
             <Descriptions.Item
@@ -451,7 +502,8 @@ const ModelStorageSyncTasks: React.FC = () => {
             >
               {detail?.error_code
                 ? intl.formatMessage({
-                    id: getModelStorageErrorPresentation(detail.error_code).messageId,
+                    id: getModelStorageErrorPresentation(detail.error_code)
+                      .messageId,
                     defaultMessage: detail.error_code
                   })
                 : '-'}

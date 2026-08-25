@@ -34,9 +34,11 @@ export interface ModelFileSyncActionState {
 
 export type ModelFileDeletePreflight = 'available' | 'active' | 'error';
 
-export const MODEL_FILE_WATCH_EVENTS: Array<
-  'INSERT' | 'UPDATE' | 'DELETE'
-> = ['INSERT', 'UPDATE', 'DELETE'];
+export const MODEL_FILE_WATCH_EVENTS: Array<'INSERT' | 'UPDATE' | 'DELETE'> = [
+  'INSERT',
+  'UPDATE',
+  'DELETE'
+];
 
 type ModelFileSyncTaskQuery = (params: {
   page: number;
@@ -126,7 +128,9 @@ export function getModelFileSyncActionState(
   defaultProfileId?: number,
   requireDefaultProfile = true
 ): ModelFileSyncActionState {
-  if (!['model_scope', 'huggingface', 'ollama_library'].includes(model.source)) {
+  if (
+    !['model_scope', 'huggingface', 'ollama_library'].includes(model.source)
+  ) {
     return { visible: true, disabled: true, reason: 'unsupported' };
   }
   if (model.state !== 'ready') {
@@ -218,7 +222,25 @@ const STORAGE_ERROR_IDS: Record<string, string> = {
   s3_object_conflict: 'resources.storage.error.objectConflict',
   manifest_invalid: 'resources.storage.error.manifestInvalid',
   worker_not_current: 'resources.storage.error.workerUnavailable',
-  worker_execution_failed: 'resources.storage.error.workerExecutionFailed'
+  worker_execution_failed: 'resources.storage.error.workerExecutionFailed',
+  model_preheat_disabled: 'resources.storage.error.modelPreheatDisabled',
+  model_sync_source_not_found: 'resources.storage.error.syncSourceNotFound',
+  model_sync_source_unsupported:
+    'resources.storage.error.syncSourceUnsupported',
+  not_reached: 'resources.storage.error.notReached',
+  invalid_endpoint_scheme: 'resources.storage.error.invalidEndpoint',
+  s3_forbidden_address: 'resources.storage.error.forbiddenAddress',
+  dns_resolution_timeout: 'resources.storage.error.dnsTimeout',
+  dns_resolution_failed: 'resources.storage.error.dnsFailed',
+  tcp_connection_failed: 'resources.storage.error.tcpFailed',
+  tls_certificate_verify_failed: 'resources.storage.error.tlsVerifyFailed',
+  tls_handshake_failed: 'resources.storage.error.tlsHandshakeFailed',
+  s3_redirect_forbidden: 'resources.storage.error.redirectForbidden',
+  s3_authentication_failed: 'resources.storage.error.authenticationFailed',
+  s3_request_failed: 'resources.storage.error.requestFailed',
+  s3_client_initialization_failed:
+    'resources.storage.error.clientInitializationFailed',
+  s3_read_content_mismatch: 'resources.storage.error.readContentMismatch'
 };
 
 export function getModelStorageFlowPresentation(
@@ -260,6 +282,35 @@ export function getModelStorageErrorPresentation(errorCode?: string | null) {
     value,
     messageId: STORAGE_ERROR_IDS[value] || 'resources.storage.error.unknown'
   };
+}
+
+export function extractModelStorageErrorCode(error: unknown) {
+  const value = error as {
+    message?: unknown;
+    response?: {
+      data?: {
+        reason?: unknown;
+        error_code?: unknown;
+        code?: unknown;
+        message?: unknown;
+      };
+    };
+  };
+  const candidates = [
+    value?.response?.data?.reason,
+    value?.response?.data?.error_code,
+    value?.response?.data?.code,
+    value?.response?.data?.message,
+    value?.message
+  ];
+  return (
+    candidates
+      .find(
+        (candidate): candidate is string =>
+          typeof candidate === 'string' && Boolean(candidate.trim())
+      )
+      ?.trim() || null
+  );
 }
 
 export function mergeModelStoragePage<T>(
@@ -514,9 +565,11 @@ const resolveTargetWorkers = (
       reasons.push({ code: 'seed_worker_not_ready' });
       return [];
     }
-    return [eligible.sort((left, right) =>
-      left.worker_uuid.localeCompare(right.worker_uuid)
-    )[0]];
+    return [
+      eligible.sort((left, right) =>
+        left.worker_uuid.localeCompare(right.worker_uuid)
+      )[0]
+    ];
   }
 
   if (values.target_scope === 'selected_workers') {
@@ -666,10 +719,13 @@ export function buildModelPreheatCreatePayload(values: ModelPreheatCreate) {
         ? values.target_worker_ids
         : [],
     target_scope:
-      values.delivery_mode === 's3_only' ? 'selected_workers' : values.target_scope,
+      values.delivery_mode === 's3_only'
+        ? 'selected_workers'
+        : values.target_scope,
     seed_worker_id: values.seed_worker_id || null,
     keep_new_workers_in_sync:
-      values.delivery_mode === 's3_and_workers' && values.keep_new_workers_in_sync
+      values.delivery_mode === 's3_and_workers' &&
+      values.keep_new_workers_in_sync
   } satisfies ModelPreheatCreate;
 }
 

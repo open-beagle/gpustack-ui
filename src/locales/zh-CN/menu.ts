@@ -23,7 +23,7 @@ export default {
   'menu.404': '404',
   'menu.resources.workers': 'Workers',
   'menu.resources.gpus': 'GPUs',
-  'menu.resources.modelfiles': '模型预热',
+  'menu.resources.modelfiles': '模型管理',
   'menu.resources.modelarchive': '模型归档',
   'menu.accessControl': '访问控制',
   'menu.accessControl.apikeys': 'API 密钥',

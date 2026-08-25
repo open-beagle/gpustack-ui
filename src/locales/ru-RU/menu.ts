@@ -22,7 +22,7 @@ export default {
   'menu.404': 'Ошибка 404',
   'menu.resources.workers': 'Воркеры',
   'menu.resources.gpus': 'GPUs',
-  'menu.resources.modelfiles': 'Предзагрузка моделей',
+  'menu.resources.modelfiles': 'Управление моделями',
   'menu.resources.modelarchive': 'Архив моделей',
   'menu.accessControl': 'Управление доступом',
   'menu.accessControl.apikeys': 'API Ключи',

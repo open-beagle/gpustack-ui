@@ -1,8 +1,11 @@
-import { Button, Select } from 'antd';
 import { useIntl } from '@umijs/max';
-import React, { useRef, useState } from 'react';
+import { Button, Divider, Select } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
 import { queryModelFilesList } from '../apis';
-import { getModelFileStorageModelId, mergeModelStoragePage } from '../config/model-preheat';
+import {
+  getModelFileStorageModelId,
+  mergeModelStoragePage
+} from '../config/model-preheat';
 import type { ModelFile } from '../config/types';
 import ModelStorageAsyncState from './model-storage-async-state';
 
@@ -13,7 +16,12 @@ interface Props {
   disabledReason?: string;
 }
 
-const ModelFileSelect: React.FC<Props> = ({ value, onChange, disabled, disabledReason }) => {
+const ModelFileSelect: React.FC<Props> = ({
+  value,
+  onChange,
+  disabled,
+  disabledReason
+}) => {
   const intl = useIntl();
   const requestId = useRef(0);
   const [items, setItems] = useState<ModelFile[]>([]);
@@ -28,9 +36,17 @@ const ModelFileSelect: React.FC<Props> = ({ value, onChange, disabled, disabledR
     setLoading(true);
     setError(undefined);
     try {
-      const result = await queryModelFilesList({ page: nextPage, perPage: 20, ...(nextSearch ? { search: nextSearch } : {}) });
+      const result = await queryModelFilesList({
+        page: nextPage,
+        perPage: 20,
+        ...(nextSearch ? { search: nextSearch } : {})
+      });
       if (id === requestId.current) {
-        setItems((current) => append ? mergeModelStoragePage(current, result.items, (item) => item.id) : result.items);
+        setItems((current) =>
+          append
+            ? mergeModelStoragePage(current, result.items, (item) => item.id)
+            : result.items
+        );
         setPage(nextPage);
         setTotal(result.pagination.total);
       }
@@ -40,10 +56,68 @@ const ModelFileSelect: React.FC<Props> = ({ value, onChange, disabled, disabledR
       if (id === requestId.current) setLoading(false);
     }
   };
-  return <ModelStorageAsyncState data={items} loading={loading} refreshing={loading && Boolean(items.length)} error={error} query={search} disabledReason={disabled ? disabledReason : undefined} onRetry={() => void load(search)}>
-    <Select showSearch allowClear filterOption={false} value={value} disabled={disabled} onSearch={(nextSearch) => void load(nextSearch, 1)} onChange={(nextValue) => onChange(nextValue, items.find((item) => item.id === nextValue))} options={items.map((item) => ({ value: item.id, label: `${getModelFileStorageModelId(item)} · ${item.state}` }))} />
-    {items.length < total && <Button type="link" loading={loading} onMouseDown={(event) => event.preventDefault()} onClick={() => void load(search, page + 1, true)}>{intl.formatMessage({ id: 'resources.storage.loadMore' })}</Button>}
-  </ModelStorageAsyncState>;
+  useEffect(() => {
+    void load('');
+    return () => {
+      requestId.current += 1;
+    };
+  }, []);
+  const options = items.map((item) => ({
+    value: item.id,
+    label: `${getModelFileStorageModelId(item)} · ${item.state}`
+  }));
+  if (value !== undefined && !items.some((item) => item.id === value))
+    options.unshift({ value, label: String(value) });
+  return (
+    <ModelStorageAsyncState
+      data={items}
+      loading={loading}
+      refreshing={loading && Boolean(items.length)}
+      error={error}
+      query={search}
+      disabledReason={disabled ? disabledReason : undefined}
+      onRetry={() => void load(search)}
+      compact
+    >
+      <Select
+        showSearch
+        allowClear
+        filterOption={false}
+        value={value}
+        disabled={disabled}
+        loading={loading}
+        onSearch={(nextSearch) => void load(nextSearch, 1)}
+        onChange={(nextValue) =>
+          onChange(
+            nextValue,
+            items.find((item) => item.id === nextValue)
+          )
+        }
+        options={options}
+        popupRender={(menu) => (
+          <>
+            {menu}
+            {items.length < total && (
+              <div
+                onMouseDown={(event) => event.preventDefault()}
+                style={{ padding: '0 12px 8px' }}
+              >
+                <Divider style={{ margin: '8px 0' }} />
+                <Button
+                  type="link"
+                  block
+                  loading={loading}
+                  onClick={() => void load(search, page + 1, true)}
+                >
+                  {intl.formatMessage({ id: 'resources.storage.loadMore' })}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      />
+    </ModelStorageAsyncState>
+  );
 };
 
 export default ModelFileSelect;

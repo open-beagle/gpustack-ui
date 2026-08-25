@@ -247,6 +247,7 @@ export interface ModelPreheatS3Profile extends ModelPreheatS3ProfileBase {
 
 export interface ModelStorageCapabilities {
   credential_encryption_available: boolean;
+  model_preheat_enabled?: boolean;
 }
 
 export interface ModelStorageConnectionStage {

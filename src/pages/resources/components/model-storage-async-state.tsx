@@ -1,5 +1,5 @@
-import { Alert, Empty, Spin } from 'antd';
 import { useIntl } from '@umijs/max';
+import { Alert, Empty, Spin } from 'antd';
 import React from 'react';
 
 interface Props<T> {
@@ -12,6 +12,7 @@ interface Props<T> {
   query?: string;
   disabledReason?: string;
   onRetry?: () => void;
+  compact?: boolean;
 }
 
 /** 共享异步状态壳：刷新时始终保留已加载内容。 */
@@ -24,7 +25,8 @@ const ModelStorageAsyncState = <T,>({
   hasFilters,
   query,
   disabledReason,
-  onRetry
+  onRetry,
+  compact = false
 }: Props<T>) => {
   const intl = useIntl();
   const message = (id: string) => intl.formatMessage({ id });
@@ -35,13 +37,15 @@ const ModelStorageAsyncState = <T,>({
       {disabledReason && (
         <Alert type="warning" showIcon message={message(disabledReason)} />
       )}
-      {initialLoading && (
+      {initialLoading && !compact && (
         <>
           <Spin spinning />
           <span>{message('resources.storage.state.loading')}</span>
         </>
       )}
-      {refreshing && <span>{message('resources.storage.state.refreshing')}</span>}
+      {refreshing && (
+        <span>{message('resources.storage.state.refreshing')}</span>
+      )}
       {Boolean(error) && (
         <Alert
           type="error"
@@ -56,7 +60,7 @@ const ModelStorageAsyncState = <T,>({
           }
         />
       )}
-      {isEmpty && (
+      {isEmpty && !compact && (
         <Empty
           description={message(
             hasFilters || Boolean(query)

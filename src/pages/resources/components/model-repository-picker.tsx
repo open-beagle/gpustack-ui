@@ -1,13 +1,28 @@
-import { Collapse, Input, Pagination, Select } from 'antd';
 import { useIntl } from '@umijs/max';
+import { Collapse, Divider, Input, Pagination, Select } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
-import { queryHuggingfaceModels, queryModelScopeModels } from '../../llmodels/apis';
+import {
+  queryHuggingfaceModels,
+  queryModelScopeModels
+} from '../../llmodels/apis';
 import ModelStorageAsyncState from './model-storage-async-state';
 
 export type RepositorySource = 'model_scope' | 'huggingface' | 'ollama_library';
-export interface RepositoryOption { id: string; label: string; revision?: string; }
-export interface RepositorySearchResult { items: RepositoryOption[]; total: number; }
-export type RepositorySearch = (args: { query: string; page: number; perPage: number; signal: AbortSignal }) => Promise<RepositorySearchResult>;
+export interface RepositoryOption {
+  id: string;
+  label: string;
+  revision?: string;
+}
+export interface RepositorySearchResult {
+  items: RepositoryOption[];
+  total: number;
+}
+export type RepositorySearch = (args: {
+  query: string;
+  page: number;
+  perPage: number;
+  signal: AbortSignal;
+}) => Promise<RepositorySearchResult>;
 
 interface Props {
   source: RepositorySource;
@@ -21,18 +36,63 @@ interface Props {
   id?: string;
 }
 
-const defaultModelscopeSearch: RepositorySearch = async ({ query, page, perPage, signal }) => {
-  const data = await queryModelScopeModels({ Name: query, PageNumber: page, PageSize: perPage }, { signal });
+const defaultModelscopeSearch: RepositorySearch = async ({
+  query,
+  page,
+  perPage,
+  signal
+}) => {
+  const data = await queryModelScopeModels(
+    { Name: query, PageNumber: page, PageSize: perPage },
+    { signal }
+  );
   const models = data?.Data?.Model?.Models || [];
-  return { items: models.map((item: any) => ({ id: `${item.Path}/${item.Name}`, label: `${item.Path}/${item.Name}`, revision: item.Revision })), total: data?.Data?.Model?.TotalCount || 0 };
+  return {
+    items: models.map((item: any) => ({
+      id: `${item.Path}/${item.Name}`,
+      label: `${item.Path}/${item.Name}`,
+      revision: item.Revision
+    })),
+    total: data?.Data?.Model?.TotalCount || 0
+  };
 };
-const defaultHuggingfaceSearch: RepositorySearch = async ({ query, page, perPage, signal }) => {
-  const models = await queryHuggingfaceModels({ search: { query, tags: [] } }, { signal, limit: page * perPage });
-  const items = models.slice((page - 1) * perPage, page * perPage).map((item: any) => ({ id: item.name || item.id, label: item.name || item.id, revision: item.sha }));
-  return { items, total: items.length === perPage ? page * perPage + 1 : (page - 1) * perPage + items.length };
+const defaultHuggingfaceSearch: RepositorySearch = async ({
+  query,
+  page,
+  perPage,
+  signal
+}) => {
+  const models = await queryHuggingfaceModels(
+    { search: { query, tags: [] } },
+    { signal, limit: page * perPage }
+  );
+  const items = models
+    .slice((page - 1) * perPage, page * perPage)
+    .map((item: any) => ({
+      id: item.name || item.id,
+      label: item.name || item.id,
+      revision: item.sha
+    }));
+  return {
+    items,
+    total:
+      items.length === perPage
+        ? page * perPage + 1
+        : (page - 1) * perPage + items.length
+  };
 };
 
-const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollamaHistory = [], searchers = {}, disabled, disabledReason, ariaLabel, id }) => {
+const ModelRepositoryPicker: React.FC<Props> = ({
+  source,
+  value,
+  onChange,
+  ollamaHistory = [],
+  searchers = {},
+  disabled,
+  disabledReason,
+  ariaLabel,
+  id
+}) => {
   const intl = useIntl();
   const message = (id: string) => intl.formatMessage({ id });
   const controller = useRef<AbortController>();
@@ -45,7 +105,12 @@ const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollam
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>();
   sourceRef.current = source;
-  const remote = source === 'model_scope' ? searchers.modelscope || defaultModelscopeSearch : source === 'huggingface' ? searchers.huggingface || defaultHuggingfaceSearch : undefined;
+  const remote =
+    source === 'model_scope'
+      ? searchers.modelscope || defaultModelscopeSearch
+      : source === 'huggingface'
+        ? searchers.huggingface || defaultHuggingfaceSearch
+        : undefined;
   const load = async (nextQuery = query, nextPage = page) => {
     if (!remote) return;
     controller.current?.abort();
@@ -56,11 +121,27 @@ const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollam
     setLoading(true);
     setError(undefined);
     try {
-      const result = await remote({ query: nextQuery, page: nextPage, perPage: 20, signal: nextController.signal });
-      if (id === generation.current && sourceRef.current === requestSource) { setItems(result.items); setTotal(result.total); }
+      const result = await remote({
+        query: nextQuery,
+        page: nextPage,
+        perPage: 20,
+        signal: nextController.signal
+      });
+      if (id === generation.current && sourceRef.current === requestSource) {
+        setItems(result.items);
+        setTotal(result.total);
+      }
     } catch (nextError) {
-      if (id === generation.current && sourceRef.current === requestSource && (nextError as Error).name !== 'AbortError') setError(nextError);
-    } finally { if (id === generation.current && sourceRef.current === requestSource) setLoading(false); }
+      if (
+        id === generation.current &&
+        sourceRef.current === requestSource &&
+        (nextError as Error).name !== 'AbortError'
+      )
+        setError(nextError);
+    } finally {
+      if (id === generation.current && sourceRef.current === requestSource)
+        setLoading(false);
+    }
   };
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
@@ -73,14 +154,109 @@ const ModelRepositoryPicker: React.FC<Props> = ({ source, value, onChange, ollam
     setQuery('');
     setError(undefined);
     setLoading(false);
+    if (remote) void load('', 1);
   }, [source]);
-  const historyItems = ollamaHistory.filter((item) => item.toLowerCase().includes(query.toLowerCase())).map((item) => ({ id: item, label: item }));
+  const historyItems = ollamaHistory
+    .filter((item) => item.toLowerCase().includes(query.toLowerCase()))
+    .map((item) => ({ id: item, label: item }));
   const options = remote ? items : historyItems;
-  return <ModelStorageAsyncState data={options} loading={loading} refreshing={loading && Boolean(options.length)} error={error} query={query} disabledReason={disabled ? disabledReason : undefined} onRetry={() => void load()}>
-    <Select id={id} aria-label={ariaLabel} showSearch allowClear filterOption={false} value={value} disabled={disabled} loading={loading} onSearch={(nextQuery) => { setQuery(nextQuery); setPage(1); if (nextQuery) onChange(nextQuery, { id: nextQuery, label: nextQuery }); if (remote) void load(nextQuery, 1); }} onChange={(nextValue) => onChange(nextValue, options.find((item) => item.id === nextValue))} options={options.map((item) => ({ value: item.id, label: item.label }))} />
-    {source === 'ollama_library' && <Collapse size="small" items={[{ key: 'exact', label: message('resources.storage.repository.advanced'), children: <Input aria-label={message('resources.storage.repository.exactInput')} placeholder={message('resources.storage.repository.exactInput')} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value || undefined, event.target.value ? { id: event.target.value, label: event.target.value } : undefined)} /> }]} />}
-    {remote && total > 20 && <Pagination size="small" current={page} pageSize={20} total={total} onChange={(nextPage) => { setPage(nextPage); void load(query, nextPage); }} />}
-  </ModelStorageAsyncState>;
+  const visibleOptions =
+    value && !options.some((item) => item.id === value)
+      ? [{ id: value, label: value }, ...options]
+      : options;
+  return (
+    <ModelStorageAsyncState
+      data={options}
+      loading={loading}
+      refreshing={loading && Boolean(options.length)}
+      error={error}
+      query={query}
+      disabledReason={disabled ? disabledReason : undefined}
+      onRetry={() => void load()}
+      compact
+    >
+      <Select
+        id={id}
+        aria-label={ariaLabel}
+        showSearch
+        allowClear
+        filterOption={false}
+        value={value}
+        disabled={disabled}
+        loading={loading}
+        onSearch={(nextQuery) => {
+          setQuery(nextQuery);
+          setPage(1);
+          if (remote) void load(nextQuery, 1);
+        }}
+        onChange={(nextValue) =>
+          onChange(
+            nextValue,
+            visibleOptions.find((item) => item.id === nextValue)
+          )
+        }
+        options={visibleOptions.map((item) => ({
+          value: item.id,
+          label: item.label
+        }))}
+        popupRender={(menu) => (
+          <>
+            {menu}
+            {remote && total > 20 && (
+              <div
+                onMouseDown={(event) => event.preventDefault()}
+                style={{ padding: '0 12px 8px' }}
+              >
+                <Divider style={{ margin: '8px 0' }} />
+                <Pagination
+                  size="small"
+                  current={page}
+                  pageSize={20}
+                  total={total}
+                  showSizeChanger={false}
+                  onChange={(nextPage) => {
+                    setPage(nextPage);
+                    void load(query, nextPage);
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+      />
+      {source === 'ollama_library' && (
+        <Collapse
+          size="small"
+          items={[
+            {
+              key: 'exact',
+              label: message('resources.storage.repository.advanced'),
+              children: (
+                <Input
+                  aria-label={message(
+                    'resources.storage.repository.exactInput'
+                  )}
+                  placeholder={message(
+                    'resources.storage.repository.exactInput'
+                  )}
+                  value={value}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onChange(
+                      event.target.value || undefined,
+                      event.target.value
+                        ? { id: event.target.value, label: event.target.value }
+                        : undefined
+                    )
+                  }
+                />
+              )
+            }
+          ]}
+        />
+      )}
+    </ModelStorageAsyncState>
+  );
 };
 
 export default ModelRepositoryPicker;

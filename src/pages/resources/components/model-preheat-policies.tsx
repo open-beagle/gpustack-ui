@@ -1,23 +1,24 @@
 import {
+  CloudSyncOutlined,
   DeleteOutlined,
   EditOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SyncOutlined
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
   Alert,
   Button,
+  message,
   Space,
   Table,
   Tabs,
   Tag,
   Tooltip,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import dayjs from 'dayjs';
 import React, {
@@ -38,6 +39,8 @@ import {
   updateModelPreheatSchedule
 } from '../apis';
 import {
+  extractModelStorageErrorCode,
+  getModelStorageErrorPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate
 } from '../config/model-preheat';
@@ -49,6 +52,7 @@ import type {
 import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
+import { useModelPreheatCapability } from './use-model-preheat-capability';
 
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
 type ScheduleAction = 'enable' | 'disable' | 'run' | 'delete';
@@ -75,7 +79,10 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [policyError, setPolicyError] = useState(false);
   const [scheduleError, setScheduleError] = useState(false);
-  const [actionError, setActionError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { state: preheatCapability, retry: retryPreheatCapability } =
+    useModelPreheatCapability();
+  const preheatEnabled = preheatCapability === 'enabled';
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -100,7 +107,9 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     schedule: ModelPreheatSchedule;
     action: ScheduleAction;
   } | null>(null);
-  const [actionLoading, setActionLoading] = useState<ActionLoading | null>(null);
+  const [actionLoading, setActionLoading] = useState<ActionLoading | null>(
+    null
+  );
 
   const policyActionDisabledReason = (
     policy: ModelPreheatDistributionPolicy,
@@ -122,21 +131,30 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     schedule: ModelPreheatSchedule,
     action: ScheduleAction
   ) =>
-    action === 'run' && !schedule.enabled
-      ? 'resources.storage.syncPolicy.disabled.policyDisabled'
-      : undefined;
+    action === 'run' && preheatCapability === 'disabled'
+      ? 'resources.preheat.disabledByServer'
+      : action === 'run' && preheatCapability === 'loading'
+        ? 'resources.preheat.capabilityChecking'
+        : action === 'run' && preheatCapability === 'error'
+          ? 'resources.preheat.capabilityLoadFailed'
+          : action === 'run' && !schedule.enabled
+            ? 'resources.storage.syncPolicy.disabled.policyDisabled'
+            : undefined;
+
+  const preheatActionSelected =
+    mode === 'preheat' || (mode === undefined && activeTab === 'schedule');
 
   const loadPolicies = useCallback(async () => {
     setPolicyLoading(true);
     setPolicyError(false);
     try {
       return await policyRequests.current.run(
-      () => queryModelPreheatPolicies({ page, perPage: pageSize }),
-      (result) => {
-        setPolicies(result.items);
-        setTotal(result.pagination.total);
-      },
-      () => setPolicyLoading(false)
+        () => queryModelPreheatPolicies({ page, perPage: pageSize }),
+        (result) => {
+          setPolicies(result.items);
+          setTotal(result.pagination.total);
+        },
+        () => setPolicyLoading(false)
       );
     } catch (error) {
       setPolicyError(true);
@@ -149,16 +167,16 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     setScheduleError(false);
     try {
       return await scheduleRequests.current.run(
-      () =>
-        queryModelPreheatSchedules({
-          page: schedulePage,
-          perPage: schedulePageSize
-        }),
-      (result) => {
-        setSchedules(result.items);
-        setScheduleTotal(result.pagination.total);
-      },
-      () => setScheduleLoading(false)
+        () =>
+          queryModelPreheatSchedules({
+            page: schedulePage,
+            perPage: schedulePageSize
+          }),
+        (result) => {
+          setSchedules(result.items);
+          setScheduleTotal(result.pagination.total);
+        },
+        () => setScheduleLoading(false)
       );
     } catch (error) {
       setScheduleError(true);
@@ -237,7 +255,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       id: policyConfirm.policy.id,
       action: policyConfirm.action
     });
-    setActionError(false);
+    setActionError(null);
     try {
       if (policyConfirm.action === 'delete') {
         await deleteModelPreheatPolicy(policyConfirm.policy.id);
@@ -251,8 +269,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       setPolicyConfirm(null);
       message.success(intl.formatMessage({ id: 'common.message.success' }));
       await loadPolicies();
-    } catch {
-      setActionError(true);
+    } catch (error) {
+      setActionError(extractModelStorageErrorCode(error) || 'unknown');
     } finally {
       actionInFlight.current.delete(actionKey);
       setActionLoading(null);
@@ -269,7 +287,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       id: scheduleConfirm.schedule.id,
       action: scheduleConfirm.action
     });
-    setActionError(false);
+    setActionError(null);
     try {
       if (scheduleConfirm.action === 'delete') {
         await deleteModelPreheatSchedule(scheduleConfirm.schedule.id);
@@ -287,8 +305,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       setScheduleConfirm(null);
       message.success(intl.formatMessage({ id: 'common.message.success' }));
       await loadSchedules();
-    } catch {
-      setActionError(true);
+    } catch (error) {
+      setActionError(extractModelStorageErrorCode(error) || 'unknown');
     } finally {
       actionInFlight.current.delete(actionKey);
       setActionLoading(null);
@@ -371,7 +389,10 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         render: (_: unknown, policy: ModelPreheatDistributionPolicy) => {
           const toggleAction = policy.enabled ? 'disable' : 'enable';
           const toggleReason = policyActionDisabledReason(policy, toggleAction);
-          const reconcileReason = policyActionDisabledReason(policy, 'reconcile');
+          const reconcileReason = policyActionDisabledReason(
+            policy,
+            'reconcile'
+          );
           const toggleTooltip =
             toggleReason === 'resources.preheat.policy.disabled.blocked'
               ? intl.formatMessage(
@@ -391,60 +412,68 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
             actionLoading.action === action;
           const hasActionInFlight =
             actionLoading?.type === 'policy' && actionLoading.id === policy.id;
-          return <Space size={4}>
-            <Tooltip title={toggleTooltip}>
-              <Button
-                type="text"
-                icon={
-                  policy.enabled ? (
-                    <PauseCircleOutlined />
-                  ) : (
-                    <PlayCircleOutlined />
-                  )
-                }
-                aria-label={intl.formatMessage({
-                  id: policy.enabled
-                    ? 'resources.preheat.policy.disable'
-                    : 'resources.preheat.policy.enable'
+          return (
+            <Space size={4}>
+              <Tooltip title={toggleTooltip}>
+                <Button
+                  type="text"
+                  icon={
+                    policy.enabled ? (
+                      <PauseCircleOutlined />
+                    ) : (
+                      <PlayCircleOutlined />
+                    )
+                  }
+                  aria-label={intl.formatMessage({
+                    id: policy.enabled
+                      ? 'resources.preheat.policy.disable'
+                      : 'resources.preheat.policy.enable'
+                  })}
+                  loading={isLoading(toggleAction)}
+                  disabled={hasActionInFlight || Boolean(toggleReason)}
+                  onClick={() =>
+                    setPolicyConfirm({
+                      policy,
+                      action: policy.enabled ? 'disable' : 'enable'
+                    })
+                  }
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({
+                  id: reconcileReason || 'resources.preheat.policy.reconcile'
                 })}
-                loading={isLoading(toggleAction)}
-                disabled={hasActionInFlight || Boolean(toggleReason)}
-                onClick={() =>
-                  setPolicyConfirm({
-                    policy,
-                    action: policy.enabled ? 'disable' : 'enable'
-                  })
-                }
-              />
-            </Tooltip>
-            <Tooltip title={intl.formatMessage({
-              id: reconcileReason || 'resources.preheat.policy.reconcile'
-            })}>
-              <Button
-                type="text"
-                icon={<SyncOutlined />}
-                aria-label={intl.formatMessage({
-                  id: 'resources.preheat.policy.reconcile'
-                })}
-                loading={isLoading('reconcile')}
-                disabled={hasActionInFlight || Boolean(reconcileReason)}
-                onClick={() =>
-                  setPolicyConfirm({ policy, action: 'reconcile' })
-                }
-              />
-            </Tooltip>
-            <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
-              <Button
-                danger
-                type="text"
-                icon={<DeleteOutlined />}
-                aria-label={intl.formatMessage({ id: 'common.button.delete' })}
-                loading={isLoading('delete')}
-                disabled={hasActionInFlight}
-                onClick={() => setPolicyConfirm({ policy, action: 'delete' })}
-              />
-            </Tooltip>
-          </Space>;
+              >
+                <Button
+                  type="text"
+                  icon={<CloudSyncOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'resources.preheat.policy.reconcile'
+                  })}
+                  loading={isLoading('reconcile')}
+                  disabled={hasActionInFlight || Boolean(reconcileReason)}
+                  onClick={() =>
+                    setPolicyConfirm({ policy, action: 'reconcile' })
+                  }
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({ id: 'common.button.delete' })}
+              >
+                <Button
+                  danger
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'common.button.delete'
+                  })}
+                  loading={isLoading('delete')}
+                  disabled={hasActionInFlight}
+                  onClick={() => setPolicyConfirm({ policy, action: 'delete' })}
+                />
+              </Tooltip>
+            </Space>
+          );
         }
       }
     ],
@@ -524,81 +553,90 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
             actionLoading.id === schedule.id &&
             actionLoading.action === action;
           const hasActionInFlight =
-            actionLoading?.type === 'schedule' && actionLoading.id === schedule.id;
-          return <Space size={4}>
-            <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
-              <Button
-                type="text"
-                icon={<EditOutlined />}
-                aria-label={intl.formatMessage({ id: 'common.button.edit' })}
-                disabled={hasActionInFlight}
-                onClick={() => {
-                  setEditingSchedule(schedule);
-                  setScheduleOpen(true);
-                }}
-              />
-            </Tooltip>
-            <Tooltip
-              title={intl.formatMessage({
-                id: schedule.enabled
-                  ? 'resources.preheat.policy.disable'
-                  : 'resources.preheat.policy.enable'
-              })}
-            >
-              <Button
-                type="text"
-                icon={
-                  schedule.enabled ? (
-                    <PauseCircleOutlined />
-                  ) : (
-                    <PlayCircleOutlined />
-                  )
-                }
-                aria-label={intl.formatMessage({
+            actionLoading?.type === 'schedule' &&
+            actionLoading.id === schedule.id;
+          return (
+            <Space size={4}>
+              <Tooltip title={intl.formatMessage({ id: 'common.button.edit' })}>
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  aria-label={intl.formatMessage({ id: 'common.button.edit' })}
+                  disabled={hasActionInFlight}
+                  onClick={() => {
+                    setEditingSchedule(schedule);
+                    setScheduleOpen(true);
+                  }}
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({
                   id: schedule.enabled
                     ? 'resources.preheat.policy.disable'
                     : 'resources.preheat.policy.enable'
                 })}
-                loading={isLoading(toggleAction)}
-                disabled={hasActionInFlight}
-                onClick={() =>
-                  openScheduleConfirm(
-                    schedule,
-                    schedule.enabled ? 'disable' : 'enable'
-                  )
-                }
-              />
-            </Tooltip>
-            <Tooltip title={intl.formatMessage({
-              id: runReason || 'resources.preheat.schedule.runNow'
-            })}>
-              <Button
-                type="text"
-                icon={<SyncOutlined />}
-                aria-label={intl.formatMessage({
-                  id: 'resources.preheat.schedule.runNow'
+              >
+                <Button
+                  type="text"
+                  icon={
+                    schedule.enabled ? (
+                      <PauseCircleOutlined />
+                    ) : (
+                      <PlayCircleOutlined />
+                    )
+                  }
+                  aria-label={intl.formatMessage({
+                    id: schedule.enabled
+                      ? 'resources.preheat.policy.disable'
+                      : 'resources.preheat.policy.enable'
+                  })}
+                  loading={isLoading(toggleAction)}
+                  disabled={hasActionInFlight}
+                  onClick={() =>
+                    openScheduleConfirm(
+                      schedule,
+                      schedule.enabled ? 'disable' : 'enable'
+                    )
+                  }
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({
+                  id: runReason || 'resources.preheat.schedule.runNow'
                 })}
-                loading={isLoading('run')}
-                disabled={hasActionInFlight || Boolean(runReason)}
-                onClick={() => openScheduleConfirm(schedule, 'run')}
-              />
-            </Tooltip>
-            <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
-              <Button
-                danger
-                type="text"
-                icon={<DeleteOutlined />}
-                aria-label={intl.formatMessage({ id: 'common.button.delete' })}
-                loading={isLoading('delete')}
-                disabled={hasActionInFlight}
-                onClick={() => openScheduleConfirm(schedule, 'delete')}
-              />
-            </Tooltip>
-          </Space>;
+              >
+                <Button
+                  type="text"
+                  icon={<ThunderboltOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'resources.preheat.schedule.runNow'
+                  })}
+                  loading={isLoading('run')}
+                  disabled={hasActionInFlight || Boolean(runReason)}
+                  onClick={() => openScheduleConfirm(schedule, 'run')}
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({ id: 'common.button.delete' })}
+              >
+                <Button
+                  danger
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'common.button.delete'
+                  })}
+                  loading={isLoading('delete')}
+                  disabled={hasActionInFlight}
+                  onClick={() => openScheduleConfirm(schedule, 'delete')}
+                />
+              </Tooltip>
+            </Space>
+          );
         }
       }
     ],
-    [actionLoading, intl]
+    [actionLoading, intl, preheatCapability]
   );
 
   return (
@@ -623,6 +661,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
+          disabled={preheatActionSelected && !preheatEnabled}
           onClick={() => {
             setPrefill({});
             if (mode === 'distribution') setContinuousOpen(true);
@@ -634,6 +673,41 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
           {intl.formatMessage({ id: 'resources.preheat.policy.create' })}
         </Button>
       </Space>
+      {preheatCapability === 'disabled' && mode !== 'distribution' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.disabledByServer'
+          })}
+        />
+      )}
+      {preheatCapability === 'loading' && mode !== 'distribution' && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.capabilityChecking'
+          })}
+        />
+      )}
+      {preheatCapability === 'error' && mode !== 'distribution' && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.capabilityLoadFailed'
+          })}
+          action={
+            <Button size="small" onClick={() => void retryPreheatCapability()}>
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
+        />
+      )}
       {((mode !== 'preheat' && policyError) ||
         (mode !== 'distribution' && scheduleError)) && (
         <Alert
@@ -646,7 +720,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
               size="small"
               onClick={() => {
                 if (mode !== 'preheat' && policyError) void loadPolicies();
-                if (mode !== 'distribution' && scheduleError) void loadSchedules();
+                if (mode !== 'distribution' && scheduleError)
+                  void loadSchedules();
               }}
             >
               {intl.formatMessage({ id: 'common.button.retry' })}
@@ -661,62 +736,66 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         }
         items={[
           ...(mode !== 'preheat'
-            ? [{
-            key: 'continuous',
-            label: intl.formatMessage({
-              id: 'resources.preheat.policy.continuous'
-            }),
-            children: (
-              <Table
-                rowKey="id"
-                columns={continuousColumns}
-                dataSource={policies}
-                loading={policyLoading}
-                scroll={{ x: 1050 }}
-                pagination={{
-                  current: page,
-                  pageSize,
-                  total,
-                  showSizeChanger: true,
-                  onChange: (nextPage, nextPageSize) => {
-                    policyRequests.current.invalidate();
-                    setPage(nextPageSize === pageSize ? nextPage : 1);
-                    setPageSize(nextPageSize);
-                  }
-                }}
-              />
-            )
-          }]
+            ? [
+                {
+                  key: 'continuous',
+                  label: intl.formatMessage({
+                    id: 'resources.preheat.policy.continuous'
+                  }),
+                  children: (
+                    <Table
+                      rowKey="id"
+                      columns={continuousColumns}
+                      dataSource={policies}
+                      loading={policyLoading}
+                      scroll={{ x: 1050 }}
+                      pagination={{
+                        current: page,
+                        pageSize,
+                        total,
+                        showSizeChanger: true,
+                        onChange: (nextPage, nextPageSize) => {
+                          policyRequests.current.invalidate();
+                          setPage(nextPageSize === pageSize ? nextPage : 1);
+                          setPageSize(nextPageSize);
+                        }
+                      }}
+                    />
+                  )
+                }
+              ]
             : []),
           ...(mode !== 'distribution'
-            ? [{
-            key: 'schedule',
-            label: intl.formatMessage({
-              id: 'resources.preheat.policy.scheduled'
-            }),
-            children: (
-              <Table
-                rowKey="id"
-                columns={scheduleColumns}
-                dataSource={schedules}
-                loading={scheduleLoading}
-                scroll={{ x: 900 }}
-                pagination={{
-                  current: schedulePage,
-                  pageSize: schedulePageSize,
-                  total: scheduleTotal,
-                  showSizeChanger: true,
-                  onChange: (nextPage, nextPageSize) => {
-                    scheduleRequests.current.invalidate();
-                    setSchedulePage(
-                      nextPageSize === schedulePageSize ? nextPage : 1
-                    );
-                    setSchedulePageSize(nextPageSize);
-                  }
-                }}
-              />
-            )
-          }]
+            ? [
+                {
+                  key: 'schedule',
+                  label: intl.formatMessage({
+                    id: 'resources.preheat.policy.scheduled'
+                  }),
+                  children: (
+                    <Table
+                      rowKey="id"
+                      columns={scheduleColumns}
+                      dataSource={schedules}
+                      loading={scheduleLoading}
+                      scroll={{ x: 900 }}
+                      pagination={{
+                        current: schedulePage,
+                        pageSize: schedulePageSize,
+                        total: scheduleTotal,
+                        showSizeChanger: true,
+                        onChange: (nextPage, nextPageSize) => {
+                          scheduleRequests.current.invalidate();
+                          setSchedulePage(
+                            nextPageSize === schedulePageSize ? nextPage : 1
+                          );
+                          setSchedulePageSize(nextPageSize);
+                        }
+                      }}
+                    />
+                  )
+                }
+              ]
             : [])
         ]}
       />
@@ -756,18 +835,24 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title={intl.formatMessage({
           id: `resources.preheat.policy.${policyConfirm?.action || 'disable'}Confirm`
         })}
-        content={<>
-          {intl.formatMessage(
-            { id: 'resources.preheat.policy.actionContent' },
-            { name: policyConfirm?.policy.name || '' }
-          )}
-          {actionError && <Alert
-            type="error"
-            showIcon
-            style={{ marginTop: 12 }}
-            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
-          />}
-        </>}
+        content={
+          <>
+            {intl.formatMessage(
+              { id: 'resources.preheat.policy.actionContent' },
+              { name: policyConfirm?.policy.name || '' }
+            )}
+            {actionError && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginTop: 12 }}
+                message={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).messageId
+                })}
+              />
+            )}
+          </>
+        }
         okText={intl.formatMessage({
           id:
             policyConfirm?.action === 'delete'
@@ -784,18 +869,24 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         title={intl.formatMessage({
           id: `resources.preheat.schedule.${scheduleConfirm?.action || 'disable'}Confirm`
         })}
-        content={<>
-          {intl.formatMessage(
-            { id: 'resources.preheat.schedule.actionContent' },
-            { name: scheduleConfirm?.schedule.name || '' }
-          )}
-          {actionError && <Alert
-            type="error"
-            showIcon
-            style={{ marginTop: 12 }}
-            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
-          />}
-        </>}
+        content={
+          <>
+            {intl.formatMessage(
+              { id: 'resources.preheat.schedule.actionContent' },
+              { name: scheduleConfirm?.schedule.name || '' }
+            )}
+            {actionError && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginTop: 12 }}
+                message={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).messageId
+                })}
+              />
+            )}
+          </>
+        }
         okText={intl.formatMessage({
           id:
             scheduleConfirm?.action === 'delete'

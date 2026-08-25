@@ -265,7 +265,11 @@ export async function runModelStorageSyncPolicyNow(
 ) {
   return request<ModelStorageSyncPolicyRun>(
     `${MODEL_STORAGE_SYNC_POLICIES_API}/${id}/run-now`,
-    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      skipErrorHandler: true
+    }
   );
 }
 
@@ -428,6 +432,10 @@ export async function runModelPreheatScheduleNow(
 ) {
   return request<ModelPreheatScheduleRun>(
     `${MODEL_PREHEAT_SCHEDULES_API}/${id}/run-now`,
-    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      skipErrorHandler: true
+    }
   );
 }

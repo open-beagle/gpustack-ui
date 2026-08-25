@@ -210,7 +210,7 @@ describe('预热组件回归', () => {
     render(<ModelPreheatS3Profiles />);
     const maintenanceRow = await screen.findByText(used.name).then((cell) => cell.closest('tr')!);
     expect(within(maintenanceRow).queryByRole('button', { name: 'resources.storage.setDefault' })).toBeNull();
-    expect(maintenanceRow.querySelector('.anticon-reload')).not.toBeNull();
+    expect(maintenanceRow.querySelector('.anticon-api')).not.toBeNull();
     await user.click(within(maintenanceRow).getByRole('button', { name: 'resources.preheat.profile.restoreAction' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'resources.preheat.profile.restoreAction' }));
     await waitFor(() => expect(api.updateModelPreheatS3Profile).toHaveBeenCalledWith(25, { lifecycle_state: 'active' }));

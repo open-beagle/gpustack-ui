@@ -22,7 +22,7 @@ export default {
   'menu.404': '404',
   'menu.resources.workers': 'Workers',
   'menu.resources.gpus': 'GPUs',
-  'menu.resources.modelfiles': 'モデルプリヒート',
+  'menu.resources.modelfiles': 'モデル管理',
   'menu.resources.modelarchive': 'モデルアーカイブ',
   'menu.accessControl': 'Access Control',
   'menu.accessControl.apikeys': 'API Keys',

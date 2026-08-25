@@ -151,21 +151,21 @@ const ModelPreheatConnectivity: React.FC<Props> = ({
             id: 'resources.preheat.connectivity.success'
           })}
         >
-          {check?.summary.success ?? 0}
+          {check?.summary?.success ?? 0}
         </Descriptions.Item>
         <Descriptions.Item
           label={intl.formatMessage({
             id: 'resources.preheat.connectivity.failed'
           })}
         >
-          {check?.summary.failed ?? 0}
+          {check?.summary?.failed ?? 0}
         </Descriptions.Item>
         <Descriptions.Item
           label={intl.formatMessage({
             id: 'resources.preheat.connectivity.notChecked'
           })}
         >
-          {check?.summary.not_checked ?? 0}
+          {check?.summary?.not_checked ?? 0}
         </Descriptions.Item>
         <Descriptions.Item
           label={intl.formatMessage({

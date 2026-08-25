@@ -1,5 +1,5 @@
-import { Button, Select } from 'antd';
 import { useIntl } from '@umijs/max';
+import { Button, Divider, Select } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { queryWorkersList } from '../apis';
 import { mergeModelStoragePage } from '../config/model-preheat';
@@ -15,18 +15,23 @@ interface Props {
 
 const latestWorkers = (workers: ListItem[]) =>
   Array.from(
-    workers.reduce((result, worker) => {
-      const current = result.get(worker.worker_uuid);
-      if (!current || current.id < worker.id) result.set(worker.worker_uuid, worker);
-      return result;
-    }, new Map<string, ListItem>()).values()
+    workers
+      .reduce((result, worker) => {
+        const current = result.get(worker.worker_uuid);
+        if (!current || current.id < worker.id)
+          result.set(worker.worker_uuid, worker);
+        return result;
+      }, new Map<string, ListItem>())
+      .values()
   );
 
 const isEligible = (worker: ListItem) =>
-  worker.state === 'ready' &&
-  worker.model_storage_protocol_version === 1;
+  worker.state === 'ready' && worker.model_storage_protocol_version === 1;
 
-const getIneligibleReason = (worker: ListItem, formatMessage: ReturnType<typeof useIntl>['formatMessage']) => {
+const getIneligibleReason = (
+  worker: ListItem,
+  formatMessage: ReturnType<typeof useIntl>['formatMessage']
+) => {
   if (worker.state !== 'ready') {
     return formatMessage({ id: `resources.preheat.state.${worker.state}` });
   }
@@ -34,7 +39,9 @@ const getIneligibleReason = (worker: ListItem, formatMessage: ReturnType<typeof 
     return formatMessage({ id: 'resources.storage.workerProtocolMissing' });
   }
   if (worker.model_storage_protocol_version !== 1) {
-    return formatMessage({ id: 'resources.storage.workerProtocolIncompatible' });
+    return formatMessage({
+      id: 'resources.storage.workerProtocolIncompatible'
+    });
   }
   return undefined;
 };
@@ -87,6 +94,9 @@ const WorkerUuidMultiSelect: React.FC<Props> = ({
 
   useEffect(() => {
     void load('');
+    return () => {
+      requestId.current += 1;
+    };
   }, []);
 
   return (
@@ -97,6 +107,7 @@ const WorkerUuidMultiSelect: React.FC<Props> = ({
       error={error}
       query={search}
       onRetry={() => void load(search)}
+      compact
     >
       <Select
         mode="multiple"
@@ -104,25 +115,42 @@ const WorkerUuidMultiSelect: React.FC<Props> = ({
         filterOption={false}
         value={value}
         disabled={disabled}
+        loading={loading}
         onSearch={(nextSearch) => void load(nextSearch, 1)}
         onChange={(nextValue) => onChange?.(nextValue)}
         options={allWorkers.map((worker) => {
-          const disabledReason = getIneligibleReason(worker, intl.formatMessage);
+          const disabledReason = getIneligibleReason(
+            worker,
+            intl.formatMessage
+          );
           return {
             value: worker.worker_uuid,
             disabled: Boolean(disabledReason),
             label: `${worker.name} · ${worker.state} · ${worker.ip || '-'} · ${(worker.status?.gpu_devices || []).map((gpu) => gpu.name).join(', ') || '-'}${disabledReason ? ` · ${disabledReason}` : ''}`
           };
         })}
+        popupRender={(menu) => (
+          <>
+            {menu}
+            {items.length < total && (
+              <div
+                onMouseDown={(event) => event.preventDefault()}
+                style={{ padding: '0 12px 8px' }}
+              >
+                <Divider style={{ margin: '8px 0' }} />
+                <Button
+                  type="link"
+                  block
+                  loading={loading}
+                  onClick={() => void load(search, page + 1, true)}
+                >
+                  {intl.formatMessage({ id: 'resources.storage.loadMore' })}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       />
-      {items.length < total && <Button
-        type="link"
-        loading={loading}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => void load(search, page + 1, true)}
-      >
-        {intl.formatMessage({ id: 'resources.storage.loadMore' })}
-      </Button>}
     </ModelStorageAsyncState>
   );
 };

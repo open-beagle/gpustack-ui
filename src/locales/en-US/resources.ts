@@ -136,9 +136,14 @@ export default {
   'resources.preheat.attempt': 'Attempt',
   'resources.preheat.targetCount': 'Targets',
   'resources.preheat.targetScope': 'Target Scope',
+  'resources.preheat.gpuModel': 'GPU Model',
   'resources.preheat.targetWorkers': 'Target Workers',
   'resources.preheat.seedWorker': 'Seed Worker',
   'resources.preheat.includePatterns': 'Include Patterns',
+  'resources.preheat.gguf.quantization': 'GGUF Quantization',
+  'resources.preheat.gguf.select': 'Select a GGUF file from this repository',
+  'resources.preheat.gguf.empty': 'No selectable GGUF model files were found',
+  'resources.preheat.gguf.loadFailed': 'Failed to load GGUF files. Try again.',
   'resources.preheat.excludePatterns': 'Exclude Patterns',
   'resources.preheat.backfillPolicy': 'S3 Backfill Policy',
   'resources.preheat.deliveryMode': 'Delivery Mode',
@@ -182,6 +187,12 @@ export default {
   'resources.preheat.state.invalid': 'Invalid',
   'resources.preheat.state.enabled': 'Enabled',
   'resources.preheat.state.disabled': 'Disabled',
+  'resources.preheat.disabledByServer':
+    'Model preheat is disabled on this server. Preheat policies cannot be created or run now.',
+  'resources.preheat.capabilityChecking':
+    'Checking server model preheat capability.',
+  'resources.preheat.capabilityLoadFailed':
+    'Unable to verify model preheat support. Related actions are temporarily disabled.',
   'resources.preheat.state.configured': 'Configured',
   'resources.preheat.state.unconfigured': 'Not Configured',
   'resources.preheat.state.skipped_worker_removed': 'Worker Removed',
@@ -328,7 +339,7 @@ export default {
     'Target worker "{worker}" has no S3 connectivity result.',
   'resources.preheat.block.worker_connectivity_unavailable':
     'Target worker “{worker}” did not pass S3 read, write, and delete checks.',
-  'resources.storage.title': 'Model Storage',
+  'resources.storage.title': 'Model Management',
   'resources.storage.description':
     'Verified node models and the shared S3 model library are reused by sync, regular downloads, and preheat.',
   'resources.storage.nodeModels': 'Node Models',
@@ -366,6 +377,34 @@ export default {
     'Test Connection checks Server to S3; Check Workers checks Worker to S3.',
   'resources.storage.testConnection': 'Test Connection',
   'resources.storage.testResult': 'Server Connection Test',
+  'resources.storage.connectionTest.scope': 'Test Scope',
+  'resources.storage.connectionTest.scope.server': 'Server to S3',
+  'resources.storage.connectionTest.stage.connection': 'Network Connection',
+  'resources.storage.connectionTest.stage.bucket': 'Bucket Access',
+  'resources.storage.connectionTest.stage.write': 'Write',
+  'resources.storage.connectionTest.stage.read': 'Read',
+  'resources.storage.connectionTest.stage.delete': 'Test Object Cleanup',
+  'resources.storage.connectionTest.ok': 'Passed',
+  'resources.storage.error.notReached':
+    'Not run because a prerequisite stage failed.',
+  'resources.storage.error.invalidEndpoint':
+    'The endpoint scheme or address is invalid.',
+  'resources.storage.error.forbiddenAddress':
+    'The endpoint resolves to a forbidden address.',
+  'resources.storage.error.dnsTimeout': 'DNS resolution timed out.',
+  'resources.storage.error.dnsFailed': 'DNS resolution failed.',
+  'resources.storage.error.tcpFailed': 'TCP connection failed.',
+  'resources.storage.error.tlsVerifyFailed':
+    'TLS certificate verification failed.',
+  'resources.storage.error.tlsHandshakeFailed': 'TLS handshake failed.',
+  'resources.storage.error.redirectForbidden':
+    'S3 returned a forbidden redirect.',
+  'resources.storage.error.authenticationFailed': 'S3 authentication failed.',
+  'resources.storage.error.requestFailed': 'The S3 request failed.',
+  'resources.storage.error.clientInitializationFailed':
+    'The S3 client could not be initialized.',
+  'resources.storage.error.readContentMismatch':
+    'The content read from S3 does not match the test content.',
   'resources.storage.encryptionUnavailable':
     'Server credential encryption is unavailable. Contact an administrator to check the data directory or key configuration.',
   'resources.storage.endpointTlsMismatch':
@@ -446,7 +485,8 @@ export default {
     'This source is not supported for S3 sync.',
   'resources.storage.sync.modelNotReady':
     'The model is not ready for synchronization.',
-  'resources.storage.workerNotCurrent': 'This is not the latest worker registration.',
+  'resources.storage.workerNotCurrent':
+    'This is not the latest worker registration.',
   'resources.storage.workerProtocolIncompatible':
     'The worker synchronization protocol is incompatible.',
   'resources.storage.workerProtocolMissing':
@@ -524,18 +564,59 @@ export default {
   'resources.storage.state.noMatch': 'No matching results',
   'resources.storage.loadMore': 'Load more',
   'resources.storage.artifact.profileRequired': 'Select an S3 profile first.',
-  'resources.storage.distributionTasks.unavailable': 'This server does not expose distribution execution records.',
+  'resources.storage.artifact.includeFilterNotSpecified':
+    'No include filter was specified',
+  'resources.storage.artifact.excludeFilterNotSpecified':
+    'No exclude filter was specified',
+  'resources.storage.artifact.includeFilterPattern': 'Request include pattern',
+  'resources.storage.artifact.excludeFilterPattern': 'Request exclude pattern',
+  'resources.storage.artifact.ggufFilterPattern': 'GGUF request filter pattern',
+  'resources.storage.artifact.requestedQuantizationHint':
+    'Requested content / quantization hint',
+  'resources.storage.artifact.fixedDistributionHint':
+    'Distribution installs the fixed artifact as a whole; its internal quantization cannot be selected separately',
+  'resources.storage.artifact.resolving':
+    'Validating that the model belongs to the selected S3 profile',
+  'resources.storage.artifact.unresolved':
+    'Select a valid model from the current S3 profile',
+  'resources.storage.distributionTasks.unavailable':
+    'This server does not expose distribution execution records.',
   'resources.storage.repository.advanced': 'Advanced settings',
   'resources.storage.flow.workerToProfile': '{worker} -> {profile}',
-  'resources.storage.flow.workerToProfileToWorker': '{worker} -> {profile} -> {targetWorker}',
-  'resources.storage.status.pending': 'Pending', 'resources.storage.status.running': 'Running', 'resources.storage.status.ready': 'Ready', 'resources.storage.status.error': 'Error', 'resources.storage.status.canceled': 'Canceled', 'resources.storage.status.valid': 'Valid', 'resources.storage.status.invalid': 'Invalid', 'resources.storage.status.missing': 'Missing', 'resources.storage.status.stale': 'Stale', 'resources.storage.status.unknown': 'Unknown status',
-  'resources.storage.error.artifactNotReady': 'Artifact is not ready', 'resources.storage.error.profileMaintenance': 'S3 profile is in maintenance', 'resources.storage.error.objectConflict': 'S3 object conflict', 'resources.storage.error.manifestInvalid': 'Invalid manifest', 'resources.storage.error.workerUnavailable': 'Worker unavailable', 'resources.storage.error.workerExecutionFailed': 'Worker execution failed', 'resources.storage.error.unknown': 'Unknown error',
+  'resources.storage.flow': 'Data Flow',
+  'resources.storage.flow.workerToProfileToWorker':
+    '{worker} -> {profile} -> {targetWorker}',
+  'resources.storage.status.pending': 'Pending',
+  'resources.storage.status.running': 'Running',
+  'resources.storage.status.ready': 'Ready',
+  'resources.storage.status.error': 'Error',
+  'resources.storage.status.canceled': 'Canceled',
+  'resources.storage.status.valid': 'Valid',
+  'resources.storage.status.invalid': 'Invalid',
+  'resources.storage.status.missing': 'Missing',
+  'resources.storage.status.stale': 'Stale',
+  'resources.storage.status.unknown': 'Unknown status',
+  'resources.storage.error.artifactNotReady': 'Artifact is not ready',
+  'resources.storage.error.profileMaintenance': 'S3 profile is in maintenance',
+  'resources.storage.error.objectConflict': 'S3 object conflict',
+  'resources.storage.error.manifestInvalid': 'Invalid manifest',
+  'resources.storage.error.workerUnavailable': 'Worker unavailable',
+  'resources.storage.error.workerExecutionFailed': 'Worker execution failed',
+  'resources.storage.error.modelPreheatDisabled':
+    'Model preheat is disabled on this server',
+  'resources.storage.error.syncSourceNotFound':
+    'The source model no longer exists',
+  'resources.storage.error.syncSourceUnsupported':
+    'This model source cannot be synced to S3',
+  'resources.storage.error.unknown': 'Unknown error',
   'resources.storage.updateCredentials': 'Update credentials',
-  'resources.storage.updateCredentialsContent': 'This replaces the current S3 access credentials.',
+  'resources.storage.updateCredentialsContent':
+    'This replaces the current S3 access credentials.',
   'resources.storage.artifactDetail': 'Artifact details',
   'resources.preheat.profile.lifecycle': 'Lifecycle',
   'resources.preheat.profile.active': 'Active',
-  'resources.storage.inventoryRefreshInterval': 'Automatic scan interval (seconds)',
+  'resources.storage.inventoryRefreshInterval':
+    'Automatic scan interval (seconds)',
   'resources.storage.inventorySource': 'Inventory source',
   'resources.storage.inventorySource.task': 'Local task',
   'resources.storage.inventorySource.scan': 'S3 scan',
@@ -553,28 +634,69 @@ export default {
   'resources.storage.createdAt': 'Created at',
   'resources.storage.updatedAt': 'Updated at',
   'resources.storage.profile': 'S3 profile',
-  'resources.storage.testCredentialsRequiredHint': 'Update credentials and enter both keys before testing the connection.',
-  'resources.storage.sync.confirmSummary': 'Matching model content is skipped; files with a different digest are replaced.',
+  'resources.storage.testCredentialsRequiredHint':
+    'Update credentials and enter both keys before testing the connection.',
+  'resources.storage.sync.confirmSummary':
+    'Matching model content is skipped; files with a different digest are replaced.',
   'resources.preheat.confirm.title': 'Confirm Creation',
   'resources.preheat.confirm.flow': 'Final flow',
   'resources.preheat.confirm.flow.s3Only': '{model} -> S3 profile {profile}',
-  'resources.preheat.confirm.flow.workers': '{model} -> S3 profile {profile} -> target workers',
-  'resources.preheat.confirm.flow.artifact': 'Fixed S3 artifact {model} -> target workers in this cluster',
+  'resources.preheat.confirm.flow.workers':
+    '{model} -> S3 profile {profile} -> target workers',
+  'resources.preheat.confirm.flow.artifact':
+    'Fixed S3 artifact {model} -> target workers in this cluster',
   'resources.preheat.confirm.targetCount': 'Target workers',
-  'resources.preheat.confirm.targetPending': 'Matched by GPU scope at execution time',
+  'resources.preheat.confirm.targetPending':
+    'Matched by GPU scope at execution time',
   'resources.preheat.confirm.capacity': 'Available capacity',
-  'resources.preheat.confirm.capacityUnavailable': 'Workers did not report capacity information',
+  'resources.preheat.confirm.capacityUnavailable':
+    'Workers did not report capacity information',
   'resources.preheat.confirm.artifactSize': 'S3 model size',
   'resources.preheat.confirm.skipRule': 'Skip rule',
-  'resources.preheat.confirm.skipRuleValue': 'Files with the same digest are skipped.',
+  'resources.preheat.confirm.skipRuleValue':
+    'Files with the same digest are skipped.',
   'resources.preheat.confirm.conflictRule': 'Overwrite/conflict rule',
-  'resources.preheat.confirm.conflictRuleValue': 'Files with a different digest are replaced; the server handles conflicts with idempotency and lease rules.',
-  'resources.preheat.confirm.conflictRuleValue.s3_only': 'Conflicting content with the same artifact ID is isolated or rejected; shared S3 artifacts are not overwritten.',
-  'resources.preheat.confirm.conflictRuleValue.workers': 'Target-worker files with a different digest are replaced under server idempotency and lease rules.',
-  'resources.preheat.confirm.conflictRuleValue.artifact': 'The fixed artifact is installed only on target workers; worker-file conflicts follow server idempotency and lease rules.',
-  'resources.storage.taskProgress': 'Progress', 'resources.storage.startedAt': 'Started at', 'resources.storage.finishedAt': 'Finished at', 'resources.storage.taskTimeline': 'Timeline',
-  'resources.preheat.schedule.preset.manual': 'Manual', 'resources.preheat.schedule.preset.hourly': 'Hourly', 'resources.preheat.schedule.preset.daily': 'Daily', 'resources.preheat.schedule.preset.weekly': 'Weekly', 'resources.preheat.schedule.preset.custom': 'Custom Cron', 'resources.preheat.schedule.time': 'Time', 'resources.preheat.schedule.weekday': 'Weekday',
-  'resources.preheat.schedule.weekday.0': 'Sunday', 'resources.preheat.schedule.weekday.1': 'Monday', 'resources.preheat.schedule.weekday.2': 'Tuesday', 'resources.preheat.schedule.weekday.3': 'Wednesday', 'resources.preheat.schedule.weekday.4': 'Thursday', 'resources.preheat.schedule.weekday.5': 'Friday', 'resources.preheat.schedule.weekday.6': 'Saturday',
-  'resources.preheat.schedule.preset.continuous': 'Continuous', 'resources.preheat.schedule.summary.label': 'Schedule summary', 'resources.preheat.schedule.summary.manual': 'Run manually', 'resources.preheat.schedule.summary.continuous': 'Continuously reconcile', 'resources.preheat.schedule.summary.hourly': 'Run hourly', 'resources.preheat.schedule.summary.daily': 'Run daily at {time}', 'resources.preheat.schedule.summary.weekly': 'Run every {weekday} at {time}', 'resources.preheat.schedule.summary.custom': 'Custom Cron: {cron}', 'resources.preheat.schedule.nextRuns': 'Next three runs', 'resources.preheat.schedule.nextRunsUnavailable': 'Unavailable for client preview',
-  'resources.storage.totalSize': 'Total Size', 'resources.storage.stateMessage': 'Status Message', 'resources.storage.taskState.paused': 'Paused', 'resources.storage.taskState.partial': 'Partially Completed', 'resources.storage.taskState.unknown': 'Unknown state', 'resources.storage.syncTask.state.running': 'Running'
+  'resources.preheat.confirm.conflictRuleValue':
+    'Files with a different digest are replaced; the server handles conflicts with idempotency and lease rules.',
+  'resources.preheat.confirm.conflictRuleValue.s3_only':
+    'Conflicting content with the same artifact ID is isolated or rejected; shared S3 artifacts are not overwritten.',
+  'resources.preheat.confirm.conflictRuleValue.workers':
+    'Target-worker files with a different digest are replaced under server idempotency and lease rules.',
+  'resources.preheat.confirm.conflictRuleValue.artifact':
+    'The fixed artifact is installed only on target workers; worker-file conflicts follow server idempotency and lease rules.',
+  'resources.storage.taskProgress': 'Progress',
+  'resources.storage.startedAt': 'Started at',
+  'resources.storage.finishedAt': 'Finished at',
+  'resources.storage.taskTimeline': 'Timeline',
+  'resources.preheat.schedule.preset.manual': 'Manual',
+  'resources.preheat.schedule.preset.hourly': 'Hourly',
+  'resources.preheat.schedule.preset.daily': 'Daily',
+  'resources.preheat.schedule.preset.weekly': 'Weekly',
+  'resources.preheat.schedule.preset.custom': 'Custom Cron',
+  'resources.preheat.schedule.time': 'Time',
+  'resources.preheat.schedule.weekday': 'Weekday',
+  'resources.preheat.schedule.weekday.0': 'Sunday',
+  'resources.preheat.schedule.weekday.1': 'Monday',
+  'resources.preheat.schedule.weekday.2': 'Tuesday',
+  'resources.preheat.schedule.weekday.3': 'Wednesday',
+  'resources.preheat.schedule.weekday.4': 'Thursday',
+  'resources.preheat.schedule.weekday.5': 'Friday',
+  'resources.preheat.schedule.weekday.6': 'Saturday',
+  'resources.preheat.schedule.preset.continuous': 'Continuous',
+  'resources.preheat.schedule.summary.label': 'Schedule summary',
+  'resources.preheat.schedule.summary.manual': 'Run manually',
+  'resources.preheat.schedule.summary.continuous': 'Continuously reconcile',
+  'resources.preheat.schedule.summary.hourly': 'Run hourly',
+  'resources.preheat.schedule.summary.daily': 'Run daily at {time}',
+  'resources.preheat.schedule.summary.weekly': 'Run every {weekday} at {time}',
+  'resources.preheat.schedule.summary.custom': 'Custom Cron: {cron}',
+  'resources.preheat.schedule.nextRuns': 'Next three runs',
+  'resources.preheat.schedule.nextRunsUnavailable':
+    'Unavailable for client preview',
+  'resources.storage.totalSize': 'Total Size',
+  'resources.storage.stateMessage': 'Status Message',
+  'resources.storage.taskState.paused': 'Paused',
+  'resources.storage.taskState.partial': 'Partially Completed',
+  'resources.storage.taskState.unknown': 'Unknown state',
+  'resources.storage.syncTask.state.running': 'Running'
 };

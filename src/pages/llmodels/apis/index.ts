@@ -281,7 +281,7 @@ export async function queryHuggingfaceModels(
 
 // list files from huggingface
 export async function queryHuggingfaceModelFiles(
-  params: { repo: string },
+  params: { repo: string; revision?: string },
   options?: any
 ) {
   const result = [];

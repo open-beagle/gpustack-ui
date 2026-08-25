@@ -1,10 +1,12 @@
 import ModalFooter from '@/components/modal-footer';
+import ScrollerModal from '@/components/scroller-modal';
 import { useIntl } from '@umijs/max';
-import { Alert, Button, Form, Input, Modal, Select } from 'antd';
+import { Alert, Button, Form, Input, Select } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   createModelPreheatPolicy,
   queryModelPreheatS3Profiles,
+  queryModelStorageSyncTask,
   queryWorkersList
 } from '../apis';
 import { loadAllPaginated } from '../config/model-preheat';
@@ -13,17 +15,17 @@ import type {
   ModelPreheatS3Profile,
   ModelStorageArtifact
 } from '../config/types';
-import ArtifactSelect from './artifact-select';
+import ArtifactSelect, { type ArtifactValidity } from './artifact-select';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatCreateSummary from './model-preheat-create-summary';
+import ScheduleEditor, {
+  getBrowserTimezone,
+  getSchedulePayload,
+  type ScheduleDraft
+} from './model-storage-schedule-editor';
 import WorkerUuidMultiSelect, {
   getEligibleWorkerUuidRecords
 } from './worker-uuid-multi-select';
-import ScheduleEditor, {
-  getSchedulePayload,
-  getBrowserTimezone,
-  type ScheduleDraft
-} from './model-storage-schedule-editor';
 
 interface FormValues extends ScheduleDraft {
   name: string;
@@ -36,7 +38,6 @@ interface FormValues extends ScheduleDraft {
 
 interface Props {
   open: boolean;
-  // 保留调用方兼容性；新建策略只允许固定 Artifact，忽略旧同步任务预填。
   initialSyncTaskId?: number;
   initialProfileId?: number;
   initialArtifactId?: string;
@@ -46,6 +47,7 @@ interface Props {
 
 const ModelDistributionPolicyModal: React.FC<Props> = ({
   open,
+  initialSyncTaskId,
   initialProfileId,
   initialArtifactId,
   onCancel,
@@ -61,6 +63,8 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [selectedArtifact, setSelectedArtifact] =
     useState<ModelStorageArtifact>();
+  const [artifactValidity, setArtifactValidity] =
+    useState<ArtifactValidity>('unresolved');
   const [confirmValues, setConfirmValues] = useState<FormValues | null>(null);
   const profileId = Form.useWatch('profile_id', form);
   const targetScope = Form.useWatch('target_scope', form);
@@ -70,24 +74,41 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
     if (!open) return;
     setLoading(true);
     setDataError(false);
+    setSelectedArtifact(undefined);
+    setArtifactValidity('unresolved');
     Promise.all([
       loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
         queryModelPreheatS3Profiles({ page, perPage })
       ),
-      loadAllPaginated<ListItem>((page, perPage) => queryWorkersList({ page, perPage }))
+      loadAllPaginated<ListItem>((page, perPage) =>
+        queryWorkersList({ page, perPage })
+      ),
+      initialSyncTaskId
+        ? queryModelStorageSyncTask(initialSyncTaskId)
+        : Promise.resolve(null)
     ])
-      .then(([profileItems, workerItems]) => {
+      .then(([profileItems, workerItems, syncTask]) => {
         const activeProfiles = profileItems.filter(
           (item) => item.lifecycle_state === 'active'
         );
+        if (
+          syncTask &&
+          (syncTask.state !== 'ready' ||
+            !syncTask.artifact_id ||
+            !syncTask.profile?.id ||
+            !activeProfiles.some((item) => item.id === syncTask.profile?.id))
+        ) {
+          throw new Error('sync_task_artifact_not_ready');
+        }
         setProfiles(activeProfiles);
         setWorkers(workerItems);
         form.setFieldsValue({
           profile_id:
+            syncTask?.profile?.id ||
             initialProfileId ||
             activeProfiles.find((item) => item.is_default)?.id ||
             activeProfiles[0]?.id,
-          artifact_id: initialArtifactId,
+          artifact_id: syncTask?.artifact_id || initialArtifactId,
           target_scope: 'selected_workers',
           worker_uuids: [],
           trigger_mode: 'manual',
@@ -97,13 +118,14 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
       })
       .catch(() => setDataError(true))
       .finally(() => setLoading(false));
-  }, [dependencyRevision, form, initialArtifactId, initialProfileId, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (initialArtifactId && profileId === initialProfileId) return;
-    form.setFieldValue('artifact_id', undefined);
-  }, [form, initialArtifactId, initialProfileId, open, profileId]);
+  }, [
+    dependencyRevision,
+    form,
+    initialArtifactId,
+    initialProfileId,
+    initialSyncTaskId,
+    open
+  ]);
 
   const gpuNames = useMemo(
     () =>
@@ -118,7 +140,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
   );
 
   const save = async () => {
-    const values = await form.validateFields() as FormValues;
+    const values = (await form.validateFields()) as FormValues;
     setConfirmValues(values);
   };
 
@@ -151,21 +173,26 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
     }
   };
 
-  const targetCapacity = confirmValues?.target_scope === 'selected_workers'
-    ? getEligibleWorkerUuidRecords(workers)
-      .filter((worker) => confirmValues.worker_uuids.includes(worker.worker_uuid))
-      .reduce(
-        (total, worker) =>
-          total + (worker.status?.filesystem || []).reduce(
-            (available, filesystem) => available + (filesystem.available || 0),
+  const targetCapacity =
+    confirmValues?.target_scope === 'selected_workers'
+      ? getEligibleWorkerUuidRecords(workers)
+          .filter((worker) =>
+            confirmValues.worker_uuids.includes(worker.worker_uuid)
+          )
+          .reduce(
+            (total, worker) =>
+              total +
+              (worker.status?.filesystem || []).reduce(
+                (available, filesystem) =>
+                  available + (filesystem.available || 0),
+                0
+              ),
             0
-          ),
-        0
-      )
-    : null;
+          )
+      : null;
 
   return (
-    <Modal
+    <ScrollerModal
       open={open}
       centered
       width={720}
@@ -173,6 +200,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
       title={intl.formatMessage({
         id: 'resources.storage.distributionPolicy.create'
       })}
+      styles={{ body: { maxHeight: '68vh', overflowY: 'auto' } }}
       onCancel={onCancel}
       footer={
         <ModalFooter
@@ -181,7 +209,12 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
           loading={saving}
           okText={intl.formatMessage({ id: 'common.button.save' })}
           okBtnProps={{
-            disabled: loading || dataError || saving || Boolean(confirmValues)
+            disabled:
+              loading ||
+              dataError ||
+              saving ||
+              Boolean(confirmValues) ||
+              artifactValidity !== 'valid'
           }}
         />
       }
@@ -194,16 +227,38 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
           id: 'resources.storage.distributionPolicy.hint'
         })}
       />
-      {dataError && <Alert
-        type="error"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={intl.formatMessage({ id: 'resources.preheat.dependencies.loadFailed' })}
-        action={<Button size="small" onClick={() => setDependencyRevision((revision) => revision + 1)}>
-          {intl.formatMessage({ id: 'common.button.retry' })}
-        </Button>}
-      />}
-      <Form form={form} layout="vertical" disabled={loading || saving || dataError || Boolean(confirmValues)}>
+      {dataError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.dependencies.loadFailed'
+          })}
+          action={
+            <Button
+              size="small"
+              onClick={() => setDependencyRevision((revision) => revision + 1)}
+            >
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
+        />
+      )}
+      <Form
+        form={form}
+        layout="vertical"
+        disabled={loading || saving || dataError || Boolean(confirmValues)}
+        onValuesChange={(changedValues) => {
+          if (
+            !Object.prototype.hasOwnProperty.call(changedValues, 'profile_id')
+          )
+            return;
+          setSelectedArtifact(undefined);
+          setArtifactValidity('unresolved');
+          form.setFieldValue('artifact_id', undefined);
+        }}
+      >
         <Form.Item
           name="name"
           label={intl.formatMessage({ id: 'resources.preheat.policy.name' })}
@@ -211,40 +266,69 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
         >
           <Input />
         </Form.Item>
-        <ScheduleEditor allowContinuous disabled={loading || saving || dataError || Boolean(confirmValues)} />
+        <ScheduleEditor
+          allowContinuous
+          disabled={loading || saving || dataError || Boolean(confirmValues)}
+        />
         <>
-            <Form.Item
-              name="profile_id"
-              label={intl.formatMessage({
-                id: 'resources.storage.targetProfile'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={profiles.map((item) => ({
-                  value: item.id,
-                  label: item.name
-                }))}
-              />
-            </Form.Item>
-            <Form.Item
-              name="artifact_id"
-              label={intl.formatMessage({
-                id: 'resources.storage.distributionPolicy.artifact'
-              })}
-              rules={[{ required: true }]}
-            >
-              <ArtifactSelect
-                profileId={profileId}
-                profileName={selectedProfile?.name}
-                onArtifactChange={setSelectedArtifact}
-              />
-            </Form.Item>
+          <Form.Item
+            name="profile_id"
+            label={intl.formatMessage({
+              id: 'resources.storage.targetProfile'
+            })}
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={profiles.map((item) => ({
+                value: item.id,
+                label: item.name
+              }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="artifact_id"
+            label={intl.formatMessage({
+              id: 'resources.storage.distributionPolicy.artifact'
+            })}
+            rules={[
+              { required: true },
+              {
+                validator: async (_, value) => {
+                  if (!value) return;
+                  if (artifactValidity === 'resolving') {
+                    throw new Error(
+                      intl.formatMessage({
+                        id: 'resources.storage.artifact.resolving'
+                      })
+                    );
+                  }
+                  if (
+                    artifactValidity !== 'valid' ||
+                    selectedArtifact?.artifact_id !== value ||
+                    selectedArtifact?.manifest_state !== 'valid'
+                  ) {
+                    throw new Error(
+                      intl.formatMessage({
+                        id: 'resources.storage.artifact.unresolved'
+                      })
+                    );
+                  }
+                }
+              }
+            ]}
+          >
+            <ArtifactSelect
+              profileId={profileId}
+              profileName={selectedProfile?.name}
+              onArtifactChange={setSelectedArtifact}
+              onValidityChange={setArtifactValidity}
+            />
+          </Form.Item>
         </>
         <Form.Item
           name="target_scope"
           label={intl.formatMessage({
-            id: 'resources.preheat.form.targetScope'
+            id: 'resources.preheat.targetScope'
           })}
           rules={[{ required: true }]}
         >
@@ -252,7 +336,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
             options={['selected_workers', 'same_gpu_model'].map((value) => ({
               value,
               label: intl.formatMessage({
-                id: `resources.preheat.target.${value}`
+                id: `resources.preheat.scope.${value}`
               })
             }))}
           />
@@ -261,7 +345,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
           <Form.Item
             name="gpu_names"
             label={intl.formatMessage({
-              id: 'resources.preheat.form.gpuModel'
+              id: 'resources.preheat.gpuModel'
             })}
             rules={[{ required: true }]}
           >
@@ -282,33 +366,38 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
       <ModelPreheatConfirmModal
         open={Boolean(confirmValues)}
         title={intl.formatMessage({ id: 'resources.preheat.confirm.title' })}
-        content={<ModelPreheatCreateSummary
-          formatMessage={intl.formatMessage}
-          flow={intl.formatMessage(
-            { id: 'resources.preheat.confirm.flow.artifact' },
-            {
-              model: selectedArtifact?.model_id || confirmValues?.artifact_id || '',
-              profile: selectedProfile?.name || ''
+        content={
+          <ModelPreheatCreateSummary
+            formatMessage={intl.formatMessage}
+            flow={intl.formatMessage(
+              { id: 'resources.preheat.confirm.flow.artifact' },
+              {
+                model:
+                  selectedArtifact?.model_id ||
+                  confirmValues?.artifact_id ||
+                  '',
+                profile: selectedProfile?.name || ''
+              }
+            )}
+            targetCount={
+              confirmValues?.target_scope === 'selected_workers'
+                ? getEligibleWorkerUuidRecords(workers).filter((worker) =>
+                    confirmValues.worker_uuids.includes(worker.worker_uuid)
+                  ).length
+                : 0
             }
-          )}
-          targetCount={
-            confirmValues?.target_scope === 'selected_workers'
-              ? getEligibleWorkerUuidRecords(workers).filter((worker) =>
-                  confirmValues.worker_uuids.includes(worker.worker_uuid)
-                ).length
-              : 0
-          }
-          targetPending={confirmValues?.target_scope === 'same_gpu_model'}
-          capacityBytes={targetCapacity}
-          artifactBytes={selectedArtifact?.total_size}
-          kind="artifact"
-        />}
+            targetPending={confirmValues?.target_scope === 'same_gpu_model'}
+            capacityBytes={targetCapacity}
+            artifactBytes={selectedArtifact?.total_size}
+            kind="artifact"
+          />
+        }
         okText={intl.formatMessage({ id: 'common.button.save' })}
         loading={saving}
         onOk={confirmSave}
         onCancel={() => setConfirmValues(null)}
       />
-    </Modal>
+    </ScrollerModal>
   );
 };
 

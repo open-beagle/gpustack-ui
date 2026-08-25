@@ -1,9 +1,9 @@
-import { Button, Select } from 'antd';
 import { useIntl } from '@umijs/max';
+import { Button, Divider, Select } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 import { queryWorker, queryWorkersList } from '../apis';
-import type { ListItem } from '../config/types';
 import { mergeModelStoragePage } from '../config/model-preheat';
+import type { ListItem } from '../config/types';
 import ModelStorageAsyncState from './model-storage-async-state';
 
 interface Props {
@@ -58,6 +58,10 @@ const WorkerFuzzySelect: React.FC<Props> = ({
 
   useEffect(() => {
     void load('');
+    return () => {
+      requestId.current += 1;
+      selectedRequestId.current += 1;
+    };
   }, []);
 
   useEffect(() => {
@@ -82,6 +86,7 @@ const WorkerFuzzySelect: React.FC<Props> = ({
       query={search}
       disabledReason={disabled ? disabledReason : undefined}
       onRetry={() => void load(search)}
+      compact
     >
       <Select
         showSearch
@@ -89,25 +94,40 @@ const WorkerFuzzySelect: React.FC<Props> = ({
         filterOption={false}
         value={value}
         disabled={disabled}
+        loading={loading}
         onSearch={(nextSearch) => void load(nextSearch, 1)}
         onChange={(nextValue) =>
-          onChange(nextValue, items.find((item) => item.id === nextValue))
+          onChange(
+            nextValue,
+            items.find((item) => item.id === nextValue)
+          )
         }
         options={items.map((worker) => ({
           value: worker.id,
           label: `${worker.name} · ${worker.state === 'ready' ? 'Ready' : worker.state} · ${worker.ip || '-'} · ${(worker.status?.gpu_devices || []).map((gpu) => gpu.name).join(', ') || '-'}${worker.model_storage_protocol_version !== undefined && worker.model_storage_protocol_version !== 1 ? ` · ${intl.formatMessage({ id: 'resources.storage.workerProtocolIncompatible' })}` : ''}`
         }))}
+        popupRender={(menu) => (
+          <>
+            {menu}
+            {items.length < total && (
+              <div
+                onMouseDown={(event) => event.preventDefault()}
+                style={{ padding: '0 12px 8px' }}
+              >
+                <Divider style={{ margin: '8px 0' }} />
+                <Button
+                  type="link"
+                  block
+                  loading={loading}
+                  onClick={() => void load(search, page + 1, true)}
+                >
+                  {intl.formatMessage({ id: 'resources.storage.loadMore' })}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       />
-      {items.length < total && (
-        <Button
-          type="link"
-          loading={loading}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => void load(search, page + 1, true)}
-        >
-          {intl.formatMessage({ id: 'resources.storage.loadMore' })}
-        </Button>
-      )}
     </ModelStorageAsyncState>
   );
 };

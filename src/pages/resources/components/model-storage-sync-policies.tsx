@@ -1,4 +1,5 @@
 import ModalFooter from '@/components/modal-footer';
+import ScrollerModal from '@/components/scroller-modal';
 import {
   DeleteOutlined,
   EditOutlined,
@@ -6,7 +7,7 @@ import {
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SyncOutlined
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
@@ -14,13 +15,12 @@ import {
   Button,
   Form,
   Input,
-  Modal,
+  message,
   Select,
   Space,
   Table,
   Tag,
-  Tooltip,
-  message
+  Tooltip
 } from 'antd';
 import dayjs from 'dayjs';
 import React, {
@@ -42,8 +42,10 @@ import {
 } from '../apis';
 import { buildSyncPolicyPatch } from '../config/model-policy';
 import {
+  extractModelStorageErrorCode,
   getModelFileStorageModelId,
   getModelFileSyncActionState,
+  getModelStorageErrorPresentation,
   IdempotencyKeyLifecycle,
   loadAllPaginated
 } from '../config/model-preheat';
@@ -57,8 +59,8 @@ import type {
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ScheduleEditor, {
-  getSchedulePayload,
   getBrowserTimezone,
+  getSchedulePayload,
   parseScheduleCron,
   type ScheduleDraft
 } from './model-storage-schedule-editor';
@@ -95,8 +97,13 @@ const ModelStorageSyncPolicies: React.FC = () => {
     action: Action;
   } | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<number>();
+  const [actionError, setActionError] = useState<string | null>(null);
   const key = useRef(new IdempotencyKeyLifecycle());
   const scope = Form.useWatch('scope', form);
+
+  useEffect(() => {
+    if (confirm) setActionError(null);
+  }, [confirm?.action, confirm?.policy.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,7 +183,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
   };
 
   const save = async () => {
-    const values = (await form.validateFields()) as ModelStorageSyncPolicyCreate & ScheduleDraft;
+    const values =
+      (await form.validateFields()) as ModelStorageSyncPolicyCreate &
+        ScheduleDraft;
     const {
       schedule_preset: _schedulePreset,
       schedule_time: _scheduleTime,
@@ -236,6 +245,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
       setConfirm(null);
       await load();
       message.success(intl.formatMessage({ id: 'common.message.success' }));
+    } catch (error) {
+      setActionError(extractModelStorageErrorCode(error) || 'unknown');
     } finally {
       setActionLoadingId(undefined);
     }
@@ -251,12 +262,14 @@ const ModelStorageSyncPolicies: React.FC = () => {
           latest?.id !== item.id
             ? intl.formatMessage({ id: 'resources.storage.workerNotCurrent' })
             : item.state !== 'ready'
-            ? intl.formatMessage({ id: 'resources.storage.workerUnavailable' })
-            : item.model_storage_protocol_version !== 1
-            ? intl.formatMessage({
-                id: 'resources.storage.workerProtocolIncompatible'
-              })
-            : undefined;
+              ? intl.formatMessage({
+                  id: 'resources.storage.workerUnavailable'
+                })
+              : item.model_storage_protocol_version !== 1
+                ? intl.formatMessage({
+                    id: 'resources.storage.workerProtocolIncompatible'
+                  })
+                : undefined;
         return {
           label: `${item.name} · ${item.state === 'ready' ? 'Ready' : item.state}${reason ? ` · ${reason}` : ''}`,
           value: item.worker_uuid,
@@ -272,12 +285,18 @@ const ModelStorageSyncPolicies: React.FC = () => {
         const action = getModelFileSyncActionState(item, undefined, false);
         const reason =
           action.reason === 'unsupported'
-            ? intl.formatMessage({ id: 'resources.storage.sync.unsupportedSource' })
+            ? intl.formatMessage({
+                id: 'resources.storage.sync.unsupportedSource'
+              })
             : action.reason === 'worker_unavailable'
-            ? intl.formatMessage({ id: 'resources.storage.workerUnavailable' })
-            : action.reason === 'model_not_ready'
-            ? intl.formatMessage({ id: 'resources.storage.sync.modelNotReady' })
-            : undefined;
+              ? intl.formatMessage({
+                  id: 'resources.storage.workerUnavailable'
+                })
+              : action.reason === 'model_not_ready'
+                ? intl.formatMessage({
+                    id: 'resources.storage.sync.modelNotReady'
+                  })
+                : undefined;
         return {
           value: item.id,
           label: `${getModelFileStorageModelId(item)}${reason ? ` · ${reason}` : ''}`,
@@ -369,7 +388,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
                   <Button
                     type="text"
                     icon={<EditOutlined />}
-                    aria-label={intl.formatMessage({ id: 'common.button.edit' })}
+                    aria-label={intl.formatMessage({
+                      id: 'common.button.edit'
+                    })}
                     onClick={() => void openEditor(record)}
                   />
                 </Tooltip>
@@ -390,7 +411,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
                     loading={
                       actionLoadingId === record.id && confirm?.action === 'run'
                     }
-                    icon={<SyncOutlined />}
+                    icon={<ThunderboltOutlined />}
                     aria-label={intl.formatMessage({
                       id: 'resources.preheat.schedule.runNow'
                     })}
@@ -452,7 +473,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
                       confirm?.action === 'delete'
                     }
                     icon={<DeleteOutlined />}
-                    aria-label={intl.formatMessage({ id: 'common.button.delete' })}
+                    aria-label={intl.formatMessage({
+                      id: 'common.button.delete'
+                    })}
                     onClick={() =>
                       setConfirm({ policy: record, action: 'delete' })
                     }
@@ -463,7 +486,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
           }
         ]}
       />
-      <Modal
+      <ScrollerModal
         open={open}
         centered
         width={720}
@@ -474,6 +497,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
             : 'resources.storage.syncPolicy.create'
         })}
         onCancel={() => setOpen(false)}
+        styles={{ body: { maxHeight: '68vh', overflowY: 'auto' } }}
         footer={
           <ModalFooter
             onOk={save}
@@ -490,7 +514,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+            message={intl.formatMessage({
+              id: 'resources.storage.state.error'
+            })}
             action={
               <Button
                 type="link"
@@ -596,16 +622,30 @@ const ModelStorageSyncPolicies: React.FC = () => {
             </Form.Item>
           )}
         </Form>
-      </Modal>
+      </ScrollerModal>
       <ModelPreheatConfirmModal
         open={Boolean(confirm)}
         title={intl.formatMessage({
           id: 'resources.storage.syncPolicy.confirmTitle'
         })}
-        content={intl.formatMessage(
-          { id: 'resources.storage.syncPolicy.confirmContent' },
-          { name: confirm?.policy.name || '' }
-        )}
+        content={
+          <>
+            {intl.formatMessage(
+              { id: 'resources.storage.syncPolicy.confirmContent' },
+              { name: confirm?.policy.name || '' }
+            )}
+            {actionError && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginTop: 12 }}
+                message={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).messageId
+                })}
+              />
+            )}
+          </>
+        }
         okText={intl.formatMessage({
           id:
             confirm?.action === 'delete'

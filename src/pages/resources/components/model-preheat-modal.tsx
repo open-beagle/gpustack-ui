@@ -32,6 +32,7 @@ import {
   queryModelPreheatS3Profiles,
   queryWorkersList
 } from '../apis';
+import { clearOwnedGgufPatterns } from '../config/model-gguf';
 import {
   IdempotencyKeyLifecycle,
   LatestRequestGate,
@@ -41,7 +42,7 @@ import {
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
   prepareModelPreheatWithFreshSnapshot,
-  shouldPollModelPreheatConnectivity,
+  shouldPollModelPreheatConnectivity
 } from '../config/model-preheat';
 import type {
   ModelPreheatConnectivityCheck,
@@ -50,6 +51,7 @@ import type {
   ModelPreheatTask,
   ModelPreheatWorker
 } from '../config/types';
+import ModelGgufFileSelect from './model-gguf-file-select';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatCreateSummary from './model-preheat-create-summary';
 import ModelRepositoryPicker from './model-repository-picker';
@@ -90,6 +92,10 @@ const ModelPreheatModal: React.FC<Props> = ({
 }) => {
   const intl = useIntl();
   const [form] = Form.useForm<ModelPreheatCreate>();
+  const modelId = Form.useWatch('model_id', form);
+  const revision = Form.useWatch('revision', form);
+  const includePatterns = Form.useWatch('include_patterns', form);
+  const ggufSelectorPatterns = useRef<string[]>();
   const idempotency = useRef(new IdempotencyKeyLifecycle());
   const connectivityIdempotency = useRef(new IdempotencyKeyLifecycle());
   const dependencyRequests = useRef(new LatestRequestGate());
@@ -112,6 +118,13 @@ const ModelPreheatModal: React.FC<Props> = ({
     connectivityFailure: boolean;
   } | null>(null);
 
+  const clearStaleGgufSelection = () => {
+    const current = form.getFieldValue('include_patterns');
+    const next = clearOwnedGgufPatterns(current, ggufSelectorPatterns.current);
+    ggufSelectorPatterns.current = undefined;
+    if (next !== current) form.setFieldValue('include_patterns', next);
+  };
+
   const loadDependencies = useCallback(async () => {
     setDataLoading(true);
     setDataError(false);
@@ -128,8 +141,9 @@ const ModelPreheatModal: React.FC<Props> = ({
           ]),
         ([workerItems, profileItems]) => {
           const nextWorkers = workerItems as ModelPreheatWorker[];
-          const readyWorkerIds = eligibleModelPreheatWorkers(nextWorkers)
-            .map((worker) => worker.id);
+          const readyWorkerIds = eligibleModelPreheatWorkers(nextWorkers).map(
+            (worker) => worker.id
+          );
           const activeProfileItems = profileItems.filter(
             (item) => item.lifecycle_state === 'active'
           );
@@ -296,9 +310,10 @@ const ModelPreheatModal: React.FC<Props> = ({
       const connectivityFailure =
         result.preview.blockingReasons.length > 0 &&
         result.preview.blockingReasons.every((reason) =>
-          ['worker_connectivity_missing', 'worker_connectivity_unavailable'].includes(
-            reason.code
-          )
+          [
+            'worker_connectivity_missing',
+            'worker_connectivity_unavailable'
+          ].includes(reason.code)
         );
       if (result.preview.canSubmit || connectivityFailure) {
         setConfirmCreate({
@@ -461,18 +476,7 @@ const ModelPreheatModal: React.FC<Props> = ({
         form={form}
         layout="vertical"
         disabled={dataLoading || dataError || submitting}
-        onValuesChange={(changed, values) => {
-          if (changed.source === 'ollama_library') {
-            form.setFieldsValue({ include_patterns: [], exclude_patterns: [] });
-            setDraft({
-              ...(values as ModelPreheatCreate),
-              include_patterns: [],
-              exclude_patterns: []
-            });
-            return;
-          }
-          setDraft(values as ModelPreheatCreate);
-        }}
+        onValuesChange={(_, values) => setDraft(values as ModelPreheatCreate)}
       >
         <Row gutter={16}>
           <Col xs={24} md={8}>
@@ -482,6 +486,7 @@ const ModelPreheatModal: React.FC<Props> = ({
               rules={[{ required: true }]}
             >
               <Select
+                onChange={clearStaleGgufSelection}
                 options={[
                   { label: 'Hugging Face', value: 'huggingface' },
                   { label: 'ModelScope', value: 'modelscope' },
@@ -491,10 +496,20 @@ const ModelPreheatModal: React.FC<Props> = ({
             </Form.Item>
           </Col>
           <Col xs={24} md={16}>
-            <Form.Item name="model_id" label={intl.formatMessage({ id: 'resources.preheat.model' })} rules={[{ required: true }]}>
+            <Form.Item
+              name="model_id"
+              label={intl.formatMessage({ id: 'resources.preheat.model' })}
+              rules={[{ required: true }]}
+            >
               <ModelRepositoryPicker
-                source={draft.source === 'modelscope' ? 'model_scope' : draft.source}
-                onChange={(value) => form.setFieldValue('model_id', value)}
+                source={
+                  draft.source === 'modelscope' ? 'model_scope' : draft.source
+                }
+                value={modelId || undefined}
+                onChange={(value) => {
+                  clearStaleGgufSelection();
+                  form.setFieldValue('model_id', value);
+                }}
               />
             </Form.Item>
           </Col>
@@ -504,10 +519,22 @@ const ModelPreheatModal: React.FC<Props> = ({
           label={intl.formatMessage({ id: 'resources.preheat.deliveryMode' })}
           rules={[{ required: true }]}
         >
-          <Radio.Group options={[
-            { value: 's3_only', label: intl.formatMessage({ id: 'resources.preheat.delivery.s3_only' }) },
-            { value: 's3_and_workers', label: intl.formatMessage({ id: 'resources.preheat.delivery.s3_and_workers' }) }
-          ]} />
+          <Radio.Group
+            options={[
+              {
+                value: 's3_only',
+                label: intl.formatMessage({
+                  id: 'resources.preheat.delivery.s3_only'
+                })
+              },
+              {
+                value: 's3_and_workers',
+                label: intl.formatMessage({
+                  id: 'resources.preheat.delivery.s3_and_workers'
+                })
+              }
+            ]}
+          />
         </Form.Item>
         <Row gutter={16}>
           <Col xs={24} md={8}>
@@ -526,110 +553,154 @@ const ModelPreheatModal: React.FC<Props> = ({
               />
             </Form.Item>
           </Col>
-          {draft.delivery_mode !== 's3_only' && <Col xs={24} md={8}>
-            <Form.Item
-              name="target_scope"
-              label={intl.formatMessage({
-                id: 'resources.preheat.targetScope'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={[
-                  'selected_workers',
-                  'seed_worker',
-                  'same_gpu_model'
-                ].map((value) => ({
-                  value,
-                  label: intl.formatMessage({
-                    id: `resources.preheat.scope.${value}`
-                  })
-                }))}
-              />
-            </Form.Item>
-          </Col>}
-          {draft.delivery_mode !== 's3_only' && <Col xs={24} md={8}>
-            <Form.Item
-              name="s3_backfill_policy"
-              label={intl.formatMessage({
-                id: 'resources.preheat.backfillPolicy'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={['always', 'when_missing', 'never'].map((value) => ({
-                  value,
-                  label: intl.formatMessage({
-                    id: `resources.preheat.backfill.${value}`
-                  })
-                }))}
-              />
-            </Form.Item>
-          </Col>}
+          {draft.delivery_mode !== 's3_only' && (
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="target_scope"
+                label={intl.formatMessage({
+                  id: 'resources.preheat.targetScope'
+                })}
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    'selected_workers',
+                    'seed_worker',
+                    'same_gpu_model'
+                  ].map((value) => ({
+                    value,
+                    label: intl.formatMessage({
+                      id: `resources.preheat.scope.${value}`
+                    })
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
+          {draft.delivery_mode !== 's3_only' && (
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="s3_backfill_policy"
+                label={intl.formatMessage({
+                  id: 'resources.preheat.backfillPolicy'
+                })}
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={['always', 'when_missing', 'never'].map((value) => ({
+                    value,
+                    label: intl.formatMessage({
+                      id: `resources.preheat.backfill.${value}`
+                    })
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
-        {draft.delivery_mode !== 's3_only' && draft.target_scope === 'selected_workers' && (
+        {draft.delivery_mode !== 's3_only' &&
+          draft.target_scope === 'selected_workers' && (
+            <Form.Item
+              name="target_worker_ids"
+              label={intl.formatMessage({
+                id: 'resources.preheat.targetWorkers'
+              })}
+              rules={[{ required: true, type: 'array', min: 1 }]}
+            >
+              <Select mode="multiple" options={workerOptions} />
+            </Form.Item>
+          )}
+        {draft.delivery_mode !== 's3_only' && (
           <Form.Item
-            name="target_worker_ids"
-            label={intl.formatMessage({
-              id: 'resources.preheat.targetWorkers'
-            })}
-            rules={[{ required: true, type: 'array', min: 1 }]}
+            name="keep_new_workers_in_sync"
+            label={intl.formatMessage({ id: 'resources.preheat.keepInSync' })}
+            valuePropName="checked"
           >
-            <Select mode="multiple" options={workerOptions} />
+            <Switch disabled={forceKeepNewWorkersInSync} />
           </Form.Item>
         )}
-        {draft.delivery_mode !== 's3_only' && <Form.Item
-          name="keep_new_workers_in_sync"
-          label={intl.formatMessage({ id: 'resources.preheat.keepInSync' })}
-          valuePropName="checked"
-        >
-          <Switch disabled={forceKeepNewWorkersInSync} />
-        </Form.Item>}
         <Collapse
           items={[
             {
               key: 'advanced',
               label: intl.formatMessage({ id: 'resources.form.advanced' }),
               forceRender: true,
-              children: <>
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="revision"
-                      label={intl.formatMessage({ id: 'resources.preheat.revision' })}
-                    >
-                      <Input />
-                    </Form.Item>
-                  </Col>
-                  {draft.delivery_mode !== 's3_only' && <Col xs={24} md={12}>
-                    <Form.Item
-                      name="seed_worker_id"
-                      label={intl.formatMessage({ id: 'resources.preheat.seedWorker' })}
-                      rules={[{ required: draft.target_scope !== 'selected_workers' }]}
-                    >
-                      <Select allowClear options={workerOptions} />
-                    </Form.Item>
-                  </Col>}
-                </Row>
-                {draft.source !== 'ollama_library' && <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="include_patterns"
-                      label={intl.formatMessage({ id: 'resources.preheat.includePatterns' })}
-                    >
-                      <Select mode="tags" tokenSeparators={[',']} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="exclude_patterns"
-                      label={intl.formatMessage({ id: 'resources.preheat.excludePatterns' })}
-                    >
-                      <Select mode="tags" tokenSeparators={[',']} />
-                    </Form.Item>
-                  </Col>
-                </Row>}
-              </>
+              children: (
+                <>
+                  <Row gutter={16}>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        name="revision"
+                        label={intl.formatMessage({
+                          id: 'resources.preheat.revision'
+                        })}
+                      >
+                        <Input onChange={clearStaleGgufSelection} />
+                      </Form.Item>
+                    </Col>
+                    {draft.delivery_mode !== 's3_only' && (
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="seed_worker_id"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.seedWorker'
+                          })}
+                          rules={[
+                            {
+                              required:
+                                draft.target_scope !== 'selected_workers'
+                            }
+                          ]}
+                        >
+                          <Select allowClear options={workerOptions} />
+                        </Form.Item>
+                      </Col>
+                    )}
+                  </Row>
+                  {draft.source !== 'ollama_library' && (
+                    <Row gutter={16}>
+                      <Col xs={24}>
+                        <Form.Item
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.gguf.quantization'
+                          })}
+                        >
+                          <ModelGgufFileSelect
+                            source={draft.source}
+                            modelId={modelId}
+                            revision={revision}
+                            value={includePatterns}
+                            onChange={(patterns) => {
+                              ggufSelectorPatterns.current = [...patterns];
+                              form.setFieldValue('include_patterns', patterns);
+                            }}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="include_patterns"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.includePatterns'
+                          })}
+                        >
+                          <Select mode="tags" tokenSeparators={[',']} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="exclude_patterns"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.excludePatterns'
+                          })}
+                        >
+                          <Select mode="tags" tokenSeparators={[',']} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  )}
+                </>
+              )
             }
           ]}
         />
@@ -706,48 +777,55 @@ const ModelPreheatModal: React.FC<Props> = ({
       <ModelPreheatConfirmModal
         open={Boolean(confirmCreate)}
         title={intl.formatMessage({ id: 'resources.preheat.confirm.title' })}
-        content={<ModelPreheatCreateSummary
-          formatMessage={intl.formatMessage}
-          flow={intl.formatMessage(
-            {
-              id: confirmCreate?.values.delivery_mode === 's3_only'
-                ? 'resources.preheat.confirm.flow.s3Only'
-                : 'resources.preheat.confirm.flow.workers'
-            },
-            {
-              model: confirmCreate?.values.model_id || '',
-              profile: confirmCreate?.profileName || ''
+        content={
+          <ModelPreheatCreateSummary
+            formatMessage={intl.formatMessage}
+            flow={intl.formatMessage(
+              {
+                id:
+                  confirmCreate?.values.delivery_mode === 's3_only'
+                    ? 'resources.preheat.confirm.flow.s3Only'
+                    : 'resources.preheat.confirm.flow.workers'
+              },
+              {
+                model: confirmCreate?.values.model_id || '',
+                profile: confirmCreate?.profileName || ''
+              }
+            )}
+            targetCount={
+              confirmCreate?.values.delivery_mode === 's3_only'
+                ? 0
+                : confirmCreate?.targetCount
             }
-          )}
-          targetCount={
-            confirmCreate?.values.delivery_mode === 's3_only'
-              ? 0
-              : confirmCreate?.targetCount
-          }
-          kind={
-            confirmCreate?.values.delivery_mode === 's3_only'
-              ? 's3_only'
-              : 'workers'
-          }
-        />}
+            kind={
+              confirmCreate?.values.delivery_mode === 's3_only'
+                ? 's3_only'
+                : 'workers'
+            }
+          />
+        }
         okText={intl.formatMessage({
           id: confirmCreate?.connectivityFailure
             ? 'resources.preheat.connectivity.createAnyway'
             : submitId
         })}
         loading={submitting}
-        extra={confirmCreate?.connectivityFailure ? (
-          <Button
-            disabled={submitting || checkLoading}
-            onClick={() => {
-              setConfirmCreate(null);
-              connectivityIdempotency.current.start();
-              setConfirmCheck(true);
-            }}
-          >
-            {intl.formatMessage({ id: 'resources.preheat.connectivity.recheck' })}
-          </Button>
-        ) : undefined}
+        extra={
+          confirmCreate?.connectivityFailure ? (
+            <Button
+              disabled={submitting || checkLoading}
+              onClick={() => {
+                setConfirmCreate(null);
+                connectivityIdempotency.current.start();
+                setConfirmCheck(true);
+              }}
+            >
+              {intl.formatMessage({
+                id: 'resources.preheat.connectivity.recheck'
+              })}
+            </Button>
+          ) : undefined
+        }
         onOk={submitDespiteConnectivityFailure}
         onCancel={() => setConfirmCreate(null)}
       />

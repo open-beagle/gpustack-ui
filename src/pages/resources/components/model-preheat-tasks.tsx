@@ -9,8 +9,8 @@ import {
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
-  Button,
   Alert,
+  Button,
   Descriptions,
   Modal,
   Space,
@@ -24,19 +24,19 @@ import {
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  queryModelPreheatS3Profiles,
   queryModelPreheatTask,
   queryModelPreheatTasks,
-  queryModelPreheatS3Profiles,
   queryWorkersList,
   runModelPreheatTaskAction
 } from '../apis';
 import {
   LatestRequestGate,
+  getModelPreheatTaskActions,
   getModelStorageFlowPresentation,
   getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
   getModelStorageTaskStatusPresentation,
-  getModelPreheatTaskActions,
   getModelStorageTransferPresentation,
   type ModelPreheatTaskAction
 } from '../config/model-preheat';
@@ -46,6 +46,7 @@ import type {
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatModal from './model-preheat-modal';
+import { useModelPreheatCapability } from './use-model-preheat-capability';
 
 const statusColors: Record<string, string> = {
   pending: 'processing',
@@ -95,24 +96,45 @@ const ModelPreheatTasks: React.FC = () => {
   const [profileNames, setProfileNames] = useState<Record<number, string>>({});
   const [workerNames, setWorkerNames] = useState<Record<number, string>>({});
   const [loadError, setLoadError] = useState(false);
+  const { state: preheatCapability, retry: retryPreheatCapability } =
+    useModelPreheatCapability();
+  const preheatEnabled = preheatCapability === 'enabled';
 
   useEffect(() => {
     void Promise.all([
       queryModelPreheatS3Profiles({ page: 1, perPage: 100 }),
       queryWorkersList({ page: 1, perPage: 100 })
-    ]).then(([profilePage, workerPage]) => {
-      setProfileNames(Object.fromEntries(profilePage.items.map((profile) => [profile.id, profile.name])));
-      setWorkerNames(Object.fromEntries(workerPage.items.map((worker) => [worker.id, worker.name])));
-    }).catch(() => undefined);
+    ])
+      .then(([profilePage, workerPage]) => {
+        setProfileNames(
+          Object.fromEntries(
+            profilePage.items.map((profile) => [profile.id, profile.name])
+          )
+        );
+        setWorkerNames(
+          Object.fromEntries(
+            workerPage.items.map((worker) => [worker.id, worker.name])
+          )
+        );
+      })
+      .catch(() => undefined);
   }, []);
 
   const formatTransferMethod = (task: ModelPreheatTask | null) => {
-    const presentation = getModelStorageTransferPresentation(task?.transfer_source || null);
+    const presentation = getModelStorageTransferPresentation(
+      task?.transfer_source || null
+    );
     return intl.formatMessage(
       { id: presentation.messageId },
       {
-        worker: presentation.includeWorker ? workerNames[task?.source_worker_id || 0] || `Worker #${task?.source_worker_id || '-'}` : '',
-        profile: presentation.includeProfile ? profileNames[task?.transfer_profile_id || 0] || `Profile #${task?.transfer_profile_id || '-'}` : ''
+        worker: presentation.includeWorker
+          ? workerNames[task?.source_worker_id || 0] ||
+            `Worker #${task?.source_worker_id || '-'}`
+          : '',
+        profile: presentation.includeProfile
+          ? profileNames[task?.transfer_profile_id || 0] ||
+            `Profile #${task?.transfer_profile_id || '-'}`
+          : ''
       }
     );
   };
@@ -149,33 +171,39 @@ const ModelPreheatTasks: React.FC = () => {
     }
   }, []);
 
-  const startPolling = useCallback(async (silent = false) => {
-    clearPollingTimer();
-    const generation = ++pollingGeneration.current;
-    if (!pollingMounted.current) return;
-    if (pollingRunning.current) {
-      pollingRestartRequested.current = true;
-      return;
-    }
-    pollingRunning.current = true;
-    try {
-      await loadTasks(silent);
-    } catch {
-      setLoadError(true);
-    } finally {
-      pollingRunning.current = false;
-    }
-    if (!pollingMounted.current) return;
-    if (pollingRestartRequested.current) {
-      pollingRestartRequested.current = false;
-      void startPolling(false);
-      return;
-    }
-    if (generation !== pollingGeneration.current) return;
-    if (shouldPollTasks.current) {
-      pollingTimer.current = window.setTimeout(() => void startPolling(true), 5000);
-    }
-  }, [clearPollingTimer, loadTasks]);
+  const startPolling = useCallback(
+    async (silent = false) => {
+      clearPollingTimer();
+      const generation = ++pollingGeneration.current;
+      if (!pollingMounted.current) return;
+      if (pollingRunning.current) {
+        pollingRestartRequested.current = true;
+        return;
+      }
+      pollingRunning.current = true;
+      try {
+        await loadTasks(silent);
+      } catch {
+        setLoadError(true);
+      } finally {
+        pollingRunning.current = false;
+      }
+      if (!pollingMounted.current) return;
+      if (pollingRestartRequested.current) {
+        pollingRestartRequested.current = false;
+        void startPolling(false);
+        return;
+      }
+      if (generation !== pollingGeneration.current) return;
+      if (shouldPollTasks.current) {
+        pollingTimer.current = window.setTimeout(
+          () => void startPolling(true),
+          5000
+        );
+      }
+    },
+    [clearPollingTimer, loadTasks]
+  );
 
   useEffect(() => {
     pollingMounted.current = true;
@@ -249,22 +277,35 @@ const ModelPreheatTasks: React.FC = () => {
       dataIndex: 'source',
       width: 130,
       render: (source: ModelPreheatTask['source']) =>
-        getModelStorageSourceLabel(source as 'modelscope' | 'huggingface' | 'ollama_library')
+        getModelStorageSourceLabel(
+          source as 'modelscope' | 'huggingface' | 'ollama_library'
+        )
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.confirm.flow' }),
       width: 240,
       render: (_: unknown, task: ModelPreheatTask) => {
         const source = workerNames[task.source_worker_id || 0] || '';
-        const profile = profileNames[task.transfer_profile_id || task.s3_profile_id] || `Profile #${task.s3_profile_id}`;
-        const flow = getModelStorageFlowPresentation(source, profile, task.delivery_mode === 's3_and_workers' ? `${task.target_worker_uuids.length}` : undefined);
+        const profile =
+          profileNames[task.transfer_profile_id || task.s3_profile_id] ||
+          `Profile #${task.s3_profile_id}`;
+        const flow = getModelStorageFlowPresentation(
+          source,
+          profile,
+          task.delivery_mode === 's3_and_workers'
+            ? `${task.target_worker_uuids.length}`
+            : undefined
+        );
         return intl.formatMessage({ id: flow.messageId }, flow.values);
       }
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.targetCount' }),
       width: 100,
-      render: (_: unknown, task: ModelPreheatTask) => task.delivery_mode === 's3_only' ? 'S3' : `${task.target_worker_uuids.length}`
+      render: (_: unknown, task: ModelPreheatTask) =>
+        task.delivery_mode === 's3_only'
+          ? 'S3'
+          : `${task.target_worker_uuids.length}`
     },
     {
       title: intl.formatMessage({ id: 'common.table.status' }),
@@ -272,9 +313,11 @@ const ModelPreheatTasks: React.FC = () => {
       width: 120,
       render: (value: string | null) => {
         const status = getModelStorageTaskStatusPresentation(value);
-        return <Tag color={statusColors[value]}>
-          {intl.formatMessage({ id: status.messageId })}
-        </Tag>
+        return (
+          <Tag color={statusColors[value]}>
+            {intl.formatMessage({ id: status.messageId })}
+          </Tag>
+        );
       }
     },
     {
@@ -336,7 +379,9 @@ const ModelPreheatTasks: React.FC = () => {
                 type="text"
                 danger={action === 'cancel'}
                 icon={actionIcons[action]}
-                aria-label={intl.formatMessage({ id: `resources.preheat.action.${action}` })}
+                aria-label={intl.formatMessage({
+                  id: `resources.preheat.action.${action}`
+                })}
                 onClick={() => setConfirm({ task, action })}
               />
             </Tooltip>
@@ -380,11 +425,47 @@ const ModelPreheatTasks: React.FC = () => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
+          disabled={!preheatEnabled}
           onClick={() => setCreateOpen(true)}
         >
           {intl.formatMessage({ id: 'resources.preheat.task.create' })}
         </Button>
       </Space>
+      {preheatCapability === 'disabled' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.disabledByServer'
+          })}
+        />
+      )}
+      {preheatCapability === 'loading' && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.capabilityChecking'
+          })}
+        />
+      )}
+      {preheatCapability === 'error' && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage({
+            id: 'resources.preheat.capabilityLoadFailed'
+          })}
+          action={
+            <Button size="small" onClick={() => void retryPreheatCapability()}>
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
+        />
+      )}
       <Table
         rowKey="id"
         columns={columns}
@@ -403,15 +484,21 @@ const ModelPreheatTasks: React.FC = () => {
           }
         }}
       />
-      {loadError && <Alert
-        type="error"
-        showIcon
-        style={{ marginTop: 12 }}
-        message={intl.formatMessage({ id: 'resources.storage.state.error' })}
-        action={<Button size="small" onClick={() => void startPolling(false)}>{intl.formatMessage({ id: 'common.button.retry' })}</Button>}
-      />}
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginTop: 12 }}
+          message={intl.formatMessage({ id: 'resources.storage.state.error' })}
+          action={
+            <Button size="small" onClick={() => void startPolling(false)}>
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
+        />
+      )}
       <ModelPreheatModal
-        open={createOpen}
+        open={createOpen && preheatEnabled}
         onCancel={() => setCreateOpen(false)}
         onCreated={(task) => {
           setCreateOpen(false);
@@ -436,13 +523,27 @@ const ModelPreheatTasks: React.FC = () => {
         }}
       >
         <Spin spinning={detailLoading}>
-          {detailError && <Alert
-            type="error"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message={intl.formatMessage({ id: 'resources.storage.state.error' })}
-            action={<Button size="small" onClick={() => detail && void openDetail(detail).catch(() => setDetailError(true))}>{intl.formatMessage({ id: 'common.button.retry' })}</Button>}
-          />}
+          {detailError && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={intl.formatMessage({
+                id: 'resources.storage.state.error'
+              })}
+              action={
+                <Button
+                  size="small"
+                  onClick={() =>
+                    detail &&
+                    void openDetail(detail).catch(() => setDetailError(true))
+                  }
+                >
+                  {intl.formatMessage({ id: 'common.button.retry' })}
+                </Button>
+              }
+            />
+          )}
           <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small">
             <Descriptions.Item
               label={intl.formatMessage({ id: 'resources.preheat.model' })}
@@ -452,12 +553,21 @@ const ModelPreheatTasks: React.FC = () => {
             <Descriptions.Item
               label={intl.formatMessage({ id: 'resources.preheat.revision' })}
             >
-              {getModelStorageRevisionPresentation(detail?.resolved_revision).short}
+              {
+                getModelStorageRevisionPresentation(detail?.resolved_revision)
+                  .short
+              }
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({ id: 'common.table.status' })}
             >
-              {detail ? intl.formatMessage({ id: getModelStorageTaskStatusPresentation(detail.execution_state).messageId }) : '-'}
+              {detail
+                ? intl.formatMessage({
+                    id: getModelStorageTaskStatusPresentation(
+                      detail.execution_state
+                    ).messageId
+                  })
+                : '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({
@@ -478,14 +588,28 @@ const ModelPreheatTasks: React.FC = () => {
             >
               {detail?.attempt}
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.transferMethod' })} span={3}>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.transferMethod'
+              })}
+              span={3}
+            >
               {formatTransferMethod(detail)}
             </Descriptions.Item>
             <Descriptions.Item label="Artifact ID" span={3}>
-              <Typography.Text copyable>{detail?.artifact_id || '-'}</Typography.Text>
+              <Typography.Text copyable>
+                {detail?.artifact_id || '-'}
+              </Typography.Text>
             </Descriptions.Item>
-            <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.taskTimeline' })} span={3}>
-              {detail ? `${intl.formatMessage({ id: 'resources.storage.createdAt' })} ${dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss')} -> ${intl.formatMessage({ id: 'resources.storage.updatedAt' })} ${dayjs(detail.updated_at).format('YYYY-MM-DD HH:mm:ss')}` : '-'}
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.taskTimeline'
+              })}
+              span={3}
+            >
+              {detail
+                ? `${intl.formatMessage({ id: 'resources.storage.createdAt' })} ${dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss')} -> ${intl.formatMessage({ id: 'resources.storage.updatedAt' })} ${dayjs(detail.updated_at).format('YYYY-MM-DD HH:mm:ss')}`
+                : '-'}
             </Descriptions.Item>
           </Descriptions>
         </Spin>

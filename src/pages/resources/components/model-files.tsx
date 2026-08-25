@@ -23,10 +23,10 @@ import DownloadModal from '@/pages/llmodels/download';
 import { convertFileSize } from '@/utils';
 import {
   CheckCircleFilled,
+  CloudUploadOutlined,
   CopyOutlined,
   InfoCircleOutlined,
-  QuestionCircleOutlined,
-  SyncOutlined
+  QuestionCircleOutlined
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
@@ -46,7 +46,7 @@ import {
 import dayjs from 'dayjs';
 import { useAtom } from 'jotai';
 import _ from 'lodash';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
   checkCurrentbackend,
@@ -152,6 +152,20 @@ const TypographyPara = styled(Paragraph)`
   color: inherit;
   margin-bottom: 0;
   font-size: 13px;
+`;
+
+const ModelManagementWrapper = styled.div`
+  .ant-table-thead > tr > .ant-table-cell-fix-right {
+    background: var(--ant-color-bg-container, #fff) !important;
+  }
+
+  .ant-table-tbody > tr > .ant-table-cell-fix-right {
+    background: var(--ant-color-bg-container, #fff) !important;
+  }
+
+  .ant-table-tbody > tr:hover > .ant-table-cell-fix-right {
+    background: var(--ant-color-fill-tertiary, #f5f5f5) !important;
+  }
 `;
 
 const TooltipTitle: React.FC<{ path: string }> = ({ path }) => {
@@ -495,9 +509,12 @@ const LocalModelFiles = () => {
         getErrorMessage: (error: any) =>
           (error?.response?.data?.message || error?.message) ===
           'model_file_has_active_sync_task'
-            ? intl.formatMessage({
-                id: 'resources.storage.deleteModelBlockedContent'
-              }, { name: record.resolved_paths?.[0] || '' })
+            ? intl.formatMessage(
+                {
+                  id: 'resources.storage.deleteModelBlockedContent'
+                },
+                { name: record.resolved_paths?.[0] || '' }
+              )
             : intl.formatMessage({ id: 'resources.storage.state.error' }),
         beforeDelete: async () => {
           setDeletePreflightError('');
@@ -646,12 +663,17 @@ const LocalModelFiles = () => {
         const firstError = rejected[0]?.reason || rejected[0];
         return (firstError?.response?.data?.message || firstError?.message) ===
           'model_file_has_active_sync_task'
-          ? intl.formatMessage({
-              id: 'resources.storage.deleteModelBlockedContent'
-            }, { name: intl.formatMessage(
-              { id: 'resources.storage.deleteModelBlockedBatchName' },
-              { count: selectedIds.length }
-            ) })
+          ? intl.formatMessage(
+              {
+                id: 'resources.storage.deleteModelBlockedContent'
+              },
+              {
+                name: intl.formatMessage(
+                  { id: 'resources.storage.deleteModelBlockedBatchName' },
+                  { count: selectedIds.length }
+                )
+              }
+            )
           : intl.formatMessage({ id: 'resources.storage.state.error' });
       },
       beforeDelete: async () => {
@@ -844,18 +866,22 @@ const LocalModelFiles = () => {
                 id: 'resources.storage.sync.unsupportedSource'
               })
             : syncAction.reason === 'model_not_ready'
-            ? intl.formatMessage({ id: 'resources.storage.sync.modelNotReady' })
-            : syncAction.reason === 'worker_unavailable'
-            ? intl.formatMessage({
-                id: 'resources.storage.workerUnavailable'
-              })
-            : syncAction.reason === 'no_default_profile'
-            ? intl.formatMessage({ id: 'resources.storage.sync.noDefault' })
-            : syncAction.reason === 'already_from_default'
               ? intl.formatMessage({
-                  id: 'resources.storage.sync.alreadyFromDefault'
+                  id: 'resources.storage.sync.modelNotReady'
                 })
-              : intl.formatMessage({ id: 'resources.storage.sync' });
+              : syncAction.reason === 'worker_unavailable'
+                ? intl.formatMessage({
+                    id: 'resources.storage.workerUnavailable'
+                  })
+                : syncAction.reason === 'no_default_profile'
+                  ? intl.formatMessage({
+                      id: 'resources.storage.sync.noDefault'
+                    })
+                  : syncAction.reason === 'already_from_default'
+                    ? intl.formatMessage({
+                        id: 'resources.storage.sync.alreadyFromDefault'
+                      })
+                    : intl.formatMessage({ id: 'resources.storage.sync' });
         return (
           <div
             style={{
@@ -869,7 +895,7 @@ const LocalModelFiles = () => {
               <Tooltip title={syncTooltip}>
                 <Button
                   type="text"
-                  icon={<SyncOutlined />}
+                  icon={<CloudUploadOutlined />}
                   aria-label={intl.formatMessage({
                     id: 'resources.storage.sync'
                   })}
@@ -916,7 +942,9 @@ const LocalModelFiles = () => {
             />
             <Select
               allowClear
-              placeholder={intl.formatMessage({ id: 'resources.filter.source' })}
+              placeholder={intl.formatMessage({
+                id: 'resources.filter.source'
+              })}
               style={{ width: 150 }}
               value={queryParams.source}
               onChange={(value) =>
@@ -975,7 +1003,9 @@ const LocalModelFiles = () => {
         open={Boolean(deletePreflightFailure)}
         centered
         maskClosable={false}
-        title={intl.formatMessage({ id: 'resources.storage.deleteModelBlocked' })}
+        title={intl.formatMessage({
+          id: 'resources.storage.deleteModelBlocked'
+        })}
         onCancel={() => setDeletePreflightFailure(null)}
         footer={
           <>
@@ -1007,7 +1037,9 @@ const LocalModelFiles = () => {
         width={460}
         maskClosable={false}
         keyboard={false}
-        title={intl.formatMessage({ id: 'resources.storage.deleteModelBlocked' })}
+        title={intl.formatMessage({
+          id: 'resources.storage.deleteModelBlocked'
+        })}
         onCancel={() => setBlockedDeleteRecord(null)}
         footer={
           <Button type="primary" onClick={() => setBlockedDeleteRecord(null)}>
@@ -1075,59 +1107,63 @@ const ModelFiles = () => {
   };
 
   return (
-    <PageContainer
-      ghost
-      header={{
-        title: (
-          <span>
-            {intl.formatMessage({ id: 'resources.storage.title' })}{' '}
-            <Tooltip
-              title={intl.formatMessage({
-                id: 'resources.storage.description'
-              })}
-            >
-              <QuestionCircleOutlined
-                aria-label={intl.formatMessage({
+    <ModelManagementWrapper>
+      <PageContainer
+        ghost
+        header={{
+          title: (
+            <span>
+              {intl.formatMessage({ id: 'menu.resources.modelfiles' })}{' '}
+              <Tooltip
+                title={intl.formatMessage({
                   id: 'resources.storage.description'
                 })}
-                style={{ color: 'var(--ant-color-text-tertiary)' }}
-              />
-            </Tooltip>
-          </span>
-        ),
-        style: {
-          paddingInline: 'var(--layout-content-header-inlinepadding)'
-        },
-        breadcrumb: {}
-      }}
-    >
-      <Tabs
-        activeKey={activeTab}
-        onChange={handleTabChange}
-        items={[
-          {
-            key: 'local',
-            label: intl.formatMessage({ id: 'resources.storage.nodeModels' }),
-            children: <LocalModelFiles />
+              >
+                <QuestionCircleOutlined
+                  aria-label={intl.formatMessage({
+                    id: 'resources.storage.description'
+                  })}
+                  style={{ color: 'var(--ant-color-text-tertiary)' }}
+                />
+              </Tooltip>
+            </span>
+          ),
+          style: {
+            paddingInline: 'var(--layout-content-header-inlinepadding)'
           },
-          {
-            key: 'storage',
-            label: intl.formatMessage({ id: 'resources.storage.library' }),
-            children: <ModelStorage />
-          },
-          {
-            key: 'tasks',
-            label: intl.formatMessage({ id: 'resources.storage.taskRecords' }),
-            children: <ModelTaskRecords />
-          },
-          {
-            key: 'policies',
-            label: intl.formatMessage({ id: 'resources.storage.policies' }),
-            children: <ModelTaskPolicies />
-          }
-        ]}
-      />
-    </PageContainer>
+          breadcrumb: {}
+        }}
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={handleTabChange}
+          items={[
+            {
+              key: 'local',
+              label: intl.formatMessage({ id: 'resources.storage.nodeModels' }),
+              children: <LocalModelFiles />
+            },
+            {
+              key: 'storage',
+              label: intl.formatMessage({ id: 'resources.storage.library' }),
+              children: <ModelStorage />
+            },
+            {
+              key: 'tasks',
+              label: intl.formatMessage({
+                id: 'resources.storage.taskRecords'
+              }),
+              children: <ModelTaskRecords />
+            },
+            {
+              key: 'policies',
+              label: intl.formatMessage({ id: 'resources.storage.policies' }),
+              children: <ModelTaskPolicies />
+            }
+          ]}
+        />
+      </PageContainer>
+    </ModelManagementWrapper>
   );
 };
 

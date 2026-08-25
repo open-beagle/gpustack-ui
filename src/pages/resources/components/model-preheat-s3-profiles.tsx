@@ -1,5 +1,6 @@
 import {
-  CloudSyncOutlined,
+  ApiOutlined,
+  EyeOutlined,
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
@@ -453,7 +454,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           >
             <Button
               type="text"
-              icon={<CloudSyncOutlined />}
+              icon={<EyeOutlined />}
               aria-label={intl.formatMessage({ id: 'resources.preheat.connectivity.detail' })}
               disabled={!record.last_connectivity_check_id}
               onClick={() => openConnectivity(record)}
@@ -462,7 +463,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           <Tooltip title={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}>
             <Button
               type="text"
-              icon={<ReloadOutlined />}
+              icon={<ApiOutlined />}
               aria-label={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
               loading={checkingProfileId === record.id}
               onClick={() => void runCheck(record)}

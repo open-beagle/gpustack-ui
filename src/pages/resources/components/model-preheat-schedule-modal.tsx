@@ -1,8 +1,20 @@
 import ModalFooter from '@/components/modal-footer';
 import ScrollerModal from '@/components/scroller-modal';
-import { useIntl } from '@umijs/max';
 import { ReloadOutlined } from '@ant-design/icons';
-import { Alert, Button, Col, Collapse, Form, Input, InputNumber, Radio, Row, Select, Switch } from 'antd';
+import { useIntl } from '@umijs/max';
+import {
+  Alert,
+  Button,
+  Col,
+  Collapse,
+  Form,
+  Input,
+  InputNumber,
+  Radio,
+  Row,
+  Select,
+  Switch
+} from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createModelPreheatConnectivityCheck,
@@ -13,11 +25,12 @@ import {
   queryWorkersList,
   updateModelPreheatSchedule
 } from '../apis';
+import { clearOwnedGgufPatterns } from '../config/model-gguf';
 import {
-  loadAllPaginated,
-  prepareModelPreheatWithFreshSnapshot,
   eligibleModelPreheatWorkers,
-  IdempotencyKeyLifecycle
+  IdempotencyKeyLifecycle,
+  loadAllPaginated,
+  prepareModelPreheatWithFreshSnapshot
 } from '../config/model-preheat';
 import type {
   ModelPreheatCreate,
@@ -26,12 +39,13 @@ import type {
   ModelPreheatScheduleCreate,
   ModelPreheatWorker
 } from '../config/types';
-import ModelRepositoryPicker from './model-repository-picker';
+import ModelGgufFileSelect from './model-gguf-file-select';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatCreateSummary from './model-preheat-create-summary';
+import ModelRepositoryPicker from './model-repository-picker';
 import ScheduleEditor, {
-  getSchedulePayload,
   getBrowserTimezone,
+  getSchedulePayload,
   parseScheduleCron,
   type ScheduleDraft
 } from './model-storage-schedule-editor';
@@ -75,6 +89,10 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
 }) => {
   const intl = useIntl();
   const [form] = Form.useForm<ModelPreheatScheduleCreate>();
+  const modelId = Form.useWatch('model_id', form);
+  const revision = Form.useWatch('revision', form);
+  const includePatterns = Form.useWatch('include_patterns', form);
+  const ggufSelectorPatterns = useRef<string[]>();
   const [workers, setWorkers] = useState<ModelPreheatWorker[]>([]);
   const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const [draft, setDraft] = useState<ModelPreheatScheduleCreate>(defaultValues);
@@ -91,6 +109,13 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
     targetPending: boolean;
     connectivityFailure: boolean;
   } | null>(null);
+
+  const clearStaleGgufSelection = () => {
+    const current = form.getFieldValue('include_patterns');
+    const next = clearOwnedGgufPatterns(current, ggufSelectorPatterns.current);
+    ggufSelectorPatterns.current = undefined;
+    if (next !== current) form.setFieldValue('include_patterns', next);
+  };
 
   useEffect(() => {
     connectivityIdempotency.current.abandon();
@@ -133,7 +158,8 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
               ...parseScheduleCron(
                 initialValues?.trigger_mode === 'manual'
                   ? null
-                  : initialValues?.cron_expression ?? defaultValues.cron_expression
+                  : (initialValues?.cron_expression ??
+                      defaultValues.cron_expression)
               ),
               target_worker_uuids:
                 initialValues?.target_worker_uuids ||
@@ -173,10 +199,13 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
     if (values.delivery_mode === 's3_only') return 0;
     if (values.target_scope === 'selected_workers') {
       const selected = new Set(values.target_worker_uuids || []);
-      return workers.filter((worker) => selected.has(worker.worker_uuid)).length;
+      return workers.filter((worker) => selected.has(worker.worker_uuid))
+        .length;
     }
     if (values.target_scope === 'seed_worker') {
-      return workers.some((worker) => worker.worker_uuid === values.seed_worker_uuid)
+      return workers.some(
+        (worker) => worker.worker_uuid === values.seed_worker_uuid
+      )
         ? 1
         : 0;
     }
@@ -319,6 +348,7 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
           ? 'resources.preheat.schedule.edit'
           : 'resources.preheat.schedule.create'
       })}
+      styles={{ body: { maxHeight: '68vh', overflowY: 'auto' } }}
       onCancel={close}
       footer={
         <ModalFooter
@@ -327,7 +357,8 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
           loading={submitting}
           okText={intl.formatMessage({ id: 'common.button.save' })}
           okBtnProps={{
-            disabled: loading || dataError || submitting || Boolean(confirmValues)
+            disabled:
+              loading || dataError || submitting || Boolean(confirmValues)
           }}
         />
       }
@@ -339,14 +370,16 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
           message={intl.formatMessage({
             id: 'resources.preheat.dependencies.loadFailed'
           })}
-          action={<Button
-            size="small"
-            icon={<ReloadOutlined />}
-            loading={loading}
-            onClick={() => setDependencyRevision((revision) => revision + 1)}
-          >
-            {intl.formatMessage({ id: 'common.button.retry' })}
-          </Button>}
+          action={
+            <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={() => setDependencyRevision((revision) => revision + 1)}
+            >
+              {intl.formatMessage({ id: 'common.button.retry' })}
+            </Button>
+          }
           style={{ marginBottom: 16 }}
         />
       )}
@@ -355,21 +388,16 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
         layout="vertical"
         disabled={loading || dataError || submitting || Boolean(confirmValues)}
         onValuesChange={(_, values) =>
-          {
-            const nextValues = values;
-            if (nextValues.source === 'ollama_library') {
-              form.setFieldsValue({ include_patterns: [], exclude_patterns: [] });
-              setDraft({
-                ...(nextValues as ModelPreheatScheduleCreate),
-                include_patterns: [],
-                exclude_patterns: []
-              });
-              return;
-            }
-            setDraft(nextValues as ModelPreheatScheduleCreate);
-          }
+          setDraft(values as ModelPreheatScheduleCreate)
         }
       >
+        <Form.Item
+          name="name"
+          label={intl.formatMessage({ id: 'resources.preheat.policy.name' })}
+          rules={[{ required: true }]}
+        >
+          <Input />
+        </Form.Item>
         <Row gutter={16}>
           <Col xs={24} md={8}>
             <Form.Item
@@ -378,6 +406,7 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
               rules={[{ required: true }]}
             >
               <Select
+                onChange={clearStaleGgufSelection}
                 options={[
                   { label: 'Hugging Face', value: 'huggingface' },
                   { label: 'ModelScope', value: 'modelscope' },
@@ -387,10 +416,20 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
             </Form.Item>
           </Col>
           <Col xs={24} md={16}>
-            <Form.Item name="model_id" label={intl.formatMessage({ id: 'resources.preheat.model' })} rules={[{ required: true }]}>
+            <Form.Item
+              name="model_id"
+              label={intl.formatMessage({ id: 'resources.preheat.model' })}
+              rules={[{ required: true }]}
+            >
               <ModelRepositoryPicker
-                source={draft.source === 'modelscope' ? 'model_scope' : draft.source}
-                onChange={(value) => form.setFieldValue('model_id', value)}
+                source={
+                  draft.source === 'modelscope' ? 'model_scope' : draft.source
+                }
+                value={modelId || undefined}
+                onChange={(value) => {
+                  clearStaleGgufSelection();
+                  form.setFieldValue('model_id', value);
+                }}
               />
             </Form.Item>
           </Col>
@@ -402,8 +441,18 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
         >
           <Radio.Group
             options={[
-              { value: 's3_only', label: intl.formatMessage({ id: 'resources.preheat.delivery.s3_only' }) },
-              { value: 's3_and_workers', label: intl.formatMessage({ id: 'resources.preheat.delivery.s3_and_workers' }) }
+              {
+                value: 's3_only',
+                label: intl.formatMessage({
+                  id: 'resources.preheat.delivery.s3_only'
+                })
+              },
+              {
+                value: 's3_and_workers',
+                label: intl.formatMessage({
+                  id: 'resources.preheat.delivery.s3_and_workers'
+                })
+              }
             ]}
           />
         </Form.Item>
@@ -424,48 +473,53 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
               />
             </Form.Item>
           </Col>
-          {draft.delivery_mode !== 's3_only' && <Col xs={24} md={8}>
-            <Form.Item
-              name="target_scope"
-              label={intl.formatMessage({
-                id: 'resources.preheat.targetScope'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={[
-                  'selected_workers',
-                  'seed_worker',
-                  'same_gpu_model'
-                ].map((value) => ({
-                  value,
-                  label: intl.formatMessage({
-                    id: `resources.preheat.scope.${value}`
-                  })
-                }))}
-              />
-            </Form.Item>
-          </Col>}
-          {draft.delivery_mode !== 's3_only' && <Col xs={24} md={8}>
-            <Form.Item
-              name="s3_backfill_policy"
-              label={intl.formatMessage({
-                id: 'resources.preheat.backfillPolicy'
-              })}
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={['always', 'when_missing', 'never'].map((value) => ({
-                  value,
-                  label: intl.formatMessage({
-                    id: `resources.preheat.backfill.${value}`
-                  })
-                }))}
-              />
-            </Form.Item>
-          </Col>}
+          {draft.delivery_mode !== 's3_only' && (
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="target_scope"
+                label={intl.formatMessage({
+                  id: 'resources.preheat.targetScope'
+                })}
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    'selected_workers',
+                    'seed_worker',
+                    'same_gpu_model'
+                  ].map((value) => ({
+                    value,
+                    label: intl.formatMessage({
+                      id: `resources.preheat.scope.${value}`
+                    })
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
+          {draft.delivery_mode !== 's3_only' && (
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="s3_backfill_policy"
+                label={intl.formatMessage({
+                  id: 'resources.preheat.backfillPolicy'
+                })}
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={['always', 'when_missing', 'never'].map((value) => ({
+                    value,
+                    label: intl.formatMessage({
+                      id: `resources.preheat.backfill.${value}`
+                    })
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
-        {draft.delivery_mode !== 's3_only' && draft.target_scope === 'selected_workers' ? (
+        {draft.delivery_mode !== 's3_only' &&
+        draft.target_scope === 'selected_workers' ? (
           <Form.Item
             name="target_worker_uuids"
             label={intl.formatMessage({
@@ -476,70 +530,148 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
             <Select mode="multiple" options={workerOptions} />
           </Form.Item>
         ) : null}
-        {draft.delivery_mode !== 's3_only' && <Form.Item
-          name="keep_new_workers_in_sync"
-          label={intl.formatMessage({ id: 'resources.preheat.keepInSync' })}
-          valuePropName="checked"
-        >
-          <Switch />
-        </Form.Item>}
-        <Form.Item name="name" label={intl.formatMessage({ id: 'resources.preheat.policy.name' })} rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
-        <ScheduleEditor disabled={loading || dataError || submitting || Boolean(confirmValues)} />
+        {draft.delivery_mode !== 's3_only' && (
+          <Form.Item
+            name="keep_new_workers_in_sync"
+            label={intl.formatMessage({ id: 'resources.preheat.keepInSync' })}
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+        )}
+        <ScheduleEditor
+          disabled={
+            loading || dataError || submitting || Boolean(confirmValues)
+          }
+        />
         <Collapse
           items={[
             {
               key: 'advanced',
               label: intl.formatMessage({ id: 'resources.form.advanced' }),
               forceRender: true,
-              children: <>
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item name="revision" label={intl.formatMessage({ id: 'resources.preheat.revision' })}>
-                      <Input />
-                    </Form.Item>
-                  </Col>
-                  {draft.delivery_mode !== 's3_only' && <Col xs={24} md={12}>
-                    <Form.Item
-                      name="seed_worker_uuid"
-                      label={intl.formatMessage({ id: 'resources.preheat.seedWorker' })}
-                      rules={[{ required: draft.target_scope !== 'selected_workers' }]}
-                    >
-                      <Select allowClear options={workerOptions} />
-                    </Form.Item>
-                  </Col>}
-                </Row>
-                <Row gutter={16}>
-                  <Col xs={24} md={8}>
-                    <Form.Item name="window_duration_minutes" label={intl.formatMessage({ id: 'resources.preheat.schedule.window' })} rules={[{ required: true }]}>
-                      <InputNumber min={1} max={10080} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <Form.Item name="max_concurrency" label={intl.formatMessage({ id: 'resources.preheat.schedule.concurrency' })} rules={[{ required: true }]}>
-                      <InputNumber min={1} max={32} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <Form.Item name="bandwidth_limit_mbps" label={intl.formatMessage({ id: 'resources.preheat.schedule.bandwidth' })}>
-                      <InputNumber min={1} max={100000} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                {draft.source !== 'ollama_library' && <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item name="include_patterns" label={intl.formatMessage({ id: 'resources.preheat.includePatterns' })}>
-                      <Select mode="tags" tokenSeparators={[',']} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item name="exclude_patterns" label={intl.formatMessage({ id: 'resources.preheat.excludePatterns' })}>
-                      <Select mode="tags" tokenSeparators={[',']} />
-                    </Form.Item>
-                  </Col>
-                </Row>}
-              </>
+              children: (
+                <>
+                  <Row gutter={16}>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        name="revision"
+                        label={intl.formatMessage({
+                          id: 'resources.preheat.revision'
+                        })}
+                      >
+                        <Input onChange={clearStaleGgufSelection} />
+                      </Form.Item>
+                    </Col>
+                    {draft.delivery_mode !== 's3_only' && (
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="seed_worker_uuid"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.seedWorker'
+                          })}
+                          rules={[
+                            {
+                              required:
+                                draft.target_scope !== 'selected_workers'
+                            }
+                          ]}
+                        >
+                          <Select allowClear options={workerOptions} />
+                        </Form.Item>
+                      </Col>
+                    )}
+                  </Row>
+                  <Row gutter={16}>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        name="window_duration_minutes"
+                        label={intl.formatMessage({
+                          id: 'resources.preheat.schedule.window'
+                        })}
+                        rules={[{ required: true }]}
+                      >
+                        <InputNumber
+                          min={1}
+                          max={10080}
+                          style={{ width: '100%' }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        name="max_concurrency"
+                        label={intl.formatMessage({
+                          id: 'resources.preheat.schedule.concurrency'
+                        })}
+                        rules={[{ required: true }]}
+                      >
+                        <InputNumber
+                          min={1}
+                          max={32}
+                          style={{ width: '100%' }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        name="bandwidth_limit_mbps"
+                        label={intl.formatMessage({
+                          id: 'resources.preheat.schedule.bandwidth'
+                        })}
+                      >
+                        <InputNumber
+                          min={1}
+                          max={100000}
+                          style={{ width: '100%' }}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  {draft.source !== 'ollama_library' && (
+                    <Row gutter={16}>
+                      <Col xs={24}>
+                        <Form.Item
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.gguf.quantization'
+                          })}
+                        >
+                          <ModelGgufFileSelect
+                            source={draft.source}
+                            modelId={modelId}
+                            revision={revision}
+                            value={includePatterns}
+                            onChange={(patterns) => {
+                              ggufSelectorPatterns.current = [...patterns];
+                              form.setFieldValue('include_patterns', patterns);
+                            }}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="include_patterns"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.includePatterns'
+                          })}
+                        >
+                          <Select mode="tags" tokenSeparators={[',']} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="exclude_patterns"
+                          label={intl.formatMessage({
+                            id: 'resources.preheat.excludePatterns'
+                          })}
+                        >
+                          <Select mode="tags" tokenSeparators={[',']} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  )}
+                </>
+              )
             }
           ]}
         />
@@ -547,31 +679,34 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
       <ModelPreheatConfirmModal
         open={Boolean(confirmValues)}
         title={intl.formatMessage({ id: 'resources.preheat.confirm.title' })}
-        content={<ModelPreheatCreateSummary
-          formatMessage={intl.formatMessage}
-          flow={intl.formatMessage(
-            {
-              id: confirmValues?.values.delivery_mode === 's3_only'
-                ? 'resources.preheat.confirm.flow.s3Only'
-                : 'resources.preheat.confirm.flow.workers'
-            },
-            {
-              model: confirmValues?.values.model_id || '',
-              profile: confirmValues?.profileName || ''
+        content={
+          <ModelPreheatCreateSummary
+            formatMessage={intl.formatMessage}
+            flow={intl.formatMessage(
+              {
+                id:
+                  confirmValues?.values.delivery_mode === 's3_only'
+                    ? 'resources.preheat.confirm.flow.s3Only'
+                    : 'resources.preheat.confirm.flow.workers'
+              },
+              {
+                model: confirmValues?.values.model_id || '',
+                profile: confirmValues?.profileName || ''
+              }
+            )}
+            targetCount={
+              confirmValues?.values.delivery_mode === 's3_only'
+                ? 0
+                : confirmValues?.targetCount
             }
-          )}
-          targetCount={
-            confirmValues?.values.delivery_mode === 's3_only'
-              ? 0
-              : confirmValues?.targetCount
-          }
-          targetPending={confirmValues?.targetPending}
-          kind={
-            confirmValues?.values.delivery_mode === 's3_only'
-              ? 's3_only'
-              : 'workers'
-          }
-        />}
+            targetPending={confirmValues?.targetPending}
+            kind={
+              confirmValues?.values.delivery_mode === 's3_only'
+                ? 's3_only'
+                : 'workers'
+            }
+          />
+        }
         okText={intl.formatMessage({
           id: confirmValues?.connectivityFailure
             ? 'resources.preheat.connectivity.createAnyway'
@@ -579,18 +714,24 @@ const ModelPreheatScheduleModal: React.FC<Props> = ({
         })}
         loading={submitting}
         onOk={confirmSave}
-        extra={confirmValues?.connectivityFailure ? <Button
-          disabled={submitting}
-          onClick={() => {
-            if (!connectivityRecheckStarted.current) {
-              connectivityIdempotency.current.start();
-              connectivityRecheckStarted.current = true;
-            }
-            void recheckConnectivity();
-          }}
-        >
-          {intl.formatMessage({ id: 'resources.preheat.connectivity.recheck' })}
-        </Button> : undefined}
+        extra={
+          confirmValues?.connectivityFailure ? (
+            <Button
+              disabled={submitting}
+              onClick={() => {
+                if (!connectivityRecheckStarted.current) {
+                  connectivityIdempotency.current.start();
+                  connectivityRecheckStarted.current = true;
+                }
+                void recheckConnectivity();
+              }}
+            >
+              {intl.formatMessage({
+                id: 'resources.preheat.connectivity.recheck'
+              })}
+            </Button>
+          ) : undefined
+        }
         onCancel={() => {
           connectivityIdempotency.current.abandon();
           connectivityRecheckStarted.current = false;

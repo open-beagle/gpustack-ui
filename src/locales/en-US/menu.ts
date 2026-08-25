@@ -19,7 +19,7 @@ export default {
   'menu.users': 'Users',
   'menu.resources.workers': 'Workers',
   'menu.resources.gpus': 'GPUs',
-  'menu.resources.modelfiles': 'Model Preheat',
+  'menu.resources.modelfiles': 'Model Management',
   'menu.resources.modelarchive': 'Model Archive',
   'menu.accessControl': 'Access Control',
   'menu.accessControl.apikeys': 'API Keys',
