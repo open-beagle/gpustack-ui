@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
+  Alert,
   Button,
   Form,
   Input,
@@ -98,6 +99,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<number>();
   const [actionError, setActionError] = useState<string | null>(null);
   const key = useRef(new IdempotencyKeyLifecycle());
+  const editorRequestId = useRef(0);
   const scope = Form.useWatch('scope', form);
 
   useEffect(() => {
@@ -125,9 +127,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
   }, [load]);
 
   const openEditor = async (record?: ModelStorageSyncPolicy) => {
-    setEditing(record || null);
-    setOpen(true);
-    setDependencyError(false);
+    const requestId = ++editorRequestId.current;
+    if (!open || !dependencyError) setDependencyError(false);
     setDependencyLoading(true);
     try {
       const [profileItems, workerItems, modelItems] = await Promise.all([
@@ -141,6 +142,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
           queryModelFilesList({ page, perPage })
         )
       ]);
+      if (requestId !== editorRequestId.current) return;
       setProfiles(profileItems);
       setWorkers(workerItems);
       setModels(modelItems);
@@ -154,12 +156,31 @@ const ModelStorageSyncPolicies: React.FC = () => {
                 (item) => item.is_default && item.lifecycle_state === 'active'
               )?.id || 0
           };
+      form.resetFields();
       form.setFieldsValue(values);
+      setEditing(record || null);
+      setDependencyError(false);
+      setOpen(true);
     } catch {
-      setDependencyError(true);
+      if (requestId === editorRequestId.current) {
+        const values = record
+          ? { ...record, ...parseScheduleCron(record.cron_expression) }
+          : { ...defaults, ...parseScheduleCron(defaults.cron_expression) };
+        form.resetFields();
+        form.setFieldsValue(values);
+        setEditing(record || null);
+        setDependencyError(true);
+        setOpen(true);
+      }
     } finally {
-      setDependencyLoading(false);
+      if (requestId === editorRequestId.current) setDependencyLoading(false);
     }
+  };
+
+  const closeEditor = () => {
+    editorRequestId.current += 1;
+    setDependencyLoading(false);
+    setOpen(false);
   };
 
   const profileInMaintenance = (policy: ModelStorageSyncPolicy) =>
@@ -318,6 +339,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
+          loading={dependencyLoading}
+          disabled={dependencyLoading}
           onClick={() => void openEditor()}
         >
           {intl.formatMessage({ id: 'resources.storage.syncPolicy.create' })}
@@ -495,12 +518,12 @@ const ModelStorageSyncPolicies: React.FC = () => {
             ? 'resources.storage.syncPolicy.edit'
             : 'resources.storage.syncPolicy.create'
         })}
-        onCancel={() => setOpen(false)}
+        onCancel={closeEditor}
         styles={{ body: { maxHeight: '68vh', overflowY: 'auto' } }}
         footer={
           <ModalFooter
             onOk={save}
-            onCancel={() => setOpen(false)}
+            onCancel={closeEditor}
             loading={saving}
             okText={intl.formatMessage({ id: 'common.button.save' })}
             okBtnProps={{ disabled: dependencyLoading || dependencyError }}
@@ -519,6 +542,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
             action={
               <Button
                 type="link"
+                loading={dependencyLoading}
+                disabled={dependencyLoading}
                 onClick={() => void openEditor(editing || undefined)}
               >
                 {intl.formatMessage({ id: 'resources.storage.retry' })}
@@ -526,7 +551,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
             }
           />
         )}
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" disabled={dependencyLoading}>
           {editingProfileMaintenance && (
             <Alert
               type="info"

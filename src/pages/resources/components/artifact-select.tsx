@@ -42,7 +42,7 @@ const getArtifactRequestPresentation = (
   const quantizations = ggufPatterns.flatMap((pattern) => {
     const filename = pattern.split('/').pop() || pattern;
     const quantization = filename.match(
-      /(?:^|[-_.])((?:I?Q\d|BF16|F16|F32)(?:_[A-Z0-9]+)*)/i
+      /(?:^|[^A-Z0-9])((?:I?Q\d|BF16|F16|F32)(?:_[A-Z0-9]+)*)/i
     )?.[1];
     return quantization ? [quantization.toUpperCase()] : [];
   });
@@ -60,7 +60,28 @@ const getArtifactRequestPresentation = (
       : uniqueQuantizations.length
         ? `${message('resources.storage.artifact.requestedQuantizationHint')} · ${uniqueQuantizations.join(', ')}`
         : `${message('resources.storage.artifact.ggufFilterPattern')} · ${ggufPatterns.join(', ')}`;
-  return { include, exclude, ggufHint };
+  const firstGgufFile = ggufPatterns[0]?.split('/').pop();
+  const compactGgufHint = !ggufPatterns.length
+    ? undefined
+    : uniqueQuantizations.length
+      ? `GGUF ${uniqueQuantizations.join('/')}`
+      : firstGgufFile
+        ? `GGUF ${
+            firstGgufFile.length > 28
+              ? `${firstGgufFile.slice(0, 25)}...`
+              : firstGgufFile
+          }`
+        : 'GGUF';
+  return { include, exclude, ggufHint, compactGgufHint };
+};
+
+const compactRevision = (revision?: string | null) => {
+  if (!revision) return undefined;
+  if (/^local-snapshot(?:-|:|\/)/i.test(revision)) return undefined;
+  if (/^[a-f0-9]{24,}$/i.test(revision)) return undefined;
+  return revision.length > 24
+    ? `${revision.slice(0, 15)}...${revision.slice(-6)}`
+    : revision;
 };
 
 const ArtifactSelect: React.FC<Props> = ({
@@ -246,23 +267,20 @@ const ArtifactSelect: React.FC<Props> = ({
     );
     const source = getModelStorageSourceLabel(item.source);
     const revision = item.resolved_revision || '-';
-    const hasWildcardGguf = item.include_patterns.some(
-      (pattern) => /\.gguf$/i.test(pattern) && /[*?\[]/.test(pattern)
-    );
     const compactHint =
-      requestPresentation.ggufHint && !hasWildcardGguf
-        ? requestPresentation.ggufHint.split(' · ').slice(1).join(' · ')
-        : item.include_patterns.length || item.exclude_patterns.length
-          ? intl.formatMessage(
-              { id: 'resources.storage.artifact.filterSummary' },
-              {
-                include: item.include_patterns.length,
-                exclude: item.exclude_patterns.length
-              }
-            )
-          : undefined;
-    const shortArtifactId = item.artifact_id.slice(-8);
-    const secondary = [revision, compactHint, `#${shortArtifactId}`]
+      item.include_patterns.length || item.exclude_patterns.length
+        ? intl.formatMessage(
+            { id: 'resources.storage.artifact.filterSummary' },
+            {
+              include: item.include_patterns.length,
+              exclude: item.exclude_patterns.length
+            }
+          )
+        : undefined;
+    const secondary = [
+      requestPresentation.compactGgufHint || compactRevision(revision),
+      requestPresentation.compactGgufHint ? undefined : compactHint
+    ]
       .filter(Boolean)
       .join(' · ');
     return {
@@ -274,6 +292,8 @@ const ArtifactSelect: React.FC<Props> = ({
             requestPresentation.include,
             requestPresentation.exclude,
             requestPresentation.ggufHint,
+            `${intl.formatMessage({ id: 'resources.preheat.revision' })} · ${revision}`,
+            `Artifact · ${item.artifact_id}`,
             intl.formatMessage({
               id: 'resources.storage.artifact.fixedDistributionHint'
             }),
@@ -286,9 +306,20 @@ const ArtifactSelect: React.FC<Props> = ({
             .filter(Boolean)
             .join('\n')}
           className="model-storage-artifact-option"
-          style={{ minWidth: 0 }}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            overflow: 'hidden'
+          }}
         >
-          <div>
+          <div
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
             {source} · {item.model_id}
           </div>
           <div
@@ -302,15 +333,7 @@ const ArtifactSelect: React.FC<Props> = ({
           </div>
         </div>
       ),
-      selectionLabel: [
-        source,
-        item.model_id,
-        revision,
-        compactHint,
-        shortArtifactId
-      ]
-        .filter(Boolean)
-        .join(' · ')
+      selectionLabel: [source, item.model_id].filter(Boolean).join(' · ')
     };
   });
   if (value && !items.some((item) => item.artifact_id === value))

@@ -455,7 +455,15 @@ describe('模型存储选择器', () => {
     render(<ArtifactForm />);
     const combobox = screen.getByRole('combobox');
     await user.type(combobox, 'historical');
-    await user.click(await screen.findByText('Hugging Face · org/historical'));
+    const candidate = (
+      await screen.findByText('Hugging Face · org/historical')
+    ).closest('.model-storage-artifact-option') as HTMLElement;
+    expect(candidate).toHaveTextContent('Q8_0');
+    expect(candidate).not.toHaveTextContent('feature/quantized');
+    expect(candidate).not.toHaveTextContent('12345678');
+    expect(candidate.title).toContain('feature/quantized');
+    expect(candidate.title).toContain(searchedArtifact.artifact_id);
+    await user.click(candidate);
     await user.click(combobox);
     await user.type(combobox, 'refresh');
     await user.clear(combobox);
@@ -475,9 +483,9 @@ describe('模型存储选择器', () => {
     expect(screen.queryByText('artifact-unresolved')).not.toBeInTheDocument();
     const selectedLabel = document.querySelector('.ant-select-selection-item');
     expect(selectedLabel).toHaveTextContent('org/historical');
-    expect(selectedLabel).toHaveTextContent('feature/quantized');
-    expect(selectedLabel).toHaveTextContent('Q8_0');
-    expect(selectedLabel).toHaveTextContent('12345678');
+    expect(selectedLabel).not.toHaveTextContent('feature/quantized');
+    expect(selectedLabel).not.toHaveTextContent('Q8_0');
+    expect(selectedLabel).not.toHaveTextContent('12345678');
   });
 
   it('仓库选择器自动首刷、切换来源后重刷，搜索输入不改表单值', async () => {
@@ -763,6 +771,86 @@ describe('模型存储选择器', () => {
       document.querySelector('.ant-select-selection-item')?.textContent
     ).not.toContain('*Q8_0*.gguf');
   });
+
+  it('Artifact 已选值保持单行关键身份，候选隐藏长快照并保留 GGUF 精度', async () => {
+    const longRevision =
+      'local-snapshot-d0f0cb5439088a905edc0cfde4676847b8ab12d0';
+    api.queryModelStorageArtifacts.mockResolvedValue(
+      page([
+        {
+          ...artifact,
+          artifact_id: 'artifact-d0f0cb5439088a905edc0cfde4676847b8ab12d0',
+          model_id: 'org/large-gguf-model',
+          resolved_revision: longRevision,
+          include_patterns: ['weights/*Q8_0*.gguf']
+        }
+      ])
+    );
+    render(
+      <ArtifactSelect
+        profileId={3}
+        value="artifact-d0f0cb5439088a905edc0cfde4676847b8ab12d0"
+        onChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalled()
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    const selected = document.querySelector('.ant-select-selection-item')!;
+    const option = document.querySelector(
+      '.model-storage-artifact-option'
+    ) as HTMLElement;
+
+    expect(selected.textContent).toContain('org/large-gguf-model');
+    expect(selected.textContent).not.toContain(longRevision);
+    expect(selected.textContent).not.toContain('local-snapshot');
+    expect(selected.textContent).not.toContain('d0f0cb54');
+    expect(selected.textContent).not.toContain('Q8_0');
+    expect(option.textContent).toContain('Q8_0');
+    expect(option.textContent).not.toContain(longRevision);
+    expect(option.textContent).not.toContain('local-snapshot');
+    expect(option.textContent).not.toContain('d0f0cb54');
+    expect(option.title).toContain(longRevision);
+    expect(option.scrollWidth).toBeLessThanOrEqual(option.clientWidth);
+  });
+
+  it('Artifact 候选不展示纯 SHA revision，完整值仅保留在 title', async () => {
+    const shaRevision = 'd0f0cb5439088a905edc0cfde4676847b8ab12d0';
+    api.queryModelStorageArtifacts.mockResolvedValue(
+      page([
+        {
+          ...artifact,
+          artifact_id: 'artifact-with-sha-revision',
+          model_id: 'org/sha-model',
+          resolved_revision: shaRevision,
+          include_patterns: [],
+          exclude_patterns: []
+        }
+      ])
+    );
+    render(
+      <ArtifactSelect
+        profileId={3}
+        value="artifact-with-sha-revision"
+        onChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalled()
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    const option = document.querySelector(
+      '.model-storage-artifact-option'
+    ) as HTMLElement;
+
+    expect(option.textContent).not.toContain(shaRevision);
+    expect(option.textContent).not.toContain(shaRevision.slice(0, 8));
+    expect(option.title).toContain(shaRevision);
+  });
+
   it('节点模型 SSE 的 UPDATE 可进入筛选集合，DELETE 可离开集合', () => {
     const setDataList = vi.fn();
     const { result } = renderHook(() =>

@@ -1,6 +1,6 @@
 import { useIntl } from '@umijs/max';
 import _ from 'lodash';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Inner from './inner';
 
 interface LabelSelectorProps {
@@ -25,23 +25,27 @@ const LabelSelector: React.FC<LabelSelectorProps> = ({
   description
 }) => {
   const intl = useIntl();
-  const [labelsData, setLabelsData] = useState({});
+  const labelsSnapshot = useRef(_.cloneDeep(labels || {}));
   const [labelList, setLabelList] = useState<{ key: string; value: string }[]>(
-    []
+    () =>
+      _.map(_.keys(labels || {}), (key: string) => ({
+        key,
+        value: labels[key]
+      }))
   );
 
   useEffect(() => {
-    if (!_.isEqual(labels, labelsData)) {
-      setLabelsData(labels || {});
-      const list = _.map(_.keys(labels), (key: string) => {
-        return {
+    const nextLabels = labels || {};
+    if (!_.isEqual(nextLabels, labelsSnapshot.current)) {
+      labelsSnapshot.current = _.cloneDeep(nextLabels);
+      setLabelList(
+        _.map(_.keys(nextLabels), (key: string) => ({
           key,
-          value: labels[key]
-        };
-      });
-      setLabelList(list);
+          value: nextLabels[key]
+        }))
+      );
     }
-  }, [labels]);
+  });
 
   const handleLabelListChange = useCallback(
     (list: { key: string; value: string }[]) => {
@@ -50,8 +54,7 @@ const LabelSelector: React.FC<LabelSelectorProps> = ({
     [setLabelList]
   );
   const handleLabelsChange = (data: Record<string, any>) => {
-    console.log('handleLabelsChange', data);
-    setLabelsData(data);
+    labelsSnapshot.current = _.cloneDeep(data);
     onChange?.(data);
   };
 
@@ -88,7 +91,7 @@ const LabelSelector: React.FC<LabelSelectorProps> = ({
       description={
         description ?? intl.formatMessage({ id: 'models.form.keyvalue.paste' })
       }
-      labels={labelsData}
+      labels={labels || {}}
       labelOptions={labelOptions}
       labelList={labelList}
       onChange={handleLabelsChange}
@@ -100,4 +103,4 @@ const LabelSelector: React.FC<LabelSelectorProps> = ({
   );
 };
 
-export default React.memo(LabelSelector);
+export default LabelSelector;

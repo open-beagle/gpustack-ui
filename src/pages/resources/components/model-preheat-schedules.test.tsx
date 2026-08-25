@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -20,6 +21,7 @@ const api = vi.hoisted(() => ({
   createModelPreheatConnectivityCheck: vi.fn(),
   createModelPreheatSchedule: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
+  queryModelFilesList: vi.fn(),
   queryModelPreheatS3Profile: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
@@ -62,6 +64,14 @@ const page = <T,>(items: T[]) => ({
     totalPage: 1
   }
 });
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
 
 const schedule = (
   id: number,
@@ -183,6 +193,7 @@ beforeEach(() => {
       }
     ])
   );
+  api.queryModelFilesList.mockResolvedValue(page([]));
   api.createModelPreheatSchedule.mockResolvedValue(schedule(1, 'manual'));
   api.runModelPreheatScheduleNow.mockResolvedValue({ id: 9 });
   api.updateModelPreheatSchedule.mockResolvedValue(schedule(1, 'manual'));
@@ -678,6 +689,123 @@ describe('预热策略触发方式', () => {
         .closest('.ant-typography')
         ?.querySelector('.ant-typography-copy')
     ).not.toBeNull();
+  });
+
+  it('新建同步策略等待依赖完成后再打开且不闪现旧编辑值', async () => {
+    const user = userEvent.setup();
+    render(<ModelStorageSyncPolicies />);
+    const row = (await screen.findByText('sync-policy')).closest('tr')!;
+    await user.click(
+      within(row).getByRole('button', { name: 'common.button.edit' })
+    );
+    const editDialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(editDialog).getByDisplayValue('sync-policy')).toBeVisible()
+    );
+    await user.click(
+      within(editDialog).getByRole('button', { name: 'common.button.cancel' })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
+
+    const profiles = deferred<ReturnType<typeof page>>();
+    const workers = deferred<ReturnType<typeof page>>();
+    const models = deferred<ReturnType<typeof page>>();
+    api.queryModelPreheatS3Profiles.mockReturnValueOnce(profiles.promise);
+    api.queryWorkersList.mockReturnValueOnce(workers.promise);
+    api.queryModelFilesList.mockReturnValueOnce(models.promise);
+
+    const createButton = screen.getByRole('button', {
+      name: /resources\.storage\.syncPolicy\.create/
+    });
+    await user.click(createButton);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(createButton).toBeDisabled();
+    expect(createButton).toHaveClass('ant-btn-loading');
+
+    profiles.resolve(
+      page([
+        {
+          id: 3,
+          name: 'center-cache',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ])
+    );
+    workers.resolve(page([]));
+    models.resolve(page([]));
+
+    const createDialog = await screen.findByRole('dialog');
+    expect(
+      within(createDialog).getByText('resources.storage.syncPolicy.create')
+    ).toBeInTheDocument();
+    expect(within(createDialog).queryByDisplayValue('sync-policy')).toBeNull();
+    expect(
+      within(createDialog).getByText(
+        'resources.storage.syncBatch.scope.all_ready_workers'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('同步策略依赖重试期间取消后迟到响应不会重新打开弹窗', async () => {
+    const user = userEvent.setup();
+    render(<ModelStorageSyncPolicies />);
+    await screen.findByText('sync-policy');
+    api.queryModelPreheatS3Profiles.mockRejectedValueOnce(
+      new Error('dependency-failed')
+    );
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /resources\.storage\.syncPolicy\.create/
+      })
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.state.error')
+    ).toBeInTheDocument();
+
+    const profiles = deferred<ReturnType<typeof page>>();
+    const workers = deferred<ReturnType<typeof page>>();
+    const models = deferred<ReturnType<typeof page>>();
+    api.queryModelPreheatS3Profiles.mockReturnValueOnce(profiles.promise);
+    api.queryWorkersList.mockReturnValueOnce(workers.promise);
+    api.queryModelFilesList.mockReturnValueOnce(models.promise);
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.retry'
+      })
+    );
+    const retryButton = within(dialog).getByRole('button', {
+      name: /resources\.storage\.retry/
+    });
+    expect(
+      within(dialog).getByText('resources.storage.state.error')
+    ).toBeVisible();
+    expect(retryButton).toBeDisabled();
+    expect(retryButton).toHaveClass('ant-btn-loading');
+    expect(within(dialog).getByRole('textbox')).toBeDisabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'common.button.save' })
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'common.button.cancel' })
+    ).toBeEnabled();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'common.button.cancel' })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
+
+    profiles.resolve(page([]));
+    workers.resolve(page([]));
+    models.resolve(page([]));
+    await act(async () => Promise.resolve());
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('分发策略失败时保留可复制的未知原始错误码', async () => {
