@@ -294,6 +294,27 @@ describe('统一模型存储交互', () => {
     expect(
       screen.getByText('resources.storage.error.authenticationFailed')
     ).toBeInTheDocument();
+    for (const [label, code] of [
+      [
+        'resources.storage.connectionTest.stage.bucket',
+        's3_authentication_failed'
+      ],
+      ['resources.storage.connectionTest.stage.write', 'not_reached'],
+      ['resources.storage.connectionTest.stage.read', 'not_reached'],
+      ['resources.storage.connectionTest.stage.delete', 'not_reached']
+    ]) {
+      const stage = screen
+        .getByText(label)
+        .closest('.ant-descriptions-item-label')!
+        .nextElementSibling as HTMLElement;
+      expect(within(stage).getAllByText(code)).toHaveLength(1);
+      expect(
+        within(stage)
+          .getByText(code)
+          .closest('.ant-typography')
+          ?.querySelector('.ant-typography-copy')
+      ).not.toBeNull();
+    }
   });
 
   it('节点检测直接发起 Worker API 并展示检测结果', async () => {

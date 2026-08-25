@@ -583,6 +583,76 @@ describe('模型存储选择器', () => {
     ).not.toBeNull();
   });
 
+  it('当前 Artifact 不属于搜索结果时仍按后端页信息加载最后一项', async () => {
+    const selectedArtifact = {
+      ...artifact,
+      artifact_id: 'selected-outside-search',
+      model_id: 'selected/model'
+    };
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      ...artifact,
+      artifact_id: `matched-${index + 1}`,
+      model_id: `matched/model-${index + 1}`
+    }));
+    const lastArtifact = {
+      ...artifact,
+      artifact_id: 'matched-21',
+      model_id: 'matched/model-21'
+    };
+    api.queryModelStorageArtifacts.mockImplementation(
+      (_profileId: number, params: { page: number; search?: string }) => {
+        if (!params.search) return Promise.resolve(page([selectedArtifact]));
+        return Promise.resolve(
+          page(params.page === 1 ? firstPage : [lastArtifact], params.page, 21)
+        );
+      }
+    );
+    render(
+      <ArtifactSelect
+        profileId={3}
+        value={selectedArtifact.artifact_id}
+        onChange={vi.fn()}
+      />
+    );
+
+    const input = screen.getByRole('combobox');
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3, {
+        page: 1,
+        perPage: 20
+      })
+    );
+    fireEvent.change(input, { target: { value: 'matched' } });
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3, {
+        page: 1,
+        perPage: 20,
+        search: 'matched'
+      })
+    );
+    fireEvent.mouseDown(input);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'resources.storage.loadMore'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(3, {
+        page: 2,
+        perPage: 20,
+        search: 'matched'
+      })
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', {
+          name: 'resources.storage.loadMore'
+        })
+      ).not.toBeInTheDocument()
+    );
+  });
+
   it('Worker UUID 多选的加载更多也位于 Select 下拉内部', async () => {
     const worker = {
       id: 1,

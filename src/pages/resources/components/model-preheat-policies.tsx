@@ -10,7 +10,6 @@ import {
 } from '@ant-design/icons';
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import {
-  Alert,
   Button,
   message,
   Space,
@@ -41,7 +40,6 @@ import {
 import { consumeModelStrategySearch } from '../config/model-policy';
 import {
   extractModelStorageErrorCode,
-  getModelStorageErrorPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate
 } from '../config/model-preheat';
@@ -53,6 +51,7 @@ import type {
 import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
+import { ModelStorageErrorAlert } from './model-storage-error-details';
 
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
 type ScheduleAction = 'enable' | 'disable' | 'run' | 'delete';
@@ -804,16 +803,11 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
               { name: policyConfirm?.policy.name || '' }
             )}
             {actionError && (
-              <Alert
+              <ModelStorageErrorAlert
+                errorCode={actionError}
                 type="error"
                 showIcon
                 style={{ marginTop: 12 }}
-                message={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).messageId
-                })}
-                description={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).actionHintId
-                })}
               />
             )}
           </>
@@ -841,16 +835,11 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
               { name: scheduleConfirm?.schedule.name || '' }
             )}
             {actionError && (
-              <Alert
+              <ModelStorageErrorAlert
+                errorCode={actionError}
                 type="error"
                 showIcon
                 style={{ marginTop: 12 }}
-                message={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).messageId
-                })}
-                description={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).actionHintId
-                })}
               />
             )}
           </>

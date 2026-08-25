@@ -11,7 +11,6 @@ import {
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
-  Alert,
   Button,
   Form,
   Input,
@@ -45,7 +44,6 @@ import {
   extractModelStorageErrorCode,
   getModelFileStorageModelId,
   getModelFileSyncActionState,
-  getModelStorageErrorPresentation,
   IdempotencyKeyLifecycle,
   loadAllPaginated
 } from '../config/model-preheat';
@@ -58,6 +56,7 @@ import type {
   ModelStorageSyncScope
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
+import { ModelStorageErrorAlert } from './model-storage-error-details';
 import ScheduleEditor, {
   getBrowserTimezone,
   getSchedulePayload,
@@ -635,16 +634,11 @@ const ModelStorageSyncPolicies: React.FC = () => {
               { name: confirm?.policy.name || '' }
             )}
             {actionError && (
-              <Alert
+              <ModelStorageErrorAlert
+                errorCode={actionError}
                 type="error"
                 showIcon
                 style={{ marginTop: 12 }}
-                message={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).messageId
-                })}
-                description={intl.formatMessage({
-                  id: getModelStorageErrorPresentation(actionError).actionHintId
-                })}
               />
             )}
           </>

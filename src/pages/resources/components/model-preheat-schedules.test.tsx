@@ -8,7 +8,10 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ModelPreheatSchedule } from '../config/types';
+import type {
+  ModelPreheatDistributionPolicy,
+  ModelPreheatSchedule
+} from '../config/types';
 import ModelPreheatPolicies from './model-preheat-policies';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
 import ModelStorageSyncPolicies from './model-storage-sync-policies';
@@ -25,6 +28,7 @@ const api = vi.hoisted(() => ({
   queryModelStorageArtifacts: vi.fn(),
   queryModelStorageCapabilities: vi.fn(),
   queryWorkersList: vi.fn(),
+  reconcileModelPreheatPolicy: vi.fn(),
   runModelPreheatScheduleNow: vi.fn(),
   runModelStorageSyncPolicyNow: vi.fn(),
   updateModelPreheatSchedule: vi.fn()
@@ -90,6 +94,26 @@ const schedule = (
   created_at: '2026-08-23T00:00:00Z',
   updated_at: '2026-08-23T00:00:00Z'
 });
+
+const distributionPolicy: ModelPreheatDistributionPolicy = {
+  id: 41,
+  name: 'distribution-policy',
+  enabled: true,
+  trigger_mode: 'continuous',
+  cron_expression: null,
+  timezone: 'UTC',
+  profile_id: 3,
+  profile_config_version: 1,
+  request_identity: { source: 'modelscope', model_id: 'Qwen/Test' },
+  request_digest: 'request-digest',
+  target_scope: 'selected_workers',
+  worker_selector: {},
+  gpu_selector: {},
+  created_by_task_id: null,
+  last_reconciled_at: null,
+  created_at: '',
+  updated_at: ''
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -604,6 +628,15 @@ describe('预热策略触发方式', () => {
     expect(
       screen.getByText('resources.storage.error.modelPreheatDisabled')
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('dialog')).getAllByText('model_preheat_disabled')
+    ).toHaveLength(1);
+    expect(
+      within(screen.getByRole('dialog'))
+        .getByText('model_preheat_disabled')
+        .closest('.ant-typography')
+        ?.querySelector('.ant-typography-copy')
+    ).not.toBeNull();
     await user.click(submit);
     await waitFor(() =>
       expect(api.runModelPreheatScheduleNow).toHaveBeenCalledTimes(2)
@@ -636,6 +669,51 @@ describe('预热策略触发方式', () => {
         'resources.storage.error.syncSourceNotFound'
       )
     ).toBeInTheDocument();
+    expect(
+      within(dialog).getAllByText('model_sync_source_not_found')
+    ).toHaveLength(1);
+    expect(
+      within(dialog)
+        .getByText('model_sync_source_not_found')
+        .closest('.ant-typography')
+        ?.querySelector('.ant-typography-copy')
+    ).not.toBeNull();
+  });
+
+  it('分发策略失败时保留可复制的未知原始错误码', async () => {
+    const user = userEvent.setup();
+    api.queryModelPreheatPolicies.mockResolvedValueOnce(
+      page([distributionPolicy])
+    );
+    api.reconcileModelPreheatPolicy.mockRejectedValueOnce({
+      response: { data: { error_code: 'future_distribution_failure' } }
+    });
+    render(<ModelPreheatPolicies mode="distribution" />);
+    const row = (await screen.findByText('distribution-policy')).closest('tr')!;
+    await user.click(
+      within(row).getByRole('button', {
+        name: 'resources.preheat.policy.reconcile'
+      })
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.preheat.policy.reconcile'
+      })
+    );
+
+    expect(
+      await within(dialog).findByText('resources.storage.error.unknown')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getAllByText('future_distribution_failure')
+    ).toHaveLength(1);
+    expect(
+      within(dialog)
+        .getByText('future_distribution_failure')
+        .closest('.ant-typography')
+        ?.querySelector('.ant-typography-copy')
+    ).not.toBeNull();
   });
 
   it('立即执行提交中忽略快速重复点击', async () => {

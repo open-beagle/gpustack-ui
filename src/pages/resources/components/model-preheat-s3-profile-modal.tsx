@@ -12,10 +12,8 @@ import {
   Input,
   InputNumber,
   Row,
-  Space,
   Switch,
-  Tooltip,
-  Typography
+  Tooltip
 } from 'antd';
 import React, { useEffect, useState } from 'react';
 import {
@@ -26,8 +24,7 @@ import {
 } from '../apis';
 import {
   buildModelPreheatS3ProfilePayload,
-  buildSystemManagedModelPreheatS3ProfilePayload,
-  getModelStorageErrorPresentation
+  buildSystemManagedModelPreheatS3ProfilePayload
 } from '../config/model-preheat';
 import type {
   ModelPreheatS3Profile,
@@ -36,6 +33,7 @@ import type {
   ModelStorageConnectionTestRequest
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
+import { ModelStorageErrorDetails } from './model-storage-error-details';
 
 interface Props {
   open: boolean;
@@ -236,16 +234,10 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
     if (stage.ok) {
       return intl.formatMessage({ id: 'resources.storage.connectionTest.ok' });
     }
-    const presentation = getModelStorageErrorPresentation(
-      stage.error_code || testResult?.error_code
-    );
     return (
-      <Space direction="vertical" size={0}>
-        <span>{intl.formatMessage({ id: presentation.messageId })}</span>
-        <Typography.Text type="secondary">
-          {intl.formatMessage({ id: presentation.actionHintId })}
-        </Typography.Text>
-      </Space>
+      <ModelStorageErrorDetails
+        errorCode={stage.error_code || testResult?.error_code || 'unknown'}
+      />
     );
   };
 

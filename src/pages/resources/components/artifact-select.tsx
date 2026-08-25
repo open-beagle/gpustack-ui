@@ -93,7 +93,7 @@ const ArtifactSelect: React.FC<Props> = ({
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<unknown>();
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [totalPage, setTotalPage] = useState(1);
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
@@ -151,7 +151,7 @@ const ArtifactSelect: React.FC<Props> = ({
             : loaded;
         });
         setPage(nextPage);
-        setTotal(result.pagination.total);
+        setTotalPage(result.pagination.totalPage);
       }
     } catch (nextError) {
       if (id === requestId.current) setError(nextError);
@@ -166,7 +166,7 @@ const ArtifactSelect: React.FC<Props> = ({
     setItems([]);
     setSearch('');
     setPage(1);
-    setTotal(0);
+    setTotalPage(1);
     setError(undefined);
     setLoading(false);
     setResolving(false);
@@ -359,7 +359,7 @@ const ArtifactSelect: React.FC<Props> = ({
         popupRender={(menu) => (
           <>
             {menu}
-            {items.length < total && (
+            {page < totalPage && (
               <div
                 onMouseDown={(event) => event.preventDefault()}
                 style={{ padding: '0 12px 8px' }}
