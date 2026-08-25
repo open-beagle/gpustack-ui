@@ -165,6 +165,13 @@ const ModelStorageSyncTasks: React.FC = () => {
     selected?.action === 'cancel'
       ? 'resources.storage.cancelSyncContent'
       : 'resources.storage.deleteSyncContent';
+  const detailFailure = detail?.error_code
+    ? getModelStorageErrorPresentation(detail.error_code)
+    : null;
+  const detailStateMessage =
+    detail?.state_message && detail.state_message !== detail.error_code
+      ? detail.state_message
+      : null;
 
   return (
     <>
@@ -309,6 +316,7 @@ const ModelStorageSyncTasks: React.FC = () => {
                       onClick={() => {
                         const query = new URLSearchParams({
                           tab: 'policies',
+                          policy_tab: 'distribution',
                           strategy: 'create',
                           sync_task: String(task.id)
                         });
@@ -493,20 +501,31 @@ const ModelStorageSyncTasks: React.FC = () => {
                 id: 'resources.storage.stateMessage'
               })}
             >
-              {detail?.state_message || '-'}
+              {detailStateMessage || '-'}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({
                 id: 'resources.storage.syncTask.errorCode'
               })}
             >
-              {detail?.error_code
-                ? intl.formatMessage({
-                    id: getModelStorageErrorPresentation(detail.error_code)
-                      .messageId,
-                    defaultMessage: detail.error_code
-                  })
-                : '-'}
+              {detailFailure && detail?.error_code ? (
+                <Space direction="vertical" size={2}>
+                  <Typography.Text strong>
+                    {intl.formatMessage({
+                      id: detailFailure.messageId,
+                      defaultMessage: detail.error_code
+                    })}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {intl.formatMessage({ id: detailFailure.actionHintId })}
+                  </Typography.Text>
+                  <Typography.Text code copyable={{ text: detail.error_code }}>
+                    {detail.error_code}
+                  </Typography.Text>
+                </Space>
+              ) : (
+                '-'
+              )}
             </Descriptions.Item>
           </Descriptions>
         )}

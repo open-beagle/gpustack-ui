@@ -351,7 +351,7 @@ describe('同步任务快捷创建分发策略', () => {
       expect(api.queryModelStorageSyncTask).toHaveBeenCalledWith(41)
     );
     expect(
-      await screen.findByText('Hugging Face · org/model')
+      await screen.findByText(/^Hugging Face · org\/model/)
     ).toBeInTheDocument();
     expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(profile.id, {
       page: 1,
@@ -370,7 +370,7 @@ describe('同步任务快捷创建分发策略', () => {
         { page: 1, perPage: 20 }
       )
     );
-    expect(screen.queryByText('Hugging Face · org/model')).toBeNull();
+    expect(screen.queryByText(/^Hugging Face · org\/model/)).toBeNull();
   });
 });
 
@@ -669,6 +669,58 @@ describe('任务发现与串行轮询', () => {
         'resources.storage.transfer.peer_via_s3:a100-58:center-cache'
       )
     ).toBeInTheDocument();
+  });
+
+  it('详情展示后端可选的时间、文件统计和失败原因', async () => {
+    const failedTask = {
+      ...task({ execution_state: 'error' }),
+      started_at: '2026-08-11T08:01:00',
+      finished_at: '2026-08-11T08:02:00',
+      file_count: 3,
+      total_size: 2048,
+      state_message: 'worker_execution_failed',
+      error_code: 'worker_execution_failed'
+    } as ModelPreheatTask;
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([failedTask]));
+    api.queryModelPreheatTask.mockResolvedValueOnce(failedTask);
+
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('2026-08-11 08:01:00');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    expect(
+      await screen.findByText('resources.storage.error.workerExecutionFailed')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'resources.storage.error.workerExecutionFailed.actionHint'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('worker_execution_failed')).toHaveLength(1);
+    expect(screen.getByText('2.05 KB')).toBeInTheDocument();
+  });
+
+  it('旧后端未返回可选详情字段时仍可打开详情', async () => {
+    const legacyTask = task({ execution_state: 'ready' });
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([legacyTask]));
+    api.queryModelPreheatTask.mockResolvedValueOnce(legacyTask);
+
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.startedAt')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('resources.storage.finishedAt')
+    ).toBeInTheDocument();
+    expect(within(dialog).getAllByText('-').length).toBeGreaterThanOrEqual(2);
   });
 
   it('列表为空时仍继续轮询并发现 schedule 新任务', async () => {

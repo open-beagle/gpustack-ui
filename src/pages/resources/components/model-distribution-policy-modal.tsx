@@ -2,7 +2,7 @@ import ModalFooter from '@/components/modal-footer';
 import ScrollerModal from '@/components/scroller-modal';
 import { useIntl } from '@umijs/max';
 import { Alert, Button, Form, Input, Select } from 'antd';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createModelPreheatPolicy,
   queryModelPreheatS3Profiles,
@@ -10,12 +10,8 @@ import {
   queryWorkersList
 } from '../apis';
 import { loadAllPaginated } from '../config/model-preheat';
-import type {
-  ListItem,
-  ModelPreheatS3Profile,
-  ModelStorageArtifact
-} from '../config/types';
-import ArtifactSelect, { type ArtifactValidity } from './artifact-select';
+import type { ListItem, ModelPreheatS3Profile } from '../config/types';
+import ArtifactSelect, { type ArtifactSelectionState } from './artifact-select';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatCreateSummary from './model-preheat-create-summary';
 import ScheduleEditor, {
@@ -61,10 +57,12 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
   const [dependencyRevision, setDependencyRevision] = useState(0);
   const [dataError, setDataError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedArtifact, setSelectedArtifact] =
-    useState<ModelStorageArtifact>();
-  const [artifactValidity, setArtifactValidity] =
-    useState<ArtifactValidity>('unresolved');
+  const artifactSelectionRef = useRef<ArtifactSelectionState>({
+    status: 'unresolved'
+  });
+  const [artifactSelection, setArtifactSelection] =
+    useState<ArtifactSelectionState>(artifactSelectionRef.current);
+  const selectedArtifact = artifactSelection.artifact;
   const [confirmValues, setConfirmValues] = useState<FormValues | null>(null);
   const profileId = Form.useWatch('profile_id', form);
   const targetScope = Form.useWatch('target_scope', form);
@@ -74,8 +72,8 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
     if (!open) return;
     setLoading(true);
     setDataError(false);
-    setSelectedArtifact(undefined);
-    setArtifactValidity('unresolved');
+    artifactSelectionRef.current = { status: 'unresolved' };
+    setArtifactSelection(artifactSelectionRef.current);
     Promise.all([
       loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
         queryModelPreheatS3Profiles({ page, perPage })
@@ -214,7 +212,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
               dataError ||
               saving ||
               Boolean(confirmValues) ||
-              artifactValidity !== 'valid'
+              artifactSelection.status !== 'valid'
           }}
         />
       }
@@ -254,8 +252,8 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
             !Object.prototype.hasOwnProperty.call(changedValues, 'profile_id')
           )
             return;
-          setSelectedArtifact(undefined);
-          setArtifactValidity('unresolved');
+          artifactSelectionRef.current = { status: 'unresolved' };
+          setArtifactSelection(artifactSelectionRef.current);
           form.setFieldValue('artifact_id', undefined);
         }}
       >
@@ -295,7 +293,8 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
               {
                 validator: async (_, value) => {
                   if (!value) return;
-                  if (artifactValidity === 'resolving') {
+                  const selection = artifactSelectionRef.current;
+                  if (selection.status === 'resolving') {
                     throw new Error(
                       intl.formatMessage({
                         id: 'resources.storage.artifact.resolving'
@@ -303,9 +302,9 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
                     );
                   }
                   if (
-                    artifactValidity !== 'valid' ||
-                    selectedArtifact?.artifact_id !== value ||
-                    selectedArtifact?.manifest_state !== 'valid'
+                    selection.status !== 'valid' ||
+                    selection.artifact?.artifact_id !== value ||
+                    selection.artifact?.manifest_state !== 'valid'
                   ) {
                     throw new Error(
                       intl.formatMessage({
@@ -320,8 +319,16 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
             <ArtifactSelect
               profileId={profileId}
               profileName={selectedProfile?.name}
-              onArtifactChange={setSelectedArtifact}
-              onValidityChange={setArtifactValidity}
+              onSelectionChange={(selection) => {
+                artifactSelectionRef.current = selection;
+                setArtifactSelection(selection);
+                Promise.resolve().then(() => {
+                  if (form.getFieldValue('artifact_id'))
+                    void form
+                      .validateFields(['artifact_id'])
+                      .catch(() => undefined);
+                });
+              }}
             />
           </Form.Item>
         </>

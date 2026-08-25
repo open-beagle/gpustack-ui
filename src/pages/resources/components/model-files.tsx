@@ -69,6 +69,7 @@ import {
   ModelfileStateMapValue,
   WorkerStatusMap
 } from '../config';
+import { modelManagementSearchForTab } from '../config/model-policy';
 import {
   MODEL_FILE_WATCH_EVENTS,
   getModelFileDeletePreflight,
@@ -156,15 +157,32 @@ const TypographyPara = styled(Paragraph)`
 
 const ModelManagementWrapper = styled.div`
   .ant-table-thead > tr > .ant-table-cell-fix-right {
-    background: var(--ant-color-bg-container, #fff) !important;
+    z-index: 3;
+    background-color: var(--ant-color-bg-container, #fff) !important;
+    background-image: linear-gradient(
+      var(--ant-color-fill-tertiary),
+      var(--ant-color-fill-tertiary)
+    ) !important;
+    background-clip: padding-box;
   }
 
   .ant-table-tbody > tr > .ant-table-cell-fix-right {
-    background: var(--ant-color-bg-container, #fff) !important;
+    z-index: 2;
+    background-color: var(--ant-color-bg-container, #fff) !important;
+    background-image: none !important;
+    background-clip: padding-box;
   }
 
   .ant-table-tbody > tr:hover > .ant-table-cell-fix-right {
-    background: var(--ant-color-fill-tertiary, #f5f5f5) !important;
+    background-color: var(--ant-color-bg-container, #fff) !important;
+    background-image: linear-gradient(
+      var(--ant-table-row-hover-bg, rgb(249 249 249)),
+      var(--ant-table-row-hover-bg, rgb(249 249 249))
+    ) !important;
+  }
+
+  .ant-table-cell-fix-right-first::after {
+    box-shadow: inset -10px 0 8px -8px var(--ant-color-split);
   }
 `;
 
@@ -1083,7 +1101,7 @@ const LocalModelFiles = () => {
         onCancel={() => setSyncRecord(null)}
         onCreated={() => {
           setSyncRecord(null);
-          navigate('/resources/modelfiles?tab=sync-tasks');
+          navigate('/resources/modelfiles?tab=tasks&task_tab=sync');
         }}
       />
     </>
@@ -1101,9 +1119,10 @@ const ModelFiles = () => {
     : 'local';
 
   const handleTabChange = (key: string) => {
-    const search = new URLSearchParams(location.search);
-    search.set('tab', key);
-    navigate(`${location.pathname}?${search.toString()}`, { replace: true });
+    navigate(
+      `${location.pathname}${modelManagementSearchForTab(location.search, key)}`,
+      { replace: true }
+    );
   };
 
   return (

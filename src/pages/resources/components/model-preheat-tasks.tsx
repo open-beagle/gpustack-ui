@@ -22,6 +22,7 @@ import {
   message
 } from 'antd';
 import dayjs from 'dayjs';
+import numeral from 'numeral';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   queryModelPreheatS3Profiles,
@@ -33,6 +34,7 @@ import {
 import {
   LatestRequestGate,
   getModelPreheatTaskActions,
+  getModelStorageErrorPresentation,
   getModelStorageFlowPresentation,
   getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
@@ -46,7 +48,6 @@ import type {
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatModal from './model-preheat-modal';
-import { useModelPreheatCapability } from './use-model-preheat-capability';
 
 const statusColors: Record<string, string> = {
   pending: 'processing',
@@ -96,9 +97,6 @@ const ModelPreheatTasks: React.FC = () => {
   const [profileNames, setProfileNames] = useState<Record<number, string>>({});
   const [workerNames, setWorkerNames] = useState<Record<number, string>>({});
   const [loadError, setLoadError] = useState(false);
-  const { state: preheatCapability, retry: retryPreheatCapability } =
-    useModelPreheatCapability();
-  const preheatEnabled = preheatCapability === 'enabled';
 
   useEffect(() => {
     void Promise.all([
@@ -339,15 +337,17 @@ const ModelPreheatTasks: React.FC = () => {
     },
     {
       title: intl.formatMessage({ id: 'resources.storage.startedAt' }),
+      dataIndex: 'started_at',
       width: 170,
-      // 当前 Public 契约未公开 started_at，不能把 updated_at 伪装成开始时间。
-      render: () => '-'
+      render: (value: string | null | undefined) =>
+        value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
     },
     {
       title: intl.formatMessage({ id: 'resources.storage.finishedAt' }),
+      dataIndex: 'finished_at',
       width: 170,
-      // 当前 Public 契约未公开 finished_at，不能把 updated_at 伪装成完成时间。
-      render: () => '-'
+      render: (value: string | null | undefined) =>
+        value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
     },
     {
       title: intl.formatMessage({ id: 'common.table.operation' }),
@@ -405,6 +405,13 @@ const ModelPreheatTasks: React.FC = () => {
       dataIndex: 'worker_uuid'
     }
   ];
+  const detailFailure = detail?.error_code
+    ? getModelStorageErrorPresentation(detail.error_code)
+    : null;
+  const detailStateMessage =
+    detail?.state_message && detail.state_message !== detail.error_code
+      ? detail.state_message
+      : null;
 
   return (
     <>
@@ -425,47 +432,11 @@ const ModelPreheatTasks: React.FC = () => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          disabled={!preheatEnabled}
           onClick={() => setCreateOpen(true)}
         >
           {intl.formatMessage({ id: 'resources.preheat.task.create' })}
         </Button>
       </Space>
-      {preheatCapability === 'disabled' && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.disabledByServer'
-          })}
-        />
-      )}
-      {preheatCapability === 'loading' && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.capabilityChecking'
-          })}
-        />
-      )}
-      {preheatCapability === 'error' && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.capabilityLoadFailed'
-          })}
-          action={
-            <Button size="small" onClick={() => void retryPreheatCapability()}>
-              {intl.formatMessage({ id: 'common.button.retry' })}
-            </Button>
-          }
-        />
-      )}
       <Table
         rowKey="id"
         columns={columns}
@@ -498,7 +469,7 @@ const ModelPreheatTasks: React.FC = () => {
         />
       )}
       <ModelPreheatModal
-        open={createOpen && preheatEnabled}
+        open={createOpen}
         onCancel={() => setCreateOpen(false)}
         onCreated={(task) => {
           setCreateOpen(false);
@@ -600,6 +571,65 @@ const ModelPreheatTasks: React.FC = () => {
               <Typography.Text copyable>
                 {detail?.artifact_id || '-'}
               </Typography.Text>
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.startedAt' })}
+            >
+              {detail?.started_at
+                ? dayjs(detail.started_at).format('YYYY-MM-DD HH:mm:ss')
+                : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.finishedAt' })}
+            >
+              {detail?.finished_at
+                ? dayjs(detail.finished_at).format('YYYY-MM-DD HH:mm:ss')
+                : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.fileCount' })}
+            >
+              {detail?.file_count ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.totalSize' })}
+            >
+              {detail?.total_size != null
+                ? numeral(detail.total_size).format('0.00 b')
+                : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.stateMessage'
+              })}
+              span={2}
+            >
+              {detailStateMessage || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
+              label={intl.formatMessage({
+                id: 'resources.storage.syncTask.errorCode'
+              })}
+              span={3}
+            >
+              {detailFailure && detail?.error_code ? (
+                <Space direction="vertical" size={2}>
+                  <Typography.Text strong>
+                    {intl.formatMessage({
+                      id: detailFailure.messageId,
+                      defaultMessage: detail.error_code
+                    })}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {intl.formatMessage({ id: detailFailure.actionHintId })}
+                  </Typography.Text>
+                  <Typography.Text code copyable={{ text: detail.error_code }}>
+                    {detail.error_code}
+                  </Typography.Text>
+                </Space>
+              ) : (
+                '-'
+              )}
             </Descriptions.Item>
             <Descriptions.Item
               label={intl.formatMessage({

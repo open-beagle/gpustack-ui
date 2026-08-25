@@ -1,6 +1,6 @@
-import { useIntl, useLocation } from '@umijs/max';
+import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import { Tabs } from 'antd';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   taskPolicyTabFromSearch,
   type TaskPolicyTab
@@ -11,18 +11,20 @@ import ModelStorageSyncPolicies from './model-storage-sync-policies';
 const ModelTaskPolicies: React.FC = () => {
   const intl = useIntl();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<TaskPolicyTab>(() =>
-    taskPolicyTabFromSearch(location.search)
-  );
-
-  useEffect(() => {
-    setActiveTab(taskPolicyTabFromSearch(location.search));
-  }, [location.search]);
+  const navigate = useNavigate();
+  const activeTab = taskPolicyTabFromSearch(location.search);
 
   return (
     <Tabs
       activeKey={activeTab}
-      onChange={(key) => setActiveTab(key as TaskPolicyTab)}
+      onChange={(key) => {
+        const search = new URLSearchParams(location.search);
+        search.set('tab', 'policies');
+        search.set('policy_tab', key as TaskPolicyTab);
+        navigate(`${location.pathname}?${search.toString()}`, {
+          replace: true
+        });
+      }}
       items={[
         {
           key: 'sync',

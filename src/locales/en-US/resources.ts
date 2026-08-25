@@ -602,13 +602,33 @@ export default {
   'resources.storage.error.manifestInvalid': 'Invalid manifest',
   'resources.storage.error.workerUnavailable': 'Worker unavailable',
   'resources.storage.error.workerExecutionFailed': 'Worker execution failed',
+  'resources.storage.error.workerExecutionFailed.actionHint':
+    'Check the worker logs, disk space, network, and S3 access, then retry.',
   'resources.storage.error.modelPreheatDisabled':
     'Model preheat is disabled on this server',
   'resources.storage.error.syncSourceNotFound':
     'The source model no longer exists',
+  'resources.storage.error.syncSourceNotFound.actionHint':
+    'Refresh the node model list and recreate the task after confirming the source model still exists.',
+  'resources.storage.error.syncSourceFilesMissing':
+    'Source model files are missing',
+  'resources.storage.error.syncSourceFilesMissing.actionHint':
+    'Restore or download the source model files on the worker, then retry the sync.',
+  'resources.storage.error.localManifestInvalid':
+    'The worker model manifest is invalid',
+  'resources.storage.error.localManifestInvalid.actionHint':
+    'Check the source model files, repair or download them again, then retry.',
+  'resources.storage.error.s3ManifestInvalid':
+    'The S3 model manifest is invalid',
+  'resources.storage.error.s3ManifestInvalid.actionHint':
+    'Refresh the S3 inventory; if it still fails, sync the model again to create a valid manifest.',
+  'resources.storage.error.manifestInvalid.actionHint':
+    'Verify that the model files match the manifest, repair them, and run the task again.',
   'resources.storage.error.syncSourceUnsupported':
     'This model source cannot be synced to S3',
   'resources.storage.error.unknown': 'Unknown error',
+  'resources.storage.error.unknown.actionHint':
+    'Review the task details and worker logs, identify the original error code, and retry.',
   'resources.storage.updateCredentials': 'Update credentials',
   'resources.storage.updateCredentialsContent':
     'This replaces the current S3 access credentials.',
@@ -631,6 +651,8 @@ export default {
   'resources.storage.manifestPath': 'Manifest path',
   'resources.storage.includePatterns': 'Include patterns',
   'resources.storage.excludePatterns': 'Exclude patterns',
+  'resources.storage.artifact.filterSummary':
+    '{include} include and {exclude} exclude filters',
   'resources.storage.createdAt': 'Created at',
   'resources.storage.updatedAt': 'Updated at',
   'resources.storage.profile': 'S3 profile',

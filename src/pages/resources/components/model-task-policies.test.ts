@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSyncPolicyPatch,
-  taskPolicyTabFromSearch
+  consumeModelStrategySearch,
+  modelManagementSearchForTab,
+  taskPolicyTabFromSearch,
+  taskRecordTabFromSearch
 } from '../config/model-policy';
 import type {
   ModelStorageSyncPolicy,
@@ -30,7 +33,31 @@ describe('任务策略页签和同步策略差量更新', () => {
     expect(
       taskPolicyTabFromSearch('?tab=policies&strategy=create&sync_task=12')
     ).toBe('distribution');
+    expect(taskPolicyTabFromSearch('?tab=policies&policy_tab=preheat')).toBe(
+      'preheat'
+    );
     expect(taskPolicyTabFromSearch('?tab=policies')).toBe('sync');
+  });
+
+  it('消费一次性策略参数后保留持久页签，切出策略页时清理一次性参数', () => {
+    expect(
+      consumeModelStrategySearch(
+        '?tab=policies&policy_tab=distribution&strategy=create&sync_task=12'
+      )
+    ).toBe('?tab=policies&policy_tab=distribution');
+    expect(
+      modelManagementSearchForTab(
+        '?tab=policies&policy_tab=preheat&strategy=create&source=modelscope&model=org%2Fmodel&revision=main&profile=3',
+        'tasks'
+      )
+    ).toBe('?tab=tasks&policy_tab=preheat');
+  });
+
+  it('任务记录页签从 task_tab 持久恢复', () => {
+    expect(taskRecordTabFromSearch('?tab=tasks&task_tab=preheat')).toBe(
+      'preheat'
+    );
+    expect(taskRecordTabFromSearch('?tab=tasks')).toBe('sync');
   });
 
   it('纯改名只提交 name，未变化时不提交字段', () => {

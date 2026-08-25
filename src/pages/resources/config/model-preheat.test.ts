@@ -9,6 +9,7 @@ import {
   buildModelPreheatPreview,
   buildModelPreheatS3ProfilePayload,
   buildSystemManagedModelPreheatS3ProfilePayload,
+  eligibleModelPreheatWorkers,
   getModelFileDeletePreflight,
   getModelFileStorageModelId,
   getModelFileSyncActionState,
@@ -16,9 +17,8 @@ import {
   getModelStorageErrorPresentation,
   getModelStorageFlowPresentation,
   getModelStorageRevisionPresentation,
-  getModelStorageStatusPresentation,
   getModelStorageSourceLabel,
-  eligibleModelPreheatWorkers,
+  getModelStorageStatusPresentation,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
   retryModelFileDeletePreflight,
@@ -250,16 +250,11 @@ describe('预热配置逻辑', () => {
   });
 
   it('仅当前配置、已完成且 TTL 内的明确 ERROR 要求连通性覆盖', () => {
-    const preview = buildModelPreheatPreview(
-      values,
-      workers,
-      profile,
-      {
-        ...check,
-        finished_at: new Date().toISOString(),
-        workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
-      }
-    );
+    const preview = buildModelPreheatPreview(values, workers, profile, {
+      ...check,
+      finished_at: new Date().toISOString(),
+      workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
+    });
 
     expect(preview.blockingReasons).toEqual([
       { code: 'worker_connectivity_unavailable', workerName: 'a100-58' }
@@ -267,22 +262,16 @@ describe('预热配置逻辑', () => {
   });
 
   it('未检测、过期错误和协议不兼容节点都不会误触发覆盖', () => {
-    const noResult = buildModelPreheatPreview(
-      values,
-      workers,
-      profile,
-      { ...check, finished_at: new Date().toISOString(), workers: [] }
-    );
-    const expiredError = buildModelPreheatPreview(
-      values,
-      workers,
-      profile,
-      {
-        ...check,
-        finished_at: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
-        workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
-      }
-    );
+    const noResult = buildModelPreheatPreview(values, workers, profile, {
+      ...check,
+      finished_at: new Date().toISOString(),
+      workers: []
+    });
+    const expiredError = buildModelPreheatPreview(values, workers, profile, {
+      ...check,
+      finished_at: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+      workers: [{ ...check.workers[0], state: 'error' }, check.workers[1]]
+    });
     const incompatibleWorkers = [
       ...workers,
       {
@@ -302,7 +291,11 @@ describe('预热配置逻辑', () => {
 
     expect(noResult.blockingReasons).toEqual([]);
     expect(expiredError.blockingReasons).toEqual([]);
-    expect(eligibleModelPreheatWorkers(incompatibleWorkers).map((worker) => worker.id)).toEqual([12, 18]);
+    expect(
+      eligibleModelPreheatWorkers(incompatibleWorkers).map(
+        (worker) => worker.id
+      )
+    ).toEqual([12, 18]);
   });
 
   it('S3-only 使用 UUID 最小的可用 Seed，并在该节点明确失败时要求覆盖', () => {
@@ -322,7 +315,9 @@ describe('预热配置逻辑', () => {
       }
     );
 
-    expect(preview.rows.map((row) => row.worker.worker_uuid)).toEqual(['worker-a']);
+    expect(preview.rows.map((row) => row.worker.worker_uuid)).toEqual([
+      'worker-a'
+    ]);
     expect(preview.blockingReasons).toEqual([
       { code: 'worker_connectivity_unavailable', workerName: 'a100-58' }
     ]);
@@ -341,11 +336,57 @@ describe('模型存储展示映射', () => {
     });
     expect(getModelStorageErrorPresentation('artifact_not_ready')).toEqual({
       value: 'artifact_not_ready',
-      messageId: 'resources.storage.error.artifactNotReady'
+      messageId: 'resources.storage.error.artifactNotReady',
+      actionHintId: 'resources.storage.error.unknown.actionHint'
     });
     expect(getModelStorageErrorPresentation('future_error')).toEqual({
       value: 'future_error',
-      messageId: 'resources.storage.error.unknown'
+      messageId: 'resources.storage.error.unknown',
+      actionHintId: 'resources.storage.error.unknown.actionHint'
+    });
+  });
+
+  it.each([
+    [
+      'model_sync_source_not_found',
+      'resources.storage.error.syncSourceNotFound',
+      'resources.storage.error.syncSourceNotFound.actionHint'
+    ],
+    [
+      'model_sync_source_files_missing',
+      'resources.storage.error.syncSourceFilesMissing',
+      'resources.storage.error.syncSourceFilesMissing.actionHint'
+    ],
+    [
+      'local_manifest_invalid',
+      'resources.storage.error.localManifestInvalid',
+      'resources.storage.error.localManifestInvalid.actionHint'
+    ],
+    [
+      's3_manifest_invalid',
+      'resources.storage.error.s3ManifestInvalid',
+      'resources.storage.error.s3ManifestInvalid.actionHint'
+    ],
+    [
+      'manifest_invalid',
+      'resources.storage.error.manifestInvalid',
+      'resources.storage.error.manifestInvalid.actionHint'
+    ],
+    [
+      'worker_execution_failed',
+      'resources.storage.error.workerExecutionFailed',
+      'resources.storage.error.workerExecutionFailed.actionHint'
+    ],
+    [
+      'future_error',
+      'resources.storage.error.unknown',
+      'resources.storage.error.unknown.actionHint'
+    ]
+  ])('错误 %s 同时返回标题和处理建议', (value, messageId, actionHintId) => {
+    expect(getModelStorageErrorPresentation(value)).toEqual({
+      value,
+      messageId,
+      actionHintId
     });
   });
 
@@ -397,6 +438,27 @@ describe('同步确认文案', () => {
 
   it.each(locales)('%s 说明摘要跳过和覆盖行为', (_locale, resources) => {
     expect(resources['resources.storage.sync.confirmSummary']).toBeTruthy();
+  });
+});
+
+describe('模型存储错误处理文案', () => {
+  const locales = [zhCNResources, enUSResources, jaJPResources, ruRUResources];
+  const keys = [
+    'resources.storage.artifact.filterSummary',
+    'resources.storage.error.syncSourceNotFound.actionHint',
+    'resources.storage.error.syncSourceFilesMissing',
+    'resources.storage.error.syncSourceFilesMissing.actionHint',
+    'resources.storage.error.localManifestInvalid',
+    'resources.storage.error.localManifestInvalid.actionHint',
+    'resources.storage.error.s3ManifestInvalid',
+    'resources.storage.error.s3ManifestInvalid.actionHint',
+    'resources.storage.error.manifestInvalid.actionHint',
+    'resources.storage.error.workerExecutionFailed.actionHint',
+    'resources.storage.error.unknown.actionHint'
+  ] as const;
+
+  it.each(locales)('新增标题与处理建议在四种语言中完整', (resources) => {
+    for (const key of keys) expect(resources[key]).toBeTruthy();
   });
 });
 
@@ -516,10 +578,7 @@ describe('节点模型同步入口', () => {
 
 describe('节点模型删除预检', () => {
   it('逐状态查询所有选中模型，活动任务和查询错误都不会放行', async () => {
-    const query = async (params: {
-      model_file_id: number;
-      state: string;
-    }) => ({
+    const query = async (params: { model_file_id: number; state: string }) => ({
       items:
         params.model_file_id === 2 && params.state === 'publishing'
           ? [{ state: 'publishing' }]

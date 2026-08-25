@@ -225,8 +225,12 @@ const STORAGE_ERROR_IDS: Record<string, string> = {
   worker_execution_failed: 'resources.storage.error.workerExecutionFailed',
   model_preheat_disabled: 'resources.storage.error.modelPreheatDisabled',
   model_sync_source_not_found: 'resources.storage.error.syncSourceNotFound',
+  model_sync_source_files_missing:
+    'resources.storage.error.syncSourceFilesMissing',
   model_sync_source_unsupported:
     'resources.storage.error.syncSourceUnsupported',
+  local_manifest_invalid: 'resources.storage.error.localManifestInvalid',
+  s3_manifest_invalid: 'resources.storage.error.s3ManifestInvalid',
   not_reached: 'resources.storage.error.notReached',
   invalid_endpoint_scheme: 'resources.storage.error.invalidEndpoint',
   s3_forbidden_address: 'resources.storage.error.forbiddenAddress',
@@ -241,6 +245,19 @@ const STORAGE_ERROR_IDS: Record<string, string> = {
   s3_client_initialization_failed:
     'resources.storage.error.clientInitializationFailed',
   s3_read_content_mismatch: 'resources.storage.error.readContentMismatch'
+};
+
+const STORAGE_ERROR_ACTION_HINT_IDS: Record<string, string> = {
+  model_sync_source_not_found:
+    'resources.storage.error.syncSourceNotFound.actionHint',
+  model_sync_source_files_missing:
+    'resources.storage.error.syncSourceFilesMissing.actionHint',
+  local_manifest_invalid:
+    'resources.storage.error.localManifestInvalid.actionHint',
+  s3_manifest_invalid: 'resources.storage.error.s3ManifestInvalid.actionHint',
+  manifest_invalid: 'resources.storage.error.manifestInvalid.actionHint',
+  worker_execution_failed:
+    'resources.storage.error.workerExecutionFailed.actionHint'
 };
 
 export function getModelStorageFlowPresentation(
@@ -280,7 +297,10 @@ export function getModelStorageErrorPresentation(errorCode?: string | null) {
   const value = errorCode || 'unknown';
   return {
     value,
-    messageId: STORAGE_ERROR_IDS[value] || 'resources.storage.error.unknown'
+    messageId: STORAGE_ERROR_IDS[value] || 'resources.storage.error.unknown',
+    actionHintId:
+      STORAGE_ERROR_ACTION_HINT_IDS[value] ||
+      'resources.storage.error.unknown.actionHint'
   };
 }
 

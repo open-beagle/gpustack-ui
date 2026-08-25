@@ -1,8 +1,8 @@
 import {
   ApiOutlined,
-  EyeOutlined,
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
   ReloadOutlined
@@ -282,7 +282,8 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
       }
       if (confirm.action === 'maintenance' || confirm.action === 'restore') {
         await updateModelPreheatS3Profile(confirm.profile.id, {
-          lifecycle_state: confirm.action === 'maintenance' ? 'maintenance' : 'active'
+          lifecycle_state:
+            confirm.action === 'maintenance' ? 'maintenance' : 'active'
         });
         message.success(intl.formatMessage({ id: 'common.message.success' }));
         setConfirm(null);
@@ -317,7 +318,9 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           <Tag color="blue">
             {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
           </Tag>
-        ) : '-'
+        ) : (
+          '-'
+        )
     },
     {
       title: intl.formatMessage({ id: 'resources.preheat.profile.name' }),
@@ -328,20 +331,35 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           <ProfileNameText className="model-preheat-profile-name-text">
             {value}
           </ProfileNameText>
-          {(record.system_managed || (isActiveProfile(record) && record.is_default) || !isActiveProfile(record)) && (
+          {(record.system_managed ||
+            (isActiveProfile(record) && record.is_default) ||
+            !isActiveProfile(record)) && (
             <ProfileNameTags className="model-preheat-profile-name-tags">
               {record.system_managed && (
-                <Tag>{intl.formatMessage({ id: 'resources.storage.systemProfile' })}</Tag>
+                <Tag>
+                  {intl.formatMessage({
+                    id: 'resources.storage.systemProfile'
+                  })}
+                </Tag>
               )}
               {isActiveProfile(record) && record.is_default && (
                 <Tag color="blue">
-                  {intl.formatMessage({ id: 'resources.preheat.profile.default' })}
+                  {intl.formatMessage({
+                    id: 'resources.preheat.profile.default'
+                  })}
                 </Tag>
               )}
               {!isActiveProfile(record) && (
-                <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.maintenanceHint' })}>
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'resources.preheat.profile.maintenanceHint'
+                  })}
+                >
                   <Tag color="orange">
-                    {intl.formatMessage({ id: 'resources.preheat.profile.maintenance' })} <QuestionCircleOutlined />
+                    {intl.formatMessage({
+                      id: 'resources.preheat.profile.maintenance'
+                    })}{' '}
+                    <QuestionCircleOutlined />
                   </Tag>
                 </Tooltip>
               )}
@@ -367,11 +385,17 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
       dataIndex: 'credential_configured',
       width: 120,
       render: (value: boolean, record: ModelPreheatS3Profile) => (
-        <Tooltip title={!value ? intl.formatMessage({
-          id: record.system_managed
-            ? 'resources.preheat.profile.systemCredentialUnavailableHint'
-            : 'resources.preheat.profile.credentialUnavailableHint'
-        }) : undefined}>
+        <Tooltip
+          title={
+            !value
+              ? intl.formatMessage({
+                  id: record.system_managed
+                    ? 'resources.preheat.profile.systemCredentialUnavailableHint'
+                    : 'resources.preheat.profile.credentialUnavailableHint'
+                })
+              : undefined
+          }
+        >
           <Tag color={value ? 'success' : 'error'}>
             {intl.formatMessage({
               id: value
@@ -389,11 +413,17 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
       dataIndex: 'connectivity_state',
       width: 130,
       render: (value: string, record: ModelPreheatS3Profile) => (
-        <Tooltip title={value === 'unavailable' ? intl.formatMessage({
-          id: record.system_managed
-            ? 'resources.preheat.profile.systemConnectivityUnavailableHint'
-            : 'resources.preheat.profile.connectivityUnavailableHint'
-        }) : undefined}>
+        <Tooltip
+          title={
+            value === 'unavailable'
+              ? intl.formatMessage({
+                  id: record.system_managed
+                    ? 'resources.preheat.profile.systemConnectivityUnavailableHint'
+                    : 'resources.preheat.profile.connectivityUnavailableHint'
+                })
+              : undefined
+          }
+        >
           <Tag color={connectivityColors[value]}>
             {intl.formatMessage({ id: `resources.preheat.state.${value}` })}
           </Tag>
@@ -414,15 +444,28 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
       key: 'inventory',
       width: 180,
       render: (_: unknown, record: ModelPreheatS3Profile) => {
-        const error = getModelStorageErrorPresentation(record.inventory_last_error_code);
+        const error = getModelStorageErrorPresentation(
+          record.inventory_last_error_code
+        );
         const errorText = record.inventory_last_error_code
-          ? intl.formatMessage({ id: error.messageId })
+          ? `${intl.formatMessage({ id: error.messageId })} ${intl.formatMessage({ id: error.actionHintId })}`
           : undefined;
         return (
           <Tooltip title={errorText}>
             <span>
-              {record.inventory_last_attempt_at && `${intl.formatMessage({ id: 'resources.storage.scanAttemptAt' })}: ${dayjs(record.inventory_last_attempt_at).format('YYYY-MM-DD HH:mm:ss')}`}
-              {record.inventory_last_success_at && <><br />{`${intl.formatMessage({ id: 'resources.storage.scanSucceededAt' })}: ${dayjs(record.inventory_last_success_at).format('YYYY-MM-DD HH:mm:ss')}`}<br />{intl.formatMessage({ id: 'resources.storage.scanResult.success' }, { count: record.inventory_last_scan_count || 0 })}</>}
+              {record.inventory_last_attempt_at &&
+                `${intl.formatMessage({ id: 'resources.storage.scanAttemptAt' })}: ${dayjs(record.inventory_last_attempt_at).format('YYYY-MM-DD HH:mm:ss')}`}
+              {record.inventory_last_success_at && (
+                <>
+                  <br />
+                  {`${intl.formatMessage({ id: 'resources.storage.scanSucceededAt' })}: ${dayjs(record.inventory_last_success_at).format('YYYY-MM-DD HH:mm:ss')}`}
+                  <br />
+                  {intl.formatMessage(
+                    { id: 'resources.storage.scanResult.success' },
+                    { count: record.inventory_last_scan_count || 0 }
+                  )}
+                </>
+              )}
               {!record.inventory_last_attempt_at && '-'}
             </span>
           </Tooltip>
@@ -455,43 +498,78 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
             <Button
               type="text"
               icon={<EyeOutlined />}
-              aria-label={intl.formatMessage({ id: 'resources.preheat.connectivity.detail' })}
+              aria-label={intl.formatMessage({
+                id: 'resources.preheat.connectivity.detail'
+              })}
               disabled={!record.last_connectivity_check_id}
               onClick={() => openConnectivity(record)}
             />
           </Tooltip>
-          <Tooltip title={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}>
+          <Tooltip
+            title={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
+          >
             <Button
               type="text"
               icon={<ApiOutlined />}
-              aria-label={intl.formatMessage({ id: 'resources.storage.checkWorkers' })}
+              aria-label={intl.formatMessage({
+                id: 'resources.storage.checkWorkers'
+              })}
               loading={checkingProfileId === record.id}
               onClick={() => void runCheck(record)}
             />
           </Tooltip>
           {isActiveProfile(record) && !record.is_default && (
-            <Tooltip title={intl.formatMessage({ id: 'resources.storage.setDefault' })}>
-              <Button type="text" onClick={() => openConfirm('default', record)}>
+            <Tooltip
+              title={intl.formatMessage({ id: 'resources.storage.setDefault' })}
+            >
+              <Button
+                type="text"
+                onClick={() => openConfirm('default', record)}
+              >
                 {intl.formatMessage({ id: 'resources.storage.setDefault' })}
               </Button>
             </Tooltip>
           )}
           {isActiveProfile(record) ? (
-            <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.maintenanceActionHint' })}>
-              <Button type="text" onClick={() => openConfirm('maintenance', record)}>
-                {intl.formatMessage({ id: 'resources.preheat.profile.maintenanceAction' })}
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'resources.preheat.profile.maintenanceActionHint'
+              })}
+            >
+              <Button
+                type="text"
+                onClick={() => openConfirm('maintenance', record)}
+              >
+                {intl.formatMessage({
+                  id: 'resources.preheat.profile.maintenanceAction'
+                })}
               </Button>
             </Tooltip>
           ) : (
-            <Tooltip title={intl.formatMessage({ id: 'resources.preheat.profile.restoreActionHint' })}>
-              <Button type="text" onClick={() => openConfirm('restore', record)}>
-                {intl.formatMessage({ id: 'resources.preheat.profile.restoreAction' })}
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'resources.preheat.profile.restoreActionHint'
+              })}
+            >
+              <Button
+                type="text"
+                onClick={() => openConfirm('restore', record)}
+              >
+                {intl.formatMessage({
+                  id: 'resources.preheat.profile.restoreAction'
+                })}
               </Button>
             </Tooltip>
           )}
           {!record.ever_used_at && (
             <Tooltip title={intl.formatMessage({ id: 'common.button.delete' })}>
-              <Button aria-label={intl.formatMessage({ id: 'common.button.delete' })} danger type="text" icon={<DeleteOutlined />} onClick={() => openConfirm('delete', record)} />
+              <Button
+                aria-label={intl.formatMessage({ id: 'common.button.delete' })}
+                danger
+                type="text"
+                icon={<DeleteOutlined />}
+                onClick={() => openConfirm('delete', record)}
+              />
             </Tooltip>
           )}
         </Space>
@@ -568,7 +646,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 ? 'resources.storage.setDefaultConfirm'
                 : confirm?.action === 'maintenance'
                   ? 'resources.preheat.profile.maintenanceConfirm'
-                    : 'resources.preheat.profile.restoreConfirm'
+                  : 'resources.preheat.profile.restoreConfirm'
         })}
         content={intl.formatMessage(
           {
@@ -591,7 +669,7 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
                 ? 'resources.storage.setDefault'
                 : confirm?.action === 'maintenance'
                   ? 'resources.preheat.profile.maintenanceAction'
-                    : 'resources.preheat.profile.restoreAction'
+                  : 'resources.preheat.profile.restoreAction'
         })}
         danger={confirm?.action === 'delete'}
         loading={confirmLoading}

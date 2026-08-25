@@ -38,6 +38,7 @@ import {
   updateModelPreheatPolicy,
   updateModelPreheatSchedule
 } from '../apis';
+import { consumeModelStrategySearch } from '../config/model-policy';
 import {
   extractModelStorageErrorCode,
   getModelStorageErrorPresentation,
@@ -52,7 +53,6 @@ import type {
 import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatScheduleModal from './model-preheat-schedule-modal';
-import { useModelPreheatCapability } from './use-model-preheat-capability';
 
 type ContinuousAction = 'enable' | 'disable' | 'reconcile' | 'delete';
 type ScheduleAction = 'enable' | 'disable' | 'run' | 'delete';
@@ -80,9 +80,6 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const [policyError, setPolicyError] = useState(false);
   const [scheduleError, setScheduleError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { state: preheatCapability, retry: retryPreheatCapability } =
-    useModelPreheatCapability();
-  const preheatEnabled = preheatCapability === 'enabled';
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -131,18 +128,9 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     schedule: ModelPreheatSchedule,
     action: ScheduleAction
   ) =>
-    action === 'run' && preheatCapability === 'disabled'
-      ? 'resources.preheat.disabledByServer'
-      : action === 'run' && preheatCapability === 'loading'
-        ? 'resources.preheat.capabilityChecking'
-        : action === 'run' && preheatCapability === 'error'
-          ? 'resources.preheat.capabilityLoadFailed'
-          : action === 'run' && !schedule.enabled
-            ? 'resources.storage.syncPolicy.disabled.policyDisabled'
-            : undefined;
-
-  const preheatActionSelected =
-    mode === 'preheat' || (mode === undefined && activeTab === 'schedule');
+    action === 'run' && !schedule.enabled
+      ? 'resources.storage.syncPolicy.disabled.policyDisabled'
+      : undefined;
 
   const loadPolicies = useCallback(async () => {
     setPolicyLoading(true);
@@ -211,7 +199,12 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       setDistributionSyncTaskId(syncTaskId);
       if (mode === 'preheat') setScheduleOpen(true);
       else setContinuousOpen(true);
-      navigate(`${location.pathname}?tab=policies`, { replace: true });
+      navigate(
+        `${location.pathname}${consumeModelStrategySearch(location.search)}`,
+        {
+          replace: true
+        }
+      );
       return;
     }
     const source = query.get('source');
@@ -231,7 +224,12 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     else if (mode === 'preheat') setScheduleOpen(true);
     else if (activeTab === 'continuous') setContinuousOpen(true);
     else setScheduleOpen(true);
-    navigate(`${location.pathname}?tab=policies`, { replace: true });
+    navigate(
+      `${location.pathname}${consumeModelStrategySearch(location.search)}`,
+      {
+        replace: true
+      }
+    );
   }, [activeTab, location.pathname, location.search, mode, navigate]);
 
   const scheduleInitialValues = useMemo(
@@ -636,7 +634,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         }
       }
     ],
-    [actionLoading, intl, preheatCapability]
+    [actionLoading, intl]
   );
 
   return (
@@ -661,7 +659,6 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          disabled={preheatActionSelected && !preheatEnabled}
           onClick={() => {
             setPrefill({});
             if (mode === 'distribution') setContinuousOpen(true);
@@ -673,41 +670,6 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
           {intl.formatMessage({ id: 'resources.preheat.policy.create' })}
         </Button>
       </Space>
-      {preheatCapability === 'disabled' && mode !== 'distribution' && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.disabledByServer'
-          })}
-        />
-      )}
-      {preheatCapability === 'loading' && mode !== 'distribution' && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.capabilityChecking'
-          })}
-        />
-      )}
-      {preheatCapability === 'error' && mode !== 'distribution' && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={intl.formatMessage({
-            id: 'resources.preheat.capabilityLoadFailed'
-          })}
-          action={
-            <Button size="small" onClick={() => void retryPreheatCapability()}>
-              {intl.formatMessage({ id: 'common.button.retry' })}
-            </Button>
-          }
-        />
-      )}
       {((mode !== 'preheat' && policyError) ||
         (mode !== 'distribution' && scheduleError)) && (
         <Alert
@@ -849,6 +811,9 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 message={intl.formatMessage({
                   id: getModelStorageErrorPresentation(actionError).messageId
                 })}
+                description={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).actionHintId
+                })}
               />
             )}
           </>
@@ -882,6 +847,9 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                 style={{ marginTop: 12 }}
                 message={intl.formatMessage({
                   id: getModelStorageErrorPresentation(actionError).messageId
+                })}
+                description={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).actionHintId
                 })}
               />
             )}

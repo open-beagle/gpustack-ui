@@ -26,9 +26,10 @@ const api = vi.hoisted(() => ({
   queryModelStorageSyncTasks: vi.fn(),
   queryWorkersList: vi.fn()
 }));
+const router = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock('@umijs/max', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => router.navigate,
   useIntl: () => ({
     formatMessage: (
       { id }: { id: string },
@@ -134,6 +135,25 @@ afterEach(() => {
 });
 
 describe('同步任务获取方式', () => {
+  it('从完成任务创建策略时写入持久分发页签', async () => {
+    const user = userEvent.setup();
+    api.queryModelStorageSyncTasks.mockResolvedValue({
+      items: [listTask()],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+
+    render(<ModelStorageSyncTasks />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'resources.storage.createStrategy'
+      })
+    );
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      '/resources/modelfiles?tab=policies&policy_tab=distribution&strategy=create&sync_task=5'
+    );
+  });
+
   it('失败任务显示业务状态并允许删除', async () => {
     const user = userEvent.setup();
     api.queryModelStorageSyncTasks.mockResolvedValue({
@@ -709,5 +729,32 @@ describe('同步任务获取方式', () => {
     ).toBeGreaterThan(1);
     expect(api.queryModelPreheatS3Profiles).not.toHaveBeenCalled();
     expect(api.queryWorkersList).not.toHaveBeenCalled();
+  });
+
+  it('失败详情只展示一次错误并给出处理建议和原始错误码', async () => {
+    const failed = detailTask({
+      state: 'error',
+      state_message: 's3_manifest_invalid',
+      error_code: 's3_manifest_invalid'
+    });
+    api.queryModelStorageSyncTasks.mockResolvedValue({
+      items: [failed],
+      pagination: { page: 1, per_page: 100, total: 1, total_page: 1 }
+    });
+    api.queryModelStorageSyncTask.mockResolvedValue(failed);
+
+    const { container } = render(<ModelStorageSyncTasks />);
+    await screen.findByText('team/model');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    expect(
+      await screen.findByText('resources.storage.error.s3ManifestInvalid')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('resources.storage.error.s3ManifestInvalid.actionHint')
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('s3_manifest_invalid')).toHaveLength(1);
   });
 });

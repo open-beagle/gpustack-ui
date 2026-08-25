@@ -563,10 +563,27 @@ export default {
   'resources.storage.error.manifestInvalid': '模型清单无效',
   'resources.storage.error.workerUnavailable': '节点不可用',
   'resources.storage.error.workerExecutionFailed': '节点执行失败',
+  'resources.storage.error.workerExecutionFailed.actionHint':
+    '请查看执行节点日志，并检查磁盘空间、网络和 S3 访问是否正常后重试。',
   'resources.storage.error.modelPreheatDisabled': '当前服务未启用模型预热',
   'resources.storage.error.syncSourceNotFound': '同步来源模型不存在或已被删除',
+  'resources.storage.error.syncSourceNotFound.actionHint':
+    '请刷新节点模型列表，确认来源模型仍存在后重新创建任务。',
+  'resources.storage.error.syncSourceFilesMissing': '同步来源模型文件缺失',
+  'resources.storage.error.syncSourceFilesMissing.actionHint':
+    '请恢复或重新下载来源节点上的模型文件，然后重试同步。',
+  'resources.storage.error.localManifestInvalid': '节点模型清单无效',
+  'resources.storage.error.localManifestInvalid.actionHint':
+    '请检查来源节点上的模型文件完整性，修复或重新下载后重试。',
+  'resources.storage.error.s3ManifestInvalid': 'S3 模型清单无效',
+  'resources.storage.error.s3ManifestInvalid.actionHint':
+    '请刷新 S3 库存；若仍失败，请重新同步该模型生成有效清单。',
+  'resources.storage.error.manifestInvalid.actionHint':
+    '请检查模型文件与清单是否一致，修复后重新执行任务。',
   'resources.storage.error.syncSourceUnsupported': '该模型来源不支持同步到 S3',
   'resources.storage.error.unknown': '发生未知错误',
+  'resources.storage.error.unknown.actionHint':
+    '请查看任务详情和节点日志，确认原始错误码后重试。',
   'resources.storage.updateCredentials': '更新凭据',
   'resources.storage.updateCredentialsContent': '将替换当前 S3 访问凭据。',
   'resources.storage.artifactDetail': '模型详情',
@@ -587,6 +604,8 @@ export default {
   'resources.storage.manifestPath': '清单路径',
   'resources.storage.includePatterns': '包含规则',
   'resources.storage.excludePatterns': '排除规则',
+  'resources.storage.artifact.filterSummary':
+    '包含 {include} 条，排除 {exclude} 条',
   'resources.storage.createdAt': '创建时间',
   'resources.storage.updatedAt': '更新时间',
   'resources.storage.profile': 'S3 配置',

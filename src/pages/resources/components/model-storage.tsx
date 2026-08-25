@@ -26,8 +26,8 @@ import {
   refreshModelStorageArtifacts
 } from '../apis';
 import {
-  getModelStorageRevisionPresentation,
   getModelStorageErrorPresentation,
+  getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
   IdempotencyKeyLifecycle
 } from '../config/model-preheat';
@@ -36,16 +36,22 @@ import type {
   ModelPreheatS3Profile,
   ModelStorageArtifact
 } from '../config/types';
+import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConnectivity from './model-preheat-connectivity';
 import ModelPreheatS3Profiles from './model-preheat-s3-profiles';
-import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelStorageAsyncState from './model-storage-async-state';
 
 const ModelStorage: React.FC = () => {
   const intl = useIntl();
   const connectivityKey = useRef(new IdempotencyKeyLifecycle());
-  const artifactRequest = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
-  const refreshRequest = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
+  const artifactRequest = useRef<{
+    generation: number;
+    controller?: AbortController;
+  }>({ generation: 0 });
+  const refreshRequest = useRef<{
+    generation: number;
+    controller?: AbortController;
+  }>({ generation: 0 });
   const [allProfiles, setAllProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const [artifactProfileId, setArtifactProfileId] = useState<number>();
   const [connectivityProfileId, setConnectivityProfileId] = useState<number>();
@@ -83,15 +89,29 @@ const ModelStorage: React.FC = () => {
   );
   const scanSummary = selectedArtifact && (
     <span>
-      {intl.formatMessage({ id: 'resources.storage.lastScan' })}: {' '}
+      {intl.formatMessage({ id: 'resources.storage.lastScan' })}:{' '}
       {selectedArtifact.inventory_last_attempt_at
-        ? dayjs(selectedArtifact.inventory_last_attempt_at).format('YYYY-MM-DD HH:mm:ss')
+        ? dayjs(selectedArtifact.inventory_last_attempt_at).format(
+            'YYYY-MM-DD HH:mm:ss'
+          )
         : '-'}
       {selectedArtifact.inventory_last_success_at && (
-        <> · {intl.formatMessage({ id: 'resources.storage.scanResult' })}: {intl.formatMessage({ id: 'resources.storage.scanResult.success' }, { count: selectedArtifact.inventory_last_scan_count || 0 })}</>
+        <>
+          {' '}
+          · {intl.formatMessage({ id: 'resources.storage.scanResult' })}:{' '}
+          {intl.formatMessage(
+            { id: 'resources.storage.scanResult.success' },
+            { count: selectedArtifact.inventory_last_scan_count || 0 }
+          )}
+        </>
       )}
       {selectedArtifact.inventory_last_error_code && (
-        <> · {intl.formatMessage({ id: 'resources.storage.scanResult' })}: {intl.formatMessage({ id: scanError.messageId })}</>
+        <>
+          {' '}
+          · {intl.formatMessage({ id: 'resources.storage.scanResult' })}:{' '}
+          {intl.formatMessage({ id: scanError.messageId })} ·{' '}
+          {intl.formatMessage({ id: scanError.actionHintId })}
+        </>
       )}
     </span>
   );
@@ -129,25 +149,40 @@ const ModelStorage: React.FC = () => {
     setLoading(true);
     setArtifactError(undefined);
     try {
-      const result = await queryModelStorageArtifacts(artifactProfileId, {
-        page: artifactPage,
-        perPage: 20,
-        ...(artifactSearch ? { search: artifactSearch } : {}),
-        ...(artifactSource ? { source: artifactSource } : {}),
-        ...(artifactState ? { manifest_state: artifactState } : {})
-      }, { signal: controller.signal });
+      const result = await queryModelStorageArtifacts(
+        artifactProfileId,
+        {
+          page: artifactPage,
+          perPage: 20,
+          ...(artifactSearch ? { search: artifactSearch } : {}),
+          ...(artifactSource ? { source: artifactSource } : {}),
+          ...(artifactState ? { manifest_state: artifactState } : {})
+        },
+        { signal: controller.signal }
+      );
       if (generation !== artifactRequest.current.generation) return;
       // 兼容历史测试桩；真实服务始终返回 PaginatedList。
       setArtifacts(Array.isArray(result) ? result : result.items);
-      setArtifactTotal(Array.isArray(result) ? result.length : result.pagination.total);
+      setArtifactTotal(
+        Array.isArray(result) ? result.length : result.pagination.total
+      );
     } catch (error) {
-      if (generation === artifactRequest.current.generation && !controller.signal.aborted) {
+      if (
+        generation === artifactRequest.current.generation &&
+        !controller.signal.aborted
+      ) {
         setArtifactError(error);
       }
     } finally {
       if (generation === artifactRequest.current.generation) setLoading(false);
     }
-  }, [artifactPage, artifactProfileId, artifactSearch, artifactSource, artifactState]);
+  }, [
+    artifactPage,
+    artifactProfileId,
+    artifactSearch,
+    artifactSource,
+    artifactState
+  ]);
   const loadArtifactsRef = useRef(loadArtifacts);
   loadArtifactsRef.current = loadArtifacts;
 
@@ -157,12 +192,15 @@ const ModelStorage: React.FC = () => {
   useEffect(() => {
     void loadArtifacts().catch(() => undefined);
   }, [loadArtifacts]);
-  useEffect(() => () => {
-    artifactRequest.current.generation += 1;
-    artifactRequest.current.controller?.abort();
-    refreshRequest.current.generation += 1;
-    refreshRequest.current.controller?.abort();
-  }, []);
+  useEffect(
+    () => () => {
+      artifactRequest.current.generation += 1;
+      artifactRequest.current.controller?.abort();
+      refreshRequest.current.generation += 1;
+      refreshRequest.current.controller?.abort();
+    },
+    []
+  );
 
   useEffect(() => {
     refreshRequest.current.generation += 1;
@@ -188,18 +226,22 @@ const ModelStorage: React.FC = () => {
     setRefreshing(true);
     setArtifactError(undefined);
     try {
-      await refreshModelStorageArtifacts(profileId, { signal: controller.signal });
+      await refreshModelStorageArtifacts(profileId, {
+        signal: controller.signal
+      });
       if (
         controller.signal.aborted ||
         generation !== refreshRequest.current.generation ||
         artifactProfileIdRef.current !== profileId
-      ) return;
+      )
+        return;
       await loadArtifactsRef.current();
       if (
         controller.signal.aborted ||
         generation !== refreshRequest.current.generation ||
         artifactProfileIdRef.current !== profileId
-      ) return;
+      )
+        return;
       message.success(
         intl.formatMessage({ id: 'resources.storage.refreshCompleted' })
       );
@@ -208,12 +250,14 @@ const ModelStorage: React.FC = () => {
         !controller.signal.aborted &&
         generation === refreshRequest.current.generation &&
         artifactProfileIdRef.current === profileId
-      ) setArtifactError(error);
+      )
+        setArtifactError(error);
     } finally {
       if (
         generation === refreshRequest.current.generation &&
         artifactProfileIdRef.current === profileId
-      ) setRefreshing(false);
+      )
+        setRefreshing(false);
     }
   };
 
@@ -338,12 +382,16 @@ const ModelStorage: React.FC = () => {
                       setArtifactPage(1);
                     }}
                     style={{ width: 150 }}
-                    options={['modelscope', 'huggingface', 'ollama_library'].map(
-                      (value) => ({
-                        value,
-                        label: getModelStorageSourceLabel(value as ModelStorageArtifact['source'])
-                      })
-                    )}
+                    options={[
+                      'modelscope',
+                      'huggingface',
+                      'ollama_library'
+                    ].map((value) => ({
+                      value,
+                      label: getModelStorageSourceLabel(
+                        value as ModelStorageArtifact['source']
+                      )
+                    }))}
                   />
                   <Select
                     allowClear
@@ -366,13 +414,18 @@ const ModelStorage: React.FC = () => {
                     )}
                   />
                 </Space>
-                {scanSummary && <div style={{ marginBottom: 16 }}>{scanSummary}</div>}
+                {scanSummary && (
+                  <div style={{ marginBottom: 16 }}>{scanSummary}</div>
+                )}
                 <ModelStorageAsyncState
                   data={artifacts}
                   loading={loading}
                   refreshing={refreshing}
                   error={artifactError}
-                  hasFilters={Boolean(artifactProfileId && (artifactSearch || artifactSource || artifactState))}
+                  hasFilters={Boolean(
+                    artifactProfileId &&
+                    (artifactSearch || artifactSource || artifactState)
+                  )}
                   onRetry={() => void loadArtifacts()}
                 >
                   <Table
@@ -388,81 +441,131 @@ const ModelStorage: React.FC = () => {
                       onChange: setArtifactPage
                     }}
                     columns={[
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.preheat.connectivity.status'
-                      }),
-                      dataIndex: 'manifest_state',
-                      render: (value: string) =>
-                        intl.formatMessage({
-                          id: `resources.storage.status.${value}`
-                        })
-                    },
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.storage.model'
-                      }),
-                      dataIndex: 'model_id'
-                    },
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.storage.modelSource'
-                      }),
-                      dataIndex: 'source',
-                      render: (value: ModelStorageArtifact['source']) =>
-                        getModelStorageSourceLabel(value)
-                    },
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.storage.version'
-                      }),
-                      dataIndex: 'resolved_revision',
-                      render: (value: string) => {
-                        const revision =
-                          getModelStorageRevisionPresentation(value);
-                        return (
-                          <Typography.Text style={{ wordBreak: 'break-all' }} copyable={{ text: revision.full }} ellipsis={{ tooltip: revision.full }}>{revision.short}</Typography.Text>
-                        );
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.preheat.connectivity.status'
+                        }),
+                        dataIndex: 'manifest_state',
+                        render: (value: string) =>
+                          intl.formatMessage({
+                            id: `resources.storage.status.${value}`
+                          })
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.model'
+                        }),
+                        dataIndex: 'model_id'
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.modelSource'
+                        }),
+                        dataIndex: 'source',
+                        render: (value: ModelStorageArtifact['source']) =>
+                          getModelStorageSourceLabel(value)
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.version'
+                        }),
+                        dataIndex: 'resolved_revision',
+                        render: (value: string) => {
+                          const revision =
+                            getModelStorageRevisionPresentation(value);
+                          return (
+                            <Typography.Text
+                              style={{ wordBreak: 'break-all' }}
+                              copyable={{ text: revision.full }}
+                              ellipsis={{ tooltip: revision.full }}
+                            >
+                              {revision.short}
+                            </Typography.Text>
+                          );
+                        }
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.inventorySource'
+                        }),
+                        key: 'inventory_source',
+                        render: (_: unknown, record: ModelStorageArtifact) =>
+                          intl.formatMessage({
+                            id: record.created_by_task_id
+                              ? 'resources.storage.inventorySource.task'
+                              : 'resources.storage.inventorySource.scan'
+                          })
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.lastVerifiedAt'
+                        }),
+                        dataIndex: 'last_verified_at',
+                        render: (value: string | null) =>
+                          value
+                            ? dayjs(value).format('YYYY-MM-DD HH:mm:ss')
+                            : '-'
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.fileCount'
+                        }),
+                        dataIndex: 'file_count'
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'resources.storage.capacity'
+                        }),
+                        dataIndex: 'total_size',
+                        render: (value: number) =>
+                          convertFileSize(value, 1, true)
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'common.table.operation'
+                        }),
+                        key: 'operation',
+                        fixed: 'right',
+                        render: (_: unknown, record: ModelStorageArtifact) => (
+                          <Space size={4}>
+                            <Tooltip
+                              title={intl.formatMessage({
+                                id: 'resources.storage.artifactDetail'
+                              })}
+                            >
+                              <Button
+                                aria-label={intl.formatMessage({
+                                  id: 'resources.storage.artifactDetail'
+                                })}
+                                type="text"
+                                icon={<EyeOutlined />}
+                                onClick={() => setArtifactDetail(record)}
+                              />
+                            </Tooltip>
+                            <Tooltip
+                              title={
+                                record.manifest_state === 'valid'
+                                  ? intl.formatMessage({
+                                      id: 'resources.storage.distributionPolicy.create'
+                                    })
+                                  : intl.formatMessage({
+                                      id: 'resources.storage.error.artifactNotReady'
+                                    })
+                              }
+                            >
+                              <Button
+                                aria-label={intl.formatMessage({
+                                  id: 'resources.storage.distributionPolicy.create'
+                                })}
+                                type="text"
+                                icon={<SendOutlined />}
+                                disabled={record.manifest_state !== 'valid'}
+                                onClick={() => setDistributionArtifact(record)}
+                              />
+                            </Tooltip>
+                          </Space>
+                        )
                       }
-                    },
-                    {
-                      title: intl.formatMessage({ id: 'resources.storage.inventorySource' }),
-                      key: 'inventory_source',
-                      render: (_: unknown, record: ModelStorageArtifact) => intl.formatMessage({ id: record.created_by_task_id ? 'resources.storage.inventorySource.task' : 'resources.storage.inventorySource.scan' })
-                    },
-                    {
-                      title: intl.formatMessage({ id: 'resources.storage.lastVerifiedAt' }),
-                      dataIndex: 'last_verified_at',
-                      render: (value: string | null) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
-                    },
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.storage.fileCount'
-                      }),
-                      dataIndex: 'file_count'
-                    },
-                    {
-                      title: intl.formatMessage({
-                        id: 'resources.storage.capacity'
-                      }),
-                      dataIndex: 'total_size',
-                      render: (value: number) => convertFileSize(value, 1, true)
-                    },
-                    {
-                      title: intl.formatMessage({ id: 'common.table.operation' }),
-                      key: 'operation',
-                      fixed: 'right',
-                      render: (_: unknown, record: ModelStorageArtifact) => (
-                        <Space size={4}>
-                          <Tooltip title={intl.formatMessage({ id: 'resources.storage.artifactDetail' })}>
-                            <Button aria-label={intl.formatMessage({ id: 'resources.storage.artifactDetail' })} type="text" icon={<EyeOutlined />} onClick={() => setArtifactDetail(record)} />
-                          </Tooltip>
-                          <Tooltip title={record.manifest_state === 'valid' ? intl.formatMessage({ id: 'resources.storage.distributionPolicy.create' }) : intl.formatMessage({ id: 'resources.storage.error.artifactNotReady' })}>
-                            <Button aria-label={intl.formatMessage({ id: 'resources.storage.distributionPolicy.create' })} type="text" icon={<SendOutlined />} disabled={record.manifest_state !== 'valid'} onClick={() => setDistributionArtifact(record)} />
-                          </Tooltip>
-                        </Space>
-                      )
-                    }
                     ]}
                   />
                 </ModelStorageAsyncState>
@@ -513,21 +616,119 @@ const ModelStorage: React.FC = () => {
         onCancel={() => setArtifactDetail(null)}
       >
         <Descriptions bordered size="small" column={1}>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.profile' })}>{selectedArtifact?.name || '-'}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.model' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.model_id}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.modelSource' })}>{artifactDetail && getModelStorageSourceLabel(artifactDetail.source)}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.version' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.resolved_revision}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.artifactId' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.artifact_id}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.manifestDigest' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.manifest_digest}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.manifestPath' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.manifest_path}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.includePatterns' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.include_patterns?.join(', ') || '-'}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.excludePatterns' })}><Typography.Text style={{ wordBreak: 'break-all' }} copyable>{artifactDetail?.exclude_patterns?.join(', ') || '-'}</Typography.Text></Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.inventorySource' })}>{intl.formatMessage({ id: artifactDetail?.created_by_task_id ? 'resources.storage.inventorySource.task' : 'resources.storage.inventorySource.scan' })}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.lastVerifiedAt' })}>{artifactDetail?.last_verified_at ? dayjs(artifactDetail.last_verified_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.fileCount' })}>{artifactDetail?.file_count}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.capacity' })}>{artifactDetail && convertFileSize(artifactDetail.total_size, 1, true)}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.createdAt' })}>{artifactDetail?.created_at ? dayjs(artifactDetail.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
-          <Descriptions.Item label={intl.formatMessage({ id: 'resources.storage.updatedAt' })}>{artifactDetail?.updated_at ? dayjs(artifactDetail.updated_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.profile' })}
+          >
+            {selectedArtifact?.name || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.model' })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.model_id}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.modelSource' })}
+          >
+            {artifactDetail &&
+              getModelStorageSourceLabel(artifactDetail.source)}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.version' })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.resolved_revision}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.artifactId' })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.artifact_id}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({
+              id: 'resources.storage.manifestDigest'
+            })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.manifest_digest}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.manifestPath' })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.manifest_path}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({
+              id: 'resources.storage.includePatterns'
+            })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.include_patterns?.join(', ') || '-'}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({
+              id: 'resources.storage.excludePatterns'
+            })}
+          >
+            <Typography.Text style={{ wordBreak: 'break-all' }} copyable>
+              {artifactDetail?.exclude_patterns?.join(', ') || '-'}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({
+              id: 'resources.storage.inventorySource'
+            })}
+          >
+            {intl.formatMessage({
+              id: artifactDetail?.created_by_task_id
+                ? 'resources.storage.inventorySource.task'
+                : 'resources.storage.inventorySource.scan'
+            })}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({
+              id: 'resources.storage.lastVerifiedAt'
+            })}
+          >
+            {artifactDetail?.last_verified_at
+              ? dayjs(artifactDetail.last_verified_at).format(
+                  'YYYY-MM-DD HH:mm:ss'
+                )
+              : '-'}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.fileCount' })}
+          >
+            {artifactDetail?.file_count}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.capacity' })}
+          >
+            {artifactDetail &&
+              convertFileSize(artifactDetail.total_size, 1, true)}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.createdAt' })}
+          >
+            {artifactDetail?.created_at
+              ? dayjs(artifactDetail.created_at).format('YYYY-MM-DD HH:mm:ss')
+              : '-'}
+          </Descriptions.Item>
+          <Descriptions.Item
+            label={intl.formatMessage({ id: 'resources.storage.updatedAt' })}
+          >
+            {artifactDetail?.updated_at
+              ? dayjs(artifactDetail.updated_at).format('YYYY-MM-DD HH:mm:ss')
+              : '-'}
+          </Descriptions.Item>
         </Descriptions>
       </Modal>
       <ModelDistributionPolicyModal

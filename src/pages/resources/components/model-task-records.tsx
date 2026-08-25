@@ -1,14 +1,26 @@
-import { useIntl } from '@umijs/max';
+import { useIntl, useLocation, useNavigate } from '@umijs/max';
 import { Empty, Tabs } from 'antd';
 import React from 'react';
+import { taskRecordTabFromSearch } from '../config/model-policy';
 import ModelPreheatTasks from './model-preheat-tasks';
 import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
 /** 三类执行记录共用一个一级页面，保留同一筛选上下文。 */
 const ModelTaskRecords: React.FC = () => {
   const intl = useIntl();
+  const location = useLocation();
+  const navigate = useNavigate();
   return (
     <Tabs
+      activeKey={taskRecordTabFromSearch(location.search)}
+      onChange={(key) => {
+        const search = new URLSearchParams(location.search);
+        search.set('tab', 'tasks');
+        search.set('task_tab', key);
+        navigate(`${location.pathname}?${search.toString()}`, {
+          replace: true
+        });
+      }}
       items={[
         {
           key: 'sync',
@@ -22,7 +34,9 @@ const ModelTaskRecords: React.FC = () => {
         },
         {
           key: 'distribution',
-          label: intl.formatMessage({ id: 'resources.storage.distributionTasks' }),
+          label: intl.formatMessage({
+            id: 'resources.storage.distributionTasks'
+          }),
           children: (
             <Empty
               description={intl.formatMessage({

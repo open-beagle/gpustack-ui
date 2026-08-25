@@ -1,10 +1,9 @@
 import { useIntl } from '@umijs/max';
 import { Button, Divider, Select } from 'antd';
 import dayjs from 'dayjs';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { queryModelStorageArtifacts } from '../apis';
 import {
-  getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
   mergeModelStoragePage
 } from '../config/model-preheat';
@@ -19,6 +18,7 @@ interface Props {
     value: string | undefined,
     artifact?: ModelStorageArtifact
   ) => void;
+  onSelectionChange?: (selection: ArtifactSelectionState) => void;
   onArtifactChange?: (artifact?: ModelStorageArtifact) => void;
   onValidityChange?: (validity: ArtifactValidity) => void;
   disabled?: boolean;
@@ -26,6 +26,11 @@ interface Props {
 }
 
 export type ArtifactValidity = 'resolving' | 'valid' | 'unresolved';
+
+export interface ArtifactSelectionState {
+  status: ArtifactValidity;
+  artifact?: ModelStorageArtifact;
+}
 
 const getArtifactRequestPresentation = (
   artifact: ModelStorageArtifact,
@@ -63,6 +68,7 @@ const ArtifactSelect: React.FC<Props> = ({
   profileName,
   value,
   onChange,
+  onSelectionChange,
   onArtifactChange,
   onValidityChange,
   disabled,
@@ -72,8 +78,15 @@ const ArtifactSelect: React.FC<Props> = ({
   const requestId = useRef(0);
   const validationRequestId = useRef(0);
   const validatedIdentity = useRef<string>();
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const onArtifactChangeRef = useRef(onArtifactChange);
   const onValidityChangeRef = useRef(onValidityChange);
+  const selectionRef = useRef<ArtifactSelectionState>({
+    status: 'unresolved'
+  });
+  const [selection, setSelection] = useState<ArtifactSelectionState>(
+    selectionRef.current
+  );
   const [items, setItems] = useState<ModelStorageArtifact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,11 +95,21 @@ const ArtifactSelect: React.FC<Props> = ({
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+  useEffect(() => {
     onArtifactChangeRef.current = onArtifactChange;
   }, [onArtifactChange]);
   useEffect(() => {
     onValidityChangeRef.current = onValidityChange;
   }, [onValidityChange]);
+  const publishSelection = useCallback((next: ArtifactSelectionState) => {
+    selectionRef.current = next;
+    setSelection(next);
+    onSelectionChangeRef.current?.(next);
+    onArtifactChangeRef.current?.(next.artifact);
+    onValidityChangeRef.current?.(next.status);
+  }, []);
   const effectiveDisabledReason = disabled
     ? disabledReason
     : !profileId
@@ -110,15 +133,23 @@ const ArtifactSelect: React.FC<Props> = ({
         ...(nextSearch ? { search: nextSearch } : {})
       });
       if (id === requestId.current) {
-        setItems((current) =>
-          append || preserveCurrent
+        setItems((current) => {
+          const loaded =
+            append || preserveCurrent
+              ? mergeModelStoragePage(
+                  current,
+                  result.items,
+                  (item) => item.artifact_id
+                )
+              : result.items;
+          return selectionRef.current.artifact
             ? mergeModelStoragePage(
-                current,
-                result.items,
+                loaded,
+                [selectionRef.current.artifact],
                 (item) => item.artifact_id
               )
-            : result.items
-        );
+            : loaded;
+        });
         setPage(nextPage);
         setTotal(result.pagination.total);
       }
@@ -139,34 +170,32 @@ const ArtifactSelect: React.FC<Props> = ({
     setError(undefined);
     setLoading(false);
     setResolving(false);
+    publishSelection({ status: 'unresolved' });
     if (profileId) void load('', 1, false, true);
     return () => {
       requestId.current += 1;
     };
-  }, [profileId]);
-  useEffect(() => {
-    const artifact = items.find(
-      (item) => item.artifact_id === value && item.manifest_state === 'valid'
-    );
-    onArtifactChangeRef.current?.(artifact);
-  }, [items, value]);
+  }, [profileId, publishSelection]);
   useEffect(() => {
     if (!profileId || !value) {
       validationRequestId.current += 1;
       validatedIdentity.current = undefined;
       setResolving(false);
-      onValidityChangeRef.current?.('unresolved');
+      publishSelection({ status: 'unresolved' });
       return;
     }
     const identity = `${profileId}:${value}`;
-    if (validatedIdentity.current === identity) {
-      onValidityChangeRef.current?.('valid');
+    if (
+      validatedIdentity.current === identity &&
+      selectionRef.current.artifact?.artifact_id === value
+    ) {
+      publishSelection(selectionRef.current);
       return;
     }
     const candidate = value;
     const validationId = ++validationRequestId.current;
     setResolving(true);
-    onValidityChangeRef.current?.('resolving');
+    publishSelection({ status: 'resolving' });
     const resolveCandidate = async () => {
       let nextPage = 1;
       let totalPage = 1;
@@ -189,19 +218,19 @@ const ArtifactSelect: React.FC<Props> = ({
               (item) => item.artifact_id
             )
           );
-          onValidityChangeRef.current?.('valid');
+          publishSelection({ status: 'valid', artifact });
           return;
         }
         totalPage = result.pagination.totalPage;
         nextPage += 1;
       }
-      onValidityChangeRef.current?.('unresolved');
+      publishSelection({ status: 'unresolved' });
     };
     void resolveCandidate()
       .catch((nextError) => {
         if (validationId === validationRequestId.current) {
           setError(nextError);
-          onValidityChangeRef.current?.('unresolved');
+          publishSelection({ status: 'unresolved' });
         }
       })
       .finally(() => {
@@ -210,15 +239,32 @@ const ArtifactSelect: React.FC<Props> = ({
     return () => {
       validationRequestId.current += 1;
     };
-  }, [profileId, value]);
+  }, [profileId, publishSelection, value]);
   const options = items.map((item) => {
     const requestPresentation = getArtifactRequestPresentation(item, (id) =>
       intl.formatMessage({ id })
     );
     const source = getModelStorageSourceLabel(item.source);
-    const revision = getModelStorageRevisionPresentation(
-      item.resolved_revision
-    ).short;
+    const revision = item.resolved_revision || '-';
+    const hasWildcardGguf = item.include_patterns.some(
+      (pattern) => /\.gguf$/i.test(pattern) && /[*?\[]/.test(pattern)
+    );
+    const compactHint =
+      requestPresentation.ggufHint && !hasWildcardGguf
+        ? requestPresentation.ggufHint.split(' · ').slice(1).join(' · ')
+        : item.include_patterns.length || item.exclude_patterns.length
+          ? intl.formatMessage(
+              { id: 'resources.storage.artifact.filterSummary' },
+              {
+                include: item.include_patterns.length,
+                exclude: item.exclude_patterns.length
+              }
+            )
+          : undefined;
+    const shortArtifactId = item.artifact_id.slice(-8);
+    const secondary = [revision, compactHint, `#${shortArtifactId}`]
+      .filter(Boolean)
+      .join(' · ');
     return {
       value: item.artifact_id,
       disabled: item.manifest_state !== 'valid',
@@ -227,10 +273,19 @@ const ArtifactSelect: React.FC<Props> = ({
           title={[
             requestPresentation.include,
             requestPresentation.exclude,
-            requestPresentation.ggufHint
+            requestPresentation.ggufHint,
+            intl.formatMessage({
+              id: 'resources.storage.artifact.fixedDistributionHint'
+            }),
+            `${profileName || profileId} · ${
+              item.last_verified_at
+                ? dayjs(item.last_verified_at).format('YYYY-MM-DD HH:mm')
+                : '-'
+            }`
           ]
             .filter(Boolean)
             .join('\n')}
+          className="model-storage-artifact-option"
           style={{ minWidth: 0 }}
         >
           <div>
@@ -243,42 +298,19 @@ const ArtifactSelect: React.FC<Props> = ({
               whiteSpace: 'nowrap'
             }}
           >
-            {requestPresentation.include}
-          </div>
-          <div
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {requestPresentation.exclude}
-          </div>
-          {requestPresentation.ggufHint && (
-            <div
-              style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {requestPresentation.ggufHint}
-            </div>
-          )}
-          <div>
-            {intl.formatMessage({
-              id: 'resources.storage.artifact.fixedDistributionHint'
-            })}
-          </div>
-          <div>
-            {revision} · {profileName || profileId} ·{' '}
-            {item.last_verified_at
-              ? dayjs(item.last_verified_at).format('YYYY-MM-DD HH:mm')
-              : '-'}
+            {secondary}
           </div>
         </div>
       ),
-      selectionLabel: `${source} · ${item.model_id}`
+      selectionLabel: [
+        source,
+        item.model_id,
+        revision,
+        compactHint,
+        shortArtifactId
+      ]
+        .filter(Boolean)
+        .join(' · ')
     };
   });
   if (value && !items.some((item) => item.artifact_id === value))
@@ -309,13 +341,18 @@ const ArtifactSelect: React.FC<Props> = ({
         loading={loading || resolving}
         onSearch={(nextSearch) => void load(nextSearch, 1)}
         onChange={(nextValue) => {
-          const artifact = items.find((item) => item.artifact_id === nextValue);
+          const artifact = items.find(
+            (item) =>
+              item.artifact_id === nextValue && item.manifest_state === 'valid'
+          );
           validationRequestId.current += 1;
           setResolving(false);
-          validatedIdentity.current = nextValue
+          validatedIdentity.current = artifact
             ? `${profileId}:${nextValue}`
             : undefined;
-          onValidityChange?.(artifact ? 'valid' : 'unresolved');
+          publishSelection(
+            artifact ? { status: 'valid', artifact } : { status: 'unresolved' }
+          );
           onChange?.(nextValue, artifact);
         }}
         options={options}

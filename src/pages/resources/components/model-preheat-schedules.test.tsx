@@ -167,7 +167,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('预热策略触发方式', () => {
-  it('服务能力关闭时禁用新建和立即执行并展示原因', async () => {
+  it('服务能力字段关闭时仍允许新建和立即执行', async () => {
     api.queryModelStorageCapabilities.mockResolvedValue({
       credential_encryption_available: true,
       model_preheat_enabled: false
@@ -176,42 +176,41 @@ describe('预热策略触发方式', () => {
     render(<ModelPreheatPolicies mode="preheat" />);
 
     expect(
-      await screen.findByText('resources.preheat.disabledByServer')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', {
+      await screen.findByRole('button', {
         name: /resources\.preheat\.policy\.create/
       })
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(
       screen.getAllByRole('button', {
         name: 'resources.preheat.schedule.runNow'
       })[0]
-    ).toBeDisabled();
+    ).toBeEnabled();
+    expect(
+      screen.queryByText('resources.preheat.disabledByServer')
+    ).not.toBeInTheDocument();
   });
 
-  it('能力查询失败时 fail-closed，并可重试恢复', async () => {
-    const user = userEvent.setup();
-    api.queryModelStorageCapabilities
-      .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce({
-        credential_encryption_available: true,
-        model_preheat_enabled: true
-      });
+  it('能力查询失败时不阻断新建和立即执行', async () => {
+    api.queryModelStorageCapabilities.mockRejectedValue(new Error('network'));
 
     render(<ModelPreheatPolicies mode="preheat" />);
 
     expect(
-      await screen.findByText('resources.preheat.capabilityLoadFailed')
-    ).toBeInTheDocument();
-    const create = screen.getByRole('button', {
-      name: /resources\.preheat\.policy\.create/
-    });
-    expect(create).toBeDisabled();
-    await user.click(
-      screen.getByRole('button', { name: 'common.button.retry' })
-    );
-    await waitFor(() => expect(create).toBeEnabled());
+      await screen.findByRole('button', {
+        name: /resources\.preheat\.policy\.create/
+      })
+    ).toBeEnabled();
+    expect(
+      screen.getAllByRole('button', {
+        name: 'resources.preheat.schedule.runNow'
+      })[0]
+    ).toBeEnabled();
+    expect(
+      screen.queryByText('resources.preheat.capabilityLoadFailed')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'common.button.retry' })
+    ).not.toBeInTheDocument();
   });
 
   it('策略名称位于表单顶部，且编辑时模型 ID 稳定回显', async () => {

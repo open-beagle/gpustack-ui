@@ -492,6 +492,12 @@ export interface ModelPreheatTask {
   transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
+  state_message?: string | null;
+  error_code?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  file_count?: number | null;
+  total_size?: number | null;
   created_at: string;
   updated_at: string;
   deduplicated: boolean;

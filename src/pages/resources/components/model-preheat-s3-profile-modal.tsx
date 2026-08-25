@@ -12,8 +12,10 @@ import {
   Input,
   InputNumber,
   Row,
+  Space,
   Switch,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd';
 import React, { useEffect, useState } from 'react';
 import {
@@ -228,16 +230,24 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
       </Tooltip>
     </span>
   );
-  const connectionStageText = (
+  const connectionStageContent = (
     stage: ModelStorageConnectionTest['connection']
-  ) =>
-    stage.ok
-      ? intl.formatMessage({ id: 'resources.storage.connectionTest.ok' })
-      : intl.formatMessage({
-          id: getModelStorageErrorPresentation(
-            stage.error_code || testResult?.error_code
-          ).messageId
-        });
+  ) => {
+    if (stage.ok) {
+      return intl.formatMessage({ id: 'resources.storage.connectionTest.ok' });
+    }
+    const presentation = getModelStorageErrorPresentation(
+      stage.error_code || testResult?.error_code
+    );
+    return (
+      <Space direction="vertical" size={0}>
+        <span>{intl.formatMessage({ id: presentation.messageId })}</span>
+        <Typography.Text type="secondary">
+          {intl.formatMessage({ id: presentation.actionHintId })}
+        </Typography.Text>
+      </Space>
+    );
+  };
 
   return (
     <ScrollerModal
@@ -522,35 +532,35 @@ const ModelPreheatS3ProfileModal: React.FC<Props> = ({
               id: 'resources.storage.connectionTest.stage.connection'
             })}
           >
-            {connectionStageText(testResult.connection)}
+            {connectionStageContent(testResult.connection)}
           </Descriptions.Item>
           <Descriptions.Item
             label={intl.formatMessage({
               id: 'resources.storage.connectionTest.stage.bucket'
             })}
           >
-            {connectionStageText(testResult.bucket)}
+            {connectionStageContent(testResult.bucket)}
           </Descriptions.Item>
           <Descriptions.Item
             label={intl.formatMessage({
               id: 'resources.storage.connectionTest.stage.write'
             })}
           >
-            {connectionStageText(testResult.write)}
+            {connectionStageContent(testResult.write)}
           </Descriptions.Item>
           <Descriptions.Item
             label={intl.formatMessage({
               id: 'resources.storage.connectionTest.stage.read'
             })}
           >
-            {connectionStageText(testResult.read)}
+            {connectionStageContent(testResult.read)}
           </Descriptions.Item>
           <Descriptions.Item
             label={intl.formatMessage({
               id: 'resources.storage.connectionTest.stage.delete'
             })}
           >
-            {connectionStageText(testResult.delete)}
+            {connectionStageContent(testResult.delete)}
           </Descriptions.Item>
         </Descriptions>
       )}

@@ -642,6 +642,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
                 message={intl.formatMessage({
                   id: getModelStorageErrorPresentation(actionError).messageId
                 })}
+                description={intl.formatMessage({
+                  id: getModelStorageErrorPresentation(actionError).actionHintId
+                })}
               />
             )}
           </>

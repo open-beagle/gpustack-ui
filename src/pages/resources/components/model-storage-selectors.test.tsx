@@ -10,7 +10,7 @@ import {
   waitFor
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Form } from 'antd';
+import { Button, Form } from 'antd';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MODEL_FILE_WATCH_EVENTS } from '../config/model-preheat';
@@ -347,7 +347,7 @@ describe('模型存储选择器', () => {
     await act(async () => Promise.resolve());
 
     expect(api.queryModelStorageArtifacts).toHaveBeenCalledTimes(3);
-    expect(validityEvents).toEqual(['resolving']);
+    expect(validityEvents).toEqual(['unresolved', 'resolving']);
   });
 
   it('Artifact 受控值快速切换时旧分页扫描不得覆盖新值', async () => {
@@ -407,6 +407,77 @@ describe('模型存储选择器', () => {
       expect.objectContaining({ artifact_id: 'old-artifact' })
     );
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('选择搜索结果后保留完整 Artifact，并消除表单校验竞态', async () => {
+    const user = userEvent.setup();
+    const searchedArtifact = {
+      ...artifact,
+      artifact_id: 'artifact-search-result-12345678',
+      model_id: 'org/historical',
+      resolved_revision: 'feature/quantized',
+      include_patterns: ['weights/model-Q8_0.gguf']
+    };
+    api.queryModelStorageArtifacts.mockImplementation(
+      (_profileId: number, params: { search?: string }) =>
+        Promise.resolve(page(params.search ? [searchedArtifact] : []))
+    );
+    const onFinish = vi.fn();
+    const ArtifactForm = () => {
+      const [validity, setValidity] = useState<
+        'resolving' | 'valid' | 'unresolved'
+      >('unresolved');
+      const [selected, setSelected] = useState<ModelStorageArtifact>();
+      return (
+        <Form onFinish={onFinish}>
+          <Form.Item
+            name="artifact_id"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (validity !== 'valid' || selected?.artifact_id !== value)
+                    throw new Error('artifact-unresolved');
+                }
+              }
+            ]}
+          >
+            <ArtifactSelect
+              profileId={3}
+              onArtifactChange={setSelected}
+              onValidityChange={setValidity}
+            />
+          </Form.Item>
+          <Button htmlType="submit">保存</Button>
+        </Form>
+      );
+    };
+
+    render(<ArtifactForm />);
+    const combobox = screen.getByRole('combobox');
+    await user.type(combobox, 'historical');
+    await user.click(await screen.findByText('Hugging Face · org/historical'));
+    await user.click(combobox);
+    await user.type(combobox, 'refresh');
+    await user.clear(combobox);
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenLastCalledWith(3, {
+        page: 1,
+        perPage: 20
+      })
+    );
+    await user.click(screen.getByRole('button', { name: /保.*存/ }));
+
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({
+        artifact_id: searchedArtifact.artifact_id
+      })
+    );
+    expect(screen.queryByText('artifact-unresolved')).not.toBeInTheDocument();
+    const selectedLabel = document.querySelector('.ant-select-selection-item');
+    expect(selectedLabel).toHaveTextContent('org/historical');
+    expect(selectedLabel).toHaveTextContent('feature/quantized');
+    expect(selectedLabel).toHaveTextContent('Q8_0');
+    expect(selectedLabel).toHaveTextContent('12345678');
   });
 
   it('仓库选择器自动首刷、切换来源后重刷，搜索输入不改表单值', async () => {
@@ -575,40 +646,48 @@ describe('模型存储选择器', () => {
     );
     fireEvent.mouseDown(screen.getByRole('combobox'));
 
-    expect(
-      await screen.findByText(
-        'resources.storage.artifact.includeFilterNotSpecified'
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /resources\.storage\.artifact\.excludeFilterPattern.*draft/
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /resources\.storage\.artifact\.excludeFilterPattern.*legacy/
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /resources\.storage\.artifact\.ggufFilterPattern.*\*Q8_0\*\.gguf/
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /resources\.storage\.artifact\.includeFilterPattern.*\*Q8_0\*\.gguf.*tokenizer\.json/
-      )
-    ).toBeInTheDocument();
-    const q4Hints = screen.getAllByText(
-      'resources.storage.artifact.requestedQuantizationHint · Q4_K_M'
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('.model-storage-artifact-option')
+      ).toHaveLength(4)
     );
-    expect(q4Hints).toHaveLength(2);
-    q4Hints.forEach((hint) =>
-      expect(hint.textContent?.match(/Q4_K_M/g)).toHaveLength(1)
+    document
+      .querySelectorAll('.model-storage-artifact-option')
+      .forEach((option) => expect(option.children).toHaveLength(2));
+
+    const optionDetails = Array.from(
+      document.querySelectorAll('.model-storage-artifact-option')
+    )
+      .map((option) => option.getAttribute('title'))
+      .join('\n');
+    expect(optionDetails).toContain(
+      'resources.storage.artifact.includeFilterNotSpecified'
+    );
+    expect(optionDetails).toMatch(
+      /resources\.storage\.artifact\.excludeFilterPattern.*draft/
+    );
+    expect(optionDetails).toMatch(
+      /resources\.storage\.artifact\.excludeFilterPattern.*legacy/
+    );
+    expect(optionDetails).toMatch(
+      /resources\.storage\.artifact\.ggufFilterPattern.*\*Q8_0\*\.gguf/
+    );
+    expect(optionDetails).toMatch(
+      /resources\.storage\.artifact\.includeFilterPattern.*\*Q8_0\*\.gguf.*tokenizer\.json/
+    );
+    const q4SecondaryLines = Array.from(
+      document.querySelectorAll(
+        '.model-storage-artifact-option > div:last-child'
+      )
+    ).filter((line) => line.textContent?.includes('Q4_K_M'));
+    expect(q4SecondaryLines).toHaveLength(2);
+    q4SecondaryLines.forEach((line) =>
+      expect(line.textContent?.match(/Q4_K_M/g)).toHaveLength(1)
     );
     expect(
-      screen.getAllByText('resources.storage.artifact.fixedDistributionHint')
+      optionDetails.match(
+        /resources\.storage\.artifact\.fixedDistributionHint/g
+      )
     ).toHaveLength(4);
     expect(
       document.querySelector('.ant-select-selection-item')?.textContent
