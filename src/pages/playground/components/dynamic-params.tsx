@@ -174,11 +174,13 @@ const ParamsSettings: React.FC<ParamsSettingsProps> = forwardRef(
                   ]}
                 >
                   <SealSelect
+                    allowClear
                     description={intl.formatMessage({
                       id: 'playground.model.noavailable.tips2'
                     })}
                     onChange={handleOnModelChange}
                     showSearch={true}
+                    optionFilterProp="label"
                     options={modelList}
                     label={intl.formatMessage({ id: 'playground.model' })}
                   ></SealSelect>

@@ -372,6 +372,7 @@ const ModelDistributionPolicyModal: React.FC<Props> = ({
       </Form>
       <ModelPreheatConfirmModal
         open={Boolean(confirmValues)}
+        getContainer={false}
         title={intl.formatMessage({ id: 'resources.preheat.confirm.title' })}
         content={
           <ModelPreheatCreateSummary

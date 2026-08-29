@@ -52,12 +52,19 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
     }
   }, [props.value, allowNull]);
 
-  const handleClickWrapper = () => {
+  const handleClickWrapper = (event: React.MouseEvent<HTMLElement>) => {
+    // Select 的下拉通过 Portal 渲染，事件仍会沿 React 树冒泡到 Wrapper。
+    // 只处理 Wrapper 自身 DOM 内的点击，避免选中后又把下拉强制打开。
+    if (!event.currentTarget.contains(event.target as Node)) return;
+    if ((event.target as Element).closest?.('.ant-select-clear')) return;
     if (!props.disabled) {
       inputRef.current?.focus?.();
       setIsFocus(true);
-      if (props.open === undefined) {
+      const clickedSelect = (event.target as Element).closest?.('.ant-select');
+      if (!clickedSelect && props.open === undefined) {
         setDropdownOpen(true);
+      } else if (!clickedSelect) {
+        props.onOpenChange?.(true);
       }
     }
   };
@@ -72,6 +79,13 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
   const handleChange = (val: any, options: any) => {
     if (isNotEmptyValue(val) || (allowNull && val === null)) {
       setIsFocus(true);
+      if (
+        props.open === undefined &&
+        props.mode !== 'multiple' &&
+        props.mode !== 'tags'
+      ) {
+        setDropdownOpen(false);
+      }
     } else {
       setIsFocus(false);
     }
@@ -108,6 +122,10 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
           {...rest}
           ref={inputRef}
           options={children ? null : _options}
+          optionFilterProp={
+            rest.optionFilterProp ??
+            (rest.showSearch && !children ? 'label' : undefined)
+          }
           open={props.open ?? dropdownOpen}
           onFocus={handleOnFocus}
           onBlur={handleOnBlur}

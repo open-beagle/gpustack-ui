@@ -1,5 +1,6 @@
 import ModalFooter from '@/components/modal-footer';
 import { ExclamationCircleFilled } from '@ant-design/icons';
+import type { ModalProps } from 'antd';
 import { Modal, Space } from 'antd';
 import React from 'react';
 
@@ -13,6 +14,7 @@ interface Props {
   extra?: React.ReactNode;
   onOk: () => void;
   onCancel: () => void;
+  getContainer?: ModalProps['getContainer'];
 }
 
 const ModelPreheatConfirmModal: React.FC<Props> = ({
@@ -24,7 +26,8 @@ const ModelPreheatConfirmModal: React.FC<Props> = ({
   danger = false,
   extra,
   onOk,
-  onCancel
+  onCancel,
+  getContainer
 }) => (
   <Modal
     open={open}
@@ -45,6 +48,7 @@ const ModelPreheatConfirmModal: React.FC<Props> = ({
     closable={!loading}
     maskClosable={false}
     keyboard={false}
+    getContainer={getContainer}
     onCancel={loading ? undefined : onCancel}
     footer={
       <ModalFooter
@@ -58,9 +62,7 @@ const ModelPreheatConfirmModal: React.FC<Props> = ({
       />
     }
   >
-    <div style={{ margin: '8px 0 0 28px' }}>
-      {content}
-    </div>
+    <div style={{ margin: '8px 0 0 28px' }}>{content}</div>
   </Modal>
 );
 

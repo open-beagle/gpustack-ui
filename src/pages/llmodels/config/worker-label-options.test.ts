@@ -8,13 +8,14 @@ describe('Worker 标签候选项', () => {
   it('按键汇总多个 Worker 的值并去重排序', () => {
     expect(
       buildWorkerLabelOptions([
-        { labels: { zone: 'shanghai', gpu: 'a100' } },
-        { labels: { zone: 'beijing', gpu: 'a100' } },
-        { labels: { zone: 'beijing', os: 'linux' } }
+        { name: 'worker-b', labels: { zone: 'shanghai', gpu: 'a100' } },
+        { name: 'worker-a', labels: { zone: 'beijing', gpu: 'a100' } },
+        { name: 'worker-a', labels: { zone: 'beijing', os: 'linux' } }
       ])
     ).toEqual({
       gpu: ['a100'],
       os: ['linux'],
+      'worker-name': ['worker-a', 'worker-b'],
       zone: ['beijing', 'shanghai']
     });
   });
@@ -23,8 +24,8 @@ describe('Worker 标签候选项', () => {
     const request = async (page: number, perPage: number) => ({
       items:
         page === 1
-          ? [{ labels: { zone: 'beijing' } }]
-          : [{ labels: { zone: 'shanghai', gpu: 'h100' } }],
+          ? [{ name: 'worker-a', labels: { zone: 'beijing' } }]
+          : [{ name: 'worker-b', labels: { zone: 'shanghai', gpu: 'h100' } }],
       pagination: {
         page,
         perPage,
@@ -35,6 +36,7 @@ describe('Worker 标签候选项', () => {
 
     await expect(loadWorkerLabelOptions(request)).resolves.toEqual({
       gpu: ['h100'],
+      'worker-name': ['worker-a', 'worker-b'],
       zone: ['beijing', 'shanghai']
     });
   });

@@ -21,7 +21,7 @@ interface WrapperProps {
   variant?: string;
   hasPrefix?: boolean;
   labelExtra?: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 // wrapper box
@@ -224,7 +224,7 @@ const Wrapper: FC<WrapperProps> = ({
         onClick={onClick}
       >
         {label && (
-          <Label $isFocus={isFocus} $hasPrefix={hasPrefix} onClick={onClick}>
+          <Label $isFocus={isFocus} $hasPrefix={hasPrefix}>
             <LabelInfo
               label={label}
               required={required}

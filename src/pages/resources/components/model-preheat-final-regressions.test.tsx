@@ -8,6 +8,7 @@ import {
   within
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   ModelPreheatConnectivityCheck,
@@ -371,6 +372,78 @@ describe('同步任务快捷创建分发策略', () => {
       )
     );
     expect(screen.queryByText(/^Hugging Face · org\/model/)).toBeNull();
+  });
+
+  it('创建成功后同步通知父级并关闭表单与确认弹窗', async () => {
+    const user = userEvent.setup();
+    const artifact: ModelStorageArtifact = {
+      artifact_id: 'artifact-ready',
+      source: 'huggingface',
+      model_id: 'org/model',
+      resolved_revision: 'revision-a',
+      include_patterns: [],
+      exclude_patterns: [],
+      manifest_digest: 'digest',
+      manifest_path: 'manifests/artifact-ready.json',
+      manifest_state: 'valid',
+      file_count: 1,
+      total_size: 1024,
+      last_verified_at: null,
+      created_by_task_id: 41,
+      created_at: '',
+      updated_at: ''
+    };
+    api.queryModelStorageArtifacts.mockResolvedValue(page([artifact]));
+    api.createModelPreheatPolicy.mockResolvedValue({ id: 52 });
+    const onSaved = vi.fn();
+    const Harness = () => {
+      const [open, setOpen] = useState(true);
+      return (
+        <ModelDistributionPolicyModal
+          open={open}
+          initialProfileId={profile.id}
+          initialArtifactId={artifact.artifact_id}
+          onCancel={() => setOpen(false)}
+          onSaved={() => {
+            onSaved();
+            setOpen(false);
+          }}
+        />
+      );
+    };
+
+    render(<Harness />);
+
+    await screen.findByText(/^Hugging Face · org\/model/);
+    await user.type(
+      screen.getByLabelText('resources.preheat.policy.name'),
+      'distribution-policy'
+    );
+    const workerSelect = screen
+      .getByText('resources.storage.syncBatch.selectWorker')
+      .closest('.ant-form-item')!
+      .querySelector<HTMLElement>('[role="combobox"]')!;
+    await user.click(workerSelect);
+    await user.click(await screen.findByText(/a100-58 · ready/));
+    await user.click(
+      screen.getByRole('button', { name: 'common.button.save' })
+    );
+    const confirmDialog = (
+      await screen.findByText('resources.preheat.confirm.title')
+    ).closest<HTMLElement>('[role="dialog"]')!;
+    await user.click(
+      within(confirmDialog).getByRole('button', {
+        name: 'common.button.save'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.createModelPreheatPolicy).toHaveBeenCalledTimes(1)
+    );
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
   });
 });
 

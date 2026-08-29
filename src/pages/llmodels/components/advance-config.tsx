@@ -554,7 +554,8 @@ const AdvanceConfig: React.FC<AdvanceConfigProps> = (props) => {
     placement_strategy,
     gpuSelectorIds,
     EnviromentVars,
-    worker_selector
+    worker_selector,
+    workerLabelOptions
   ]);
 
   return (

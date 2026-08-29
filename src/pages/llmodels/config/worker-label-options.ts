@@ -1,10 +1,15 @@
 type WorkerWithLabels = {
+  name?: string;
   labels?: Record<string, string>;
 };
 
 export const buildWorkerLabelOptions = (workers: WorkerWithLabels[]) => {
   const options = workers.reduce<Record<string, Set<string>>>(
     (result, worker) => {
+      if (worker.name) {
+        if (!result['worker-name']) result['worker-name'] = new Set<string>();
+        result['worker-name'].add(worker.name);
+      }
       Object.entries(worker.labels || {}).forEach(([key, value]) => {
         if (!result[key]) result[key] = new Set<string>();
         result[key].add(String(value));
