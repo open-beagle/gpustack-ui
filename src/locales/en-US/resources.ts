@@ -506,10 +506,13 @@ export default {
   'resources.storage.syncBatch.create': 'Create Sync Task',
   'resources.storage.syncBatch.scope': 'Sync Scope',
   'resources.storage.syncBatch.scope.single_model': 'Single Model',
+  'resources.storage.syncBatch.scope.selected_models': 'Selected Models',
   'resources.storage.syncBatch.scope.selected_workers': 'Selected Workers',
   'resources.storage.syncBatch.scope.all_ready_workers': 'All Ready Workers',
   'resources.storage.syncBatch.description.single_model':
     'Upload one existing model on the selected Ready worker to the target S3. It will not be distributed to other workers.',
+  'resources.storage.syncBatch.description.selected_models':
+    'Create sync tasks for the selected models in one batch.',
   'resources.storage.syncBatch.description.selected_workers':
     'Upload existing models on the selected Ready workers to the target S3. They will not be distributed to other workers.',
   'resources.storage.syncBatch.description.all_ready_workers':
@@ -518,6 +521,10 @@ export default {
   'resources.storage.syncBatch.selectModel': 'Select Model',
   'resources.storage.syncBatch.noSyncableModels':
     'This worker has no syncable Ready models.',
+  'resources.storage.syncBatch.selectedModelCount': '{count} models selected',
+  'resources.storage.syncBatch.selectionLimit':
+    'You can select up to 500 models at a time.',
+  'resources.storage.syncBatch.syncSelected': 'Sync Selected',
   'resources.storage.syncBatch.planned': 'Planned',
   'resources.storage.syncBatch.created': 'Created',
   'resources.storage.syncBatch.skipped': 'Skipped',
@@ -552,6 +559,16 @@ export default {
   'resources.storage.syncTask.state.ready': 'Completed',
   'resources.storage.syncTask.state.error': 'Failed',
   'resources.storage.syncTask.state.canceled': 'Canceled',
+  'resources.storage.syncTask.batch.selectedCount': '{count} tasks selected',
+  'resources.storage.syncTask.batch.action': 'Process Selected',
+  'resources.storage.syncTask.batch.confirmTitle':
+    'Process Sync Tasks in Batch',
+  'resources.storage.syncTask.batch.confirmContent':
+    'Process all {total} selected sync tasks?',
+  'resources.storage.syncTask.batch.confirmCounts':
+    'Cancel {cancel} active tasks and delete {delete} completed tasks.',
+  'resources.storage.syncTask.batch.failedSummary':
+    '{failed} of {total} tasks failed and remain selected.',
   'resources.storage.createStrategy': 'Create Strategy from This Sync Record',
   'resources.storage.taskRecords': 'Task Records',
   'resources.storage.distributionTasks': 'Distribution Records',
@@ -726,7 +743,7 @@ export default {
   'resources.storage.distributionPolicy.createSelected': 'Create from selected',
   'resources.storage.distributionPolicy.createAllCurrent':
     'All current valid models',
-  'resources.storage.pagination.total': '{total} models',
+  'resources.storage.pagination.total': 'Total {total}',
   'resources.storage.distributionPolicy.edit': 'Edit Distribution Policy',
   'resources.storage.distributionPolicy.selectionMode': 'Model selection',
   'resources.storage.distributionPolicy.selectionMode.fixed': 'Single model',

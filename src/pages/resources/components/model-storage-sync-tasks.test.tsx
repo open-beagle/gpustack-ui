@@ -33,11 +33,13 @@ vi.mock('@umijs/max', () => ({
   useIntl: () => ({
     formatMessage: (
       { id }: { id: string },
-      values?: { worker?: string; profile?: string }
+      values?: Record<string, unknown>
     ) =>
       id.startsWith('resources.storage.transfer.')
         ? `${id}:${values?.worker || ''}:${values?.profile || ''}`
-        : id
+        : id.startsWith('resources.storage.syncTask.batch.') && values
+          ? `${id}:${JSON.stringify(values)}`
+          : id
   })
 }));
 
@@ -120,10 +122,12 @@ const detailTask = (
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 beforeEach(() => {
@@ -135,6 +139,172 @@ afterEach(() => {
 });
 
 describe('同步任务获取方式', () => {
+  it('selected_models 使用单次批次请求和一个幂等键', async () => {
+    const user = userEvent.setup();
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      items: [
+        {
+          id: 3,
+          name: 'default-s3',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryWorkersList.mockResolvedValue({
+      items: [],
+      pagination: { page: 1, perPage: 100, total: 0, totalPage: 1 }
+    });
+    api.createModelStorageSyncBatch.mockResolvedValue({
+      scope: 'selected_models',
+      planned: 3,
+      created: [{ model_file_id: 7, worker_id: 12, task_id: 70, reason: null }],
+      skipped: [
+        {
+          model_file_id: 8,
+          worker_id: 13,
+          task_id: null,
+          reason: 'active_task_exists'
+        }
+      ],
+      failed: [
+        {
+          model_file_id: 9,
+          worker_id: 14,
+          task_id: null,
+          reason: 'model_file_not_ready'
+        }
+      ]
+    });
+
+    render(
+      <ModelStorageSyncBatchModal
+        open
+        initialScope="selected_models"
+        initialModelFileIds={[9, 7, 8]}
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.syncBatch.selectedModelCount')
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    );
+    await waitFor(() =>
+      expect(api.createModelStorageSyncBatch).toHaveBeenCalledWith(
+        {
+          profile_id: 3,
+          scope: 'selected_models',
+          model_file_ids: [7, 8, 9]
+        },
+        expect.any(String)
+      )
+    );
+    expect(api.createModelStorageSyncBatch).toHaveBeenCalledTimes(1);
+    expect(
+      await within(dialog).findByText('resources.storage.syncBatch.result')
+    ).toBeInTheDocument();
+  });
+
+  it('selected_models 超过 500 个时禁止提交并显示明确提示', async () => {
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      items: [
+        {
+          id: 3,
+          name: 'default-s3',
+          lifecycle_state: 'active',
+          is_default: true
+        }
+      ],
+      pagination: { page: 1, perPage: 100, total: 1, totalPage: 1 }
+    });
+    api.queryWorkersList.mockResolvedValue({
+      items: [],
+      pagination: { page: 1, perPage: 100, total: 0, totalPage: 1 }
+    });
+
+    render(
+      <ModelStorageSyncBatchModal
+        open
+        initialScope="selected_models"
+        initialModelFileIds={Array.from(
+          { length: 501 },
+          (_, index) => index + 1
+        )}
+        onCancel={vi.fn()}
+        onTasksChanged={vi.fn()}
+      />
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.syncBatch.selectionLimit')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', {
+        name: 'resources.storage.sync.submit'
+      })
+    ).toBeDisabled();
+    expect(api.createModelStorageSyncBatch).not.toHaveBeenCalled();
+  });
+
+  it('混合状态批量处理全结算，成功移除选择且失败保留', async () => {
+    const user = userEvent.setup();
+    const pending = listTask({
+      id: 5,
+      model_id: 'pending-model',
+      state: 'pending'
+    });
+    const ready = listTask({ id: 6, model_id: 'ready-model', state: 'ready' });
+    api.queryModelStorageSyncTasks.mockResolvedValue({
+      items: [pending, ready],
+      pagination: { page: 1, perPage: 10, total: 2, totalPage: 1 }
+    });
+    const first = deferred<undefined>();
+    api.deleteModelStorageSyncTask.mockImplementation((id: number) =>
+      id === pending.id ? first.promise : Promise.reject(new Error('failed'))
+    );
+
+    render(<ModelStorageSyncTasks />);
+    const pendingRow = (await screen.findByText('pending-model')).closest(
+      'tr'
+    )!;
+    const readyRow = screen.getByText('ready-model').closest('tr')!;
+    await user.click(within(pendingRow).getByRole('checkbox'));
+    await user.click(within(readyRow).getByRole('checkbox'));
+    await user.click(
+      screen.getByRole('button', {
+        name: /resources\.storage\.syncTask\.batch\.action/
+      })
+    );
+    const confirm = screen.getByRole('dialog');
+    expect(within(confirm).getByText(/"total":2/)).toBeInTheDocument();
+    expect(
+      within(confirm).getByText(/"cancel":1,"delete":1/)
+    ).toBeInTheDocument();
+    await user.click(
+      within(confirm).getByRole('button', {
+        name: 'resources.storage.syncTask.batch.action'
+      })
+    );
+    expect(
+      within(confirm).getByRole('button', { name: 'common.button.cancel' })
+    ).toBeDisabled();
+    first.resolve(undefined);
+    await waitFor(() =>
+      expect(api.deleteModelStorageSyncTask).toHaveBeenCalledTimes(2)
+    );
+    expect(
+      await screen.findByText(/resources.storage.syncTask.batch.failedSummary/)
+    ).toBeInTheDocument();
+    expect(within(pendingRow).getByRole('checkbox')).not.toBeChecked();
+    expect(within(readyRow).getByRole('checkbox')).toBeChecked();
+  });
   it('从完成任务创建策略时写入持久分发页签', async () => {
     const user = userEvent.setup();
     api.queryModelStorageSyncTasks.mockResolvedValue({

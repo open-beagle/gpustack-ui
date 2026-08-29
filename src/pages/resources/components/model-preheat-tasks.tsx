@@ -448,6 +448,11 @@ const ModelPreheatTasks: React.FC = () => {
           pageSize,
           total,
           showSizeChanger: true,
+          showTotal: (value) =>
+            intl.formatMessage(
+              { id: 'resources.storage.pagination.total' },
+              { total: value }
+            ),
           onChange: (nextPage, nextPageSize) => {
             taskRequests.current.invalidate();
             setPage(nextPageSize === pageSize ? nextPage : 1);

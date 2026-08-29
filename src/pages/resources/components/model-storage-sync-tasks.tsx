@@ -28,6 +28,7 @@ import {
   queryModelStorageSyncTasks
 } from '../apis';
 import {
+  extractModelStorageErrorCode,
   getModelStorageErrorPresentation,
   getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
@@ -51,6 +52,7 @@ const ModelStorageSyncTasks: React.FC = () => {
   const navigate = useNavigate();
   const taskRequests = useRef(new LatestRequestGate());
   const detailRequests = useRef(new LatestRequestGate());
+  const selectedTaskKeysRef = useRef<React.Key[]>([]);
   const [tasks, setTasks] = useState<ModelStorageSyncTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -68,6 +70,16 @@ const ModelStorageSyncTasks: React.FC = () => {
   const [detailError, setDetailError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [selectedTaskKeys, setSelectedTaskKeys] = useState<React.Key[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<ModelStorageSyncTask[]>(
+    []
+  );
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [batchFailures, setBatchFailures] = useState<
+    Array<{ task: ModelStorageSyncTask; errorCode: string }>
+  >([]);
+  const [batchAttemptTotal, setBatchAttemptTotal] = useState(0);
+  selectedTaskKeysRef.current = selectedTaskKeys;
   const [loadError, setLoadError] = useState(false);
 
   const profileDestination = (task: ModelStorageSyncTask) => {
@@ -110,6 +122,20 @@ const ModelStorageSyncTasks: React.FC = () => {
           setTasks(result.items);
           setTotal(result.pagination.total);
           setLoadError(false);
+          setSelectedTasks((current) => {
+            const selectedSet = new Set(
+              selectedTaskKeysRef.current.map(Number)
+            );
+            const records = new Map(
+              current
+                .filter((item) => selectedSet.has(item.id))
+                .map((item) => [item.id, item])
+            );
+            result.items
+              .filter((item) => selectedSet.has(item.id))
+              .forEach((item) => records.set(item.id, item));
+            return Array.from(records.values());
+          });
         },
         () => setLoading(false)
       );
@@ -153,6 +179,57 @@ const ModelStorageSyncTasks: React.FC = () => {
     }
   };
 
+  const removeBatch = async () => {
+    if (!selectedTasks.length || submitting) return;
+    const targetKeys = new Set(selectedTaskKeys.map(Number));
+    const targets = selectedTasks.filter((task) => targetKeys.has(task.id));
+    setSubmitting(true);
+    setBatchFailures([]);
+    setBatchAttemptTotal(targets.length);
+    try {
+      const settled = await Promise.allSettled(
+        targets.map((task) => deleteModelStorageSyncTask(task.id))
+      );
+      const succeededIds: number[] = [];
+      const failures: Array<{
+        task: ModelStorageSyncTask;
+        errorCode: string;
+      }> = [];
+      settled.forEach((result, index) => {
+        const task = targets[index];
+        if (result.status === 'fulfilled') succeededIds.push(task.id);
+        else
+          failures.push({
+            task,
+            errorCode: extractModelStorageErrorCode(result.reason) || 'unknown'
+          });
+      });
+      const succeededSet = new Set(succeededIds);
+      const remainingKeys = selectedTaskKeysRef.current.filter(
+        (key) => !succeededSet.has(Number(key))
+      );
+      selectedTaskKeysRef.current = remainingKeys;
+      setSelectedTaskKeys(remainingKeys);
+      setSelectedTasks((items) =>
+        items.filter((item) => !succeededSet.has(item.id))
+      );
+      setBatchFailures(failures);
+      setBatchConfirmOpen(false);
+      if (succeededIds.length)
+        message.success(intl.formatMessage({ id: 'common.message.success' }));
+      await load();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedCancellableCount = selectedTasks.filter((task) =>
+    cancellableStates.has(task.state)
+  ).length;
+  const selectedTerminalCount = selectedTasks.filter((task) =>
+    terminalStates.has(task.state)
+  ).length;
+
   const confirmMessage =
     selected?.action === 'cancel'
       ? 'resources.storage.cancelSync'
@@ -190,12 +267,80 @@ const ModelStorageSyncTasks: React.FC = () => {
         >
           {intl.formatMessage({ id: 'resources.storage.syncBatch.create' })}
         </Button>
+        <Typography.Text>
+          {intl.formatMessage(
+            { id: 'resources.storage.syncTask.batch.selectedCount' },
+            { count: selectedTaskKeys.length }
+          )}
+        </Typography.Text>
+        <Button
+          danger
+          icon={<DeleteOutlined />}
+          disabled={!selectedTaskKeys.length}
+          onClick={() => {
+            setBatchFailures([]);
+            setBatchConfirmOpen(true);
+          }}
+        >
+          {intl.formatMessage({
+            id: 'resources.storage.syncTask.batch.action'
+          })}
+        </Button>
       </Space>
+      {batchFailures.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={intl.formatMessage(
+            { id: 'resources.storage.syncTask.batch.failedSummary' },
+            {
+              failed: batchFailures.length,
+              total: batchAttemptTotal
+            }
+          )}
+          description={
+            <Space direction="vertical" size={0}>
+              {batchFailures.map(({ task, errorCode }) => {
+                const presentation =
+                  getModelStorageErrorPresentation(errorCode);
+                return (
+                  <Typography.Text key={task.id}>
+                    #{task.id}:{' '}
+                    {intl.formatMessage({ id: presentation.messageId })}
+                  </Typography.Text>
+                );
+              })}
+            </Space>
+          }
+        />
+      )}
       <Table
         rowKey="id"
         loading={loading}
         dataSource={tasks}
         scroll={{ x: 1600 }}
+        rowSelection={{
+          selectedRowKeys: selectedTaskKeys,
+          preserveSelectedRowKeys: true,
+          getCheckboxProps: (task) => ({
+            disabled:
+              !cancellableStates.has(task.state) &&
+              !terminalStates.has(task.state)
+          }),
+          onChange: (keys, rows) => {
+            const keySet = new Set(keys.map(Number));
+            const records = new Map(
+              selectedTasks
+                .filter((item) => keySet.has(item.id))
+                .map((item) => [item.id, item])
+            );
+            rows.forEach((item) => records.set(item.id, item));
+            selectedTaskKeysRef.current = keys;
+            setSelectedTaskKeys(keys);
+            setSelectedTasks(Array.from(records.values()));
+          }
+        }}
         columns={[
           {
             title: intl.formatMessage({ id: 'resources.storage.model' }),
@@ -368,6 +513,11 @@ const ModelStorageSyncTasks: React.FC = () => {
           pageSize,
           total,
           showSizeChanger: true,
+          showTotal: (value) =>
+            intl.formatMessage(
+              { id: 'resources.storage.pagination.total' },
+              { total: value }
+            ),
           onChange: (nextPage, nextPageSize) => {
             taskRequests.current.invalidate();
             setPage(nextPageSize === pageSize ? nextPage : 1);
@@ -542,6 +692,38 @@ const ModelStorageSyncTasks: React.FC = () => {
         loading={submitting}
         onOk={remove}
         onCancel={() => setSelected(null)}
+      />
+      <ModelPreheatConfirmModal
+        open={batchConfirmOpen}
+        title={intl.formatMessage({
+          id: 'resources.storage.syncTask.batch.confirmTitle'
+        })}
+        content={
+          <Space direction="vertical" size={4}>
+            <Typography.Text>
+              {intl.formatMessage(
+                { id: 'resources.storage.syncTask.batch.confirmContent' },
+                { total: selectedTaskKeys.length }
+              )}
+            </Typography.Text>
+            <Typography.Text>
+              {intl.formatMessage(
+                { id: 'resources.storage.syncTask.batch.confirmCounts' },
+                {
+                  cancel: selectedCancellableCount,
+                  delete: selectedTerminalCount
+                }
+              )}
+            </Typography.Text>
+          </Space>
+        }
+        okText={intl.formatMessage({
+          id: 'resources.storage.syncTask.batch.action'
+        })}
+        danger
+        loading={submitting}
+        onOk={removeBatch}
+        onCancel={() => setBatchConfirmOpen(false)}
       />
       <ModelStorageSyncBatchModal
         open={batchOpen}

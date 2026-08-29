@@ -8,6 +8,7 @@ import type {
   ModelPreheatTask,
   ModelPreheatWorker,
   ModelStorageModelSource,
+  ModelStorageSyncBatchCreate,
   ModelStorageTransferSource
 } from './types';
 
@@ -154,6 +155,72 @@ export function getModelFileSyncActionState(
     };
   }
   return { visible: true, disabled: false, reason: null };
+}
+
+export function mergeSelectedModelFileRecords<T extends { id: number }>(
+  selectedKeys: readonly (string | number | bigint)[],
+  previousRecords: readonly T[],
+  currentPageRecords: readonly T[]
+): T[] {
+  const selectedIds = new Set(selectedKeys.map(Number));
+  const records = new Map(
+    previousRecords
+      .filter((item) => selectedIds.has(item.id))
+      .map((item) => [item.id, item])
+  );
+  currentPageRecords
+    .filter((item) => selectedIds.has(item.id))
+    .forEach((item) => records.set(item.id, item));
+  return Array.from(records.values());
+}
+
+export const MAX_SELECTED_MODEL_FILES = 500;
+
+export function limitSelectedModelFileIds(
+  selectedKeys: readonly (string | number | bigint)[]
+) {
+  const ids = Array.from(new Set(selectedKeys.map(Number)));
+  return {
+    ids: ids.slice(0, MAX_SELECTED_MODEL_FILES),
+    exceeded: ids.length > MAX_SELECTED_MODEL_FILES
+  };
+}
+
+function canonicalizeModelStorageSyncBatchPayload(
+  payload: ModelStorageSyncBatchCreate
+): ModelStorageSyncBatchCreate {
+  return {
+    profile_id: payload.profile_id,
+    scope: payload.scope,
+    ...(payload.scope === 'single_model'
+      ? { model_file_id: payload.model_file_id }
+      : {}),
+    ...(payload.scope === 'selected_models'
+      ? {
+          model_file_ids: [...new Set(payload.model_file_ids || [])].sort(
+            (left, right) => left - right
+          )
+        }
+      : {}),
+    ...(payload.scope === 'selected_workers'
+      ? {
+          worker_ids: [...new Set(payload.worker_ids || [])].sort(
+            (left, right) => left - right
+          )
+        }
+      : {})
+  };
+}
+
+export function prepareModelStorageSyncBatchRequest(
+  idempotency: IdempotencyKeyLifecycle,
+  payload: ModelStorageSyncBatchCreate
+) {
+  const canonicalPayload = canonicalizeModelStorageSyncBatchPayload(payload);
+  return {
+    payload: canonicalPayload,
+    idempotencyKey: idempotency.keyForRequest(JSON.stringify(canonicalPayload))
+  };
 }
 
 export function getModelFileStorageModelId(model: {

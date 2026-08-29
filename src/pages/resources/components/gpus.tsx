@@ -105,6 +105,11 @@ const GPUList: React.FC = () => {
               current: queryParams.page,
               total: dataSource.total,
               hideOnSinglePage: queryParams.perPage === 10,
+              showTotal: (value) =>
+                intl.formatMessage(
+                  { id: 'resources.storage.pagination.total' },
+                  { total: value }
+                ),
               onChange: handlePageChange
             }}
           >

@@ -386,6 +386,7 @@ export interface ModelStorageSyncTaskDetail {
 
 export type ModelStorageSyncScope =
   | 'single_model'
+  | 'selected_models'
   | 'selected_workers'
   | 'all_ready_workers';
 
@@ -393,6 +394,7 @@ export interface ModelStorageSyncBatchCreate {
   profile_id: number;
   scope: ModelStorageSyncScope;
   model_file_id?: number;
+  model_file_ids?: number[];
   worker_ids?: number[];
 }
 

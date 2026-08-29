@@ -71,11 +71,14 @@ import {
 } from '../config';
 import { modelManagementSearchForTab } from '../config/model-policy';
 import {
+  MAX_SELECTED_MODEL_FILES,
   MODEL_FILE_WATCH_EVENTS,
   getModelFileDeletePreflight,
   getModelFileSyncActionState,
   getModelStorageRevisionPresentation,
   getModelStorageTransferPresentation,
+  limitSelectedModelFileIds,
+  mergeSelectedModelFileRecords,
   retryModelFileDeletePreflight
 } from '../config/model-preheat';
 import {
@@ -84,6 +87,7 @@ import {
   ListItem as WorkerListItem
 } from '../config/types';
 import ModelStorage from './model-storage';
+import ModelStorageSyncBatchModal from './model-storage-sync-batch-modal';
 import ModelStorageSyncModal from './model-storage-sync-modal';
 import ModelTaskPolicies from './model-task-policies';
 import ModelTaskRecords from './model-task-records';
@@ -410,6 +414,7 @@ const LocalModelFiles = () => {
     isGGUF: false
   });
   const [syncRecord, setSyncRecord] = useState<ListItem | null>(null);
+  const [syncBatchOpen, setSyncBatchOpen] = useState(false);
   const [blockedDeleteRecord, setBlockedDeleteRecord] =
     useState<ListItem | null>(null);
   const [deletePreflightError, setDeletePreflightError] = useState('');
@@ -421,6 +426,49 @@ const LocalModelFiles = () => {
     () => profiles.find((profile) => profile.is_default)?.id,
     [profiles]
   );
+  const syncRowSelection = {
+    ...rowSelection,
+    preserveSelectedRowKeys: true,
+    getCheckboxProps: (record: ListItem) => {
+      const action = getModelFileSyncActionState(record, defaultSyncProfileId);
+      const selectionLimitReached =
+        rowSelection.selectedRowKeys.length >= MAX_SELECTED_MODEL_FILES &&
+        !rowSelection.selectedRowKeys.includes(record.id);
+      return {
+        disabled: !action.visible || action.disabled || selectionLimitReached
+      };
+    },
+    onChange: (keys: React.Key[], rows: ListItem[]) => {
+      const limited = limitSelectedModelFileIds(keys);
+      if (limited.exceeded) {
+        message.warning(
+          intl.formatMessage({
+            id: 'resources.storage.syncBatch.selectionLimit'
+          })
+        );
+      }
+      rowSelection.onChange(
+        limited.ids,
+        mergeSelectedModelFileRecords(
+          limited.ids,
+          rowSelection.selectedRows as ListItem[],
+          rows
+        )
+      );
+    }
+  };
+
+  useEffect(() => {
+    const invalidCurrentIds = dataSource.dataList
+      .filter(
+        (item) =>
+          rowSelection.selectedRowKeys.includes(item.id) &&
+          getModelFileSyncActionState(item, defaultSyncProfileId).disabled
+      )
+      .map((item) => item.id);
+    if (invalidCurrentIds.length)
+      rowSelection.removeSelectedKeys(invalidCurrentIds);
+  }, [dataSource.dataList, defaultSyncProfileId]);
 
   useEffect(() => {
     void queryWorkersList({ page: 1, perPage: 100 })
@@ -989,10 +1037,25 @@ const LocalModelFiles = () => {
                 { value: 'error', label: 'Error' }
               ]}
             />
+            <Typography.Text>
+              {intl.formatMessage(
+                { id: 'resources.storage.syncBatch.selectedModelCount' },
+                { count: rowSelection.selectedRowKeys.length }
+              )}
+            </Typography.Text>
+            <Button
+              icon={<CloudUploadOutlined />}
+              disabled={!rowSelection.selectedRowKeys.length}
+              onClick={() => setSyncBatchOpen(true)}
+            >
+              {intl.formatMessage({
+                id: 'resources.storage.syncBatch.syncSelected'
+              })}
+            </Button>
           </>
         }
         handleInputChange={handleNameChange}
-        rowSelection={rowSelection}
+        rowSelection={syncRowSelection}
         actionItems={onLineSourceOptions}
         showSelect={false}
       ></FilterBar>
@@ -1004,7 +1067,7 @@ const LocalModelFiles = () => {
           onChange={handleTableChange}
           dataSource={dataSource.dataList}
           loading={dataSource.loading}
-          rowSelection={rowSelection}
+          rowSelection={syncRowSelection}
           columns={columns}
           pagination={{
             showSizeChanger: true,
@@ -1012,6 +1075,11 @@ const LocalModelFiles = () => {
             current: queryParams.page,
             total: dataSource.total,
             hideOnSinglePage: queryParams.perPage === 10,
+            showTotal: (value) =>
+              intl.formatMessage(
+                { id: 'resources.storage.pagination.total' },
+                { total: value }
+              ),
             onChange: handlePageChange
           }}
         ></Table>
@@ -1103,6 +1171,15 @@ const LocalModelFiles = () => {
           setSyncRecord(null);
           navigate('/resources/modelfiles?tab=tasks&task_tab=sync');
         }}
+      />
+      <ModelStorageSyncBatchModal
+        open={syncBatchOpen}
+        initialScope="selected_models"
+        initialModelFileIds={(rowSelection.selectedRowKeys as number[]).map(
+          Number
+        )}
+        onCancel={() => setSyncBatchOpen(false)}
+        onTasksChanged={() => void fetchData()}
       />
     </>
   );

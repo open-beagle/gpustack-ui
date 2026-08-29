@@ -617,6 +617,11 @@ const ModelPreheatS3Profiles: React.FC<Props> = ({ onProfilesChanged }) => {
           pageSize,
           total,
           showSizeChanger: true,
+          showTotal: (value) =>
+            intl.formatMessage(
+              { id: 'resources.storage.pagination.total' },
+              { total: value }
+            ),
           onChange: (nextPage, nextPageSize) => {
             profileRequests.current.invalidate();
             setPage(nextPageSize === pageSize ? nextPage : 1);

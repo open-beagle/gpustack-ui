@@ -962,6 +962,11 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                         pageSize: schedulePageSize,
                         total: scheduleTotal,
                         showSizeChanger: true,
+                        showTotal: (value) =>
+                          intl.formatMessage(
+                            { id: 'resources.storage.pagination.total' },
+                            { total: value }
+                          ),
                         onChange: (nextPage, nextPageSize) => {
                           scheduleRequests.current.invalidate();
                           setSchedulePage(

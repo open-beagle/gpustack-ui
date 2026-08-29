@@ -46,6 +46,7 @@ import {
   getModelFileStorageModelId,
   getModelFileSyncActionState,
   IdempotencyKeyLifecycle,
+  LatestRequestGate,
   loadAllPaginated
 } from '../config/model-preheat';
 import type {
@@ -83,6 +84,11 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const intl = useIntl();
   const [form] = Form.useForm<ModelStorageSyncPolicyCreate>();
   const [items, setItems] = useState<ModelStorageSyncPolicy[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [searchDraft, setSearchDraft] = useState('');
+  const [search, setSearch] = useState('');
   const [profiles, setProfiles] = useState<ModelPreheatS3Profile[]>([]);
   const [workers, setWorkers] = useState<ListItem[]>([]);
   const [models, setModels] = useState<ModelFile[]>([]);
@@ -99,6 +105,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<number>();
   const [actionError, setActionError] = useState<string | null>(null);
   const key = useRef(new IdempotencyKeyLifecycle());
+  const policyRequests = useRef(new LatestRequestGate());
   const editorRequestId = useRef(0);
   const scope = Form.useWatch('scope', form);
 
@@ -106,24 +113,32 @@ const ModelStorageSyncPolicies: React.FC = () => {
     if (confirm) setActionError(null);
   }, [confirm?.action, confirm?.policy.id]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     setLoading(true);
-    try {
-      const [result, profileItems] = await Promise.all([
-        queryModelStorageSyncPolicies({ page: 1, perPage: 100 }),
-        loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
-          queryModelPreheatS3Profiles({ page, perPage })
-        )
-      ]);
-      setItems(result.items);
-      setProfiles(profileItems);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return policyRequests.current.run(
+      () =>
+        Promise.all([
+          queryModelStorageSyncPolicies({
+            page,
+            perPage: pageSize,
+            ...(search ? { search } : {})
+          }),
+          loadAllPaginated<ModelPreheatS3Profile>((page, perPage) =>
+            queryModelPreheatS3Profiles({ page, perPage })
+          )
+        ]),
+      ([result, profileItems]) => {
+        setItems(result.items);
+        setTotal(result.pagination.total);
+        setProfiles(profileItems);
+      },
+      () => setLoading(false)
+    );
+  }, [page, pageSize, search]);
 
   useEffect(() => {
     void load();
+    return () => policyRequests.current.invalidate();
   }, [load]);
 
   const openEditor = async (record?: ModelStorageSyncPolicy) => {
@@ -329,6 +344,28 @@ const ModelStorageSyncPolicies: React.FC = () => {
   return (
     <>
       <Space style={{ marginBottom: 16 }}>
+        <Input.Search
+          allowClear
+          value={searchDraft}
+          aria-label={intl.formatMessage({
+            id: 'common.search.name.placeholder'
+          })}
+          placeholder={intl.formatMessage({
+            id: 'common.search.name.placeholder'
+          })}
+          onChange={(event) => {
+            const value = event.target.value;
+            setSearchDraft(value);
+            if (!value) {
+              setPage(1);
+              setSearch('');
+            }
+          }}
+          onSearch={(value) => {
+            setPage(1);
+            setSearch(value.trim());
+          }}
+        />
         <Button
           icon={<ReloadOutlined />}
           loading={loading}
@@ -350,7 +387,21 @@ const ModelStorageSyncPolicies: React.FC = () => {
         rowKey="id"
         loading={loading}
         dataSource={items}
-        pagination={false}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          showTotal: (value) =>
+            intl.formatMessage(
+              { id: 'resources.storage.pagination.total' },
+              { total: value }
+            ),
+          onChange: (nextPage, nextPageSize) => {
+            setPage(nextPageSize === pageSize ? nextPage : 1);
+            setPageSize(nextPageSize);
+          }
+        }}
         columns={[
           {
             title: intl.formatMessage({ id: 'resources.preheat.policy.name' }),

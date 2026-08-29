@@ -23,7 +23,9 @@ import {
   getModelStorageRevisionPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate,
-  loadAllPaginated
+  limitSelectedModelFileIds,
+  loadAllPaginated,
+  prepareModelStorageSyncBatchRequest
 } from '../config/model-preheat';
 import type {
   ModelFile,
@@ -35,9 +37,13 @@ import type {
 
 interface Props {
   open: boolean;
+  initialScope?: ModelStorageSyncScope;
+  initialModelFileIds?: number[];
   onCancel: () => void;
   onTasksChanged: () => void;
 }
+
+const EMPTY_MODEL_FILE_IDS: number[] = [];
 
 const activeProfiles = (profiles: ModelPreheatS3Profile[]) =>
   profiles.filter((profile) => profile.lifecycle_state === 'active');
@@ -54,6 +60,8 @@ const selectStyle = { width: 'min(420px, 100%)' };
 
 const ModelStorageSyncBatchModal: React.FC<Props> = ({
   open,
+  initialScope = 'single_model',
+  initialModelFileIds = EMPTY_MODEL_FILE_IDS,
   onCancel,
   onTasksChanged
 }) => {
@@ -84,6 +92,10 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
     () => activeProfiles(profiles).find((profile) => profile.is_default),
     [profiles]
   );
+  const selectedModelFiles = useMemo(
+    () => limitSelectedModelFileIds(initialModelFileIds),
+    [initialModelFileIds]
+  );
 
   useEffect(() => {
     if (!open) {
@@ -99,7 +111,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
     setProfiles([]);
     setWorkers([]);
     setProfileId(undefined);
-    setScope('single_model');
+    setScope(initialScope);
     setWorkerId(undefined);
     setWorkerIds([]);
     setModelFileId(undefined);
@@ -125,7 +137,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
       )
       .catch(() => undefined);
     return () => dependencyRequests.current.invalidate();
-  }, [open]);
+  }, [initialScope, open]);
 
   useEffect(() => {
     if (!open || scope !== 'single_model' || !workerId) {
@@ -162,17 +174,26 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
   const submit = async () => {
     if (!profileId || submitting) return;
     if (scope === 'single_model' && !modelFileId) return;
+    if (
+      scope === 'selected_models' &&
+      (!selectedModelFiles.ids.length || selectedModelFiles.exceeded)
+    )
+      return;
     if (scope === 'selected_workers' && !workerIds.length) return;
     setSubmitting(true);
     try {
+      const request = prepareModelStorageSyncBatchRequest(idempotency.current, {
+        profile_id: profileId,
+        scope,
+        ...(scope === 'single_model' ? { model_file_id: modelFileId } : {}),
+        ...(scope === 'selected_models'
+          ? { model_file_ids: selectedModelFiles.ids }
+          : {}),
+        ...(scope === 'selected_workers' ? { worker_ids: workerIds } : {})
+      });
       const batch = await createModelStorageSyncBatch(
-        {
-          profile_id: profileId,
-          scope,
-          ...(scope === 'single_model' ? { model_file_id: modelFileId } : {}),
-          ...(scope === 'selected_workers' ? { worker_ids: workerIds } : {})
-        },
-        idempotency.current.current()
+        request.payload,
+        request.idempotencyKey
       );
       idempotency.current.complete();
       setResult(batch);
@@ -194,6 +215,8 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
     !loading &&
     !submitting &&
     (scope !== 'single_model' || Boolean(modelFileId)) &&
+    (scope !== 'selected_models' ||
+      (selectedModelFiles.ids.length > 0 && !selectedModelFiles.exceeded)) &&
     (scope !== 'selected_workers' || workerIds.length > 0) &&
     (scope !== 'all_ready_workers' || readyWorkers.length > 0);
 
@@ -346,6 +369,7 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
             <Select
               style={selectStyle}
               value={scope}
+              disabled={initialScope === 'selected_models'}
               onChange={(value: ModelStorageSyncScope) => {
                 setScope(value);
                 setWorkerId(undefined);
@@ -355,6 +379,9 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
               options={(
                 [
                   'single_model',
+                  ...(initialScope === 'selected_models'
+                    ? ['selected_models' as const]
+                    : []),
                   'selected_workers',
                   'all_ready_workers'
                 ] as ModelStorageSyncScope[]
@@ -373,6 +400,24 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
               id: `resources.storage.syncBatch.description.${scope}`
             })}
           />
+          {scope === 'selected_models' && (
+            <Alert
+              type={selectedModelFiles.exceeded ? 'error' : 'info'}
+              showIcon
+              message={
+                selectedModelFiles.exceeded
+                  ? intl.formatMessage({
+                      id: 'resources.storage.syncBatch.selectionLimit'
+                    })
+                  : intl.formatMessage(
+                      {
+                        id: 'resources.storage.syncBatch.selectedModelCount'
+                      },
+                      { count: selectedModelFiles.ids.length }
+                    )
+              }
+            />
+          )}
           {scope === 'single_model' && (
             <>
               <Select

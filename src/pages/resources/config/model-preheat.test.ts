@@ -19,8 +19,11 @@ import {
   getModelStorageRevisionPresentation,
   getModelStorageSourceLabel,
   getModelStorageStatusPresentation,
+  limitSelectedModelFileIds,
   loadAllPaginated,
   loadModelPreheatConnectivitySnapshot,
+  mergeSelectedModelFileRecords,
+  prepareModelStorageSyncBatchRequest,
   retryModelFileDeletePreflight,
   shouldPollModelPreheatConnectivity,
   submitModelPreheatWithFreshSnapshot
@@ -463,6 +466,76 @@ describe('模型存储错误处理文案', () => {
 });
 
 describe('节点模型同步入口', () => {
+  it('选择模型在 500 个边界保留全部并阻止第 501 个', () => {
+    const fiveHundred = Array.from({ length: 500 }, (_, index) => index + 1);
+    expect(limitSelectedModelFileIds(fiveHundred)).toEqual({
+      ids: fiveHundred,
+      exceeded: false
+    });
+    expect(limitSelectedModelFileIds([...fiveHundred, 501])).toEqual({
+      ids: fiveHundred,
+      exceeded: true
+    });
+  });
+
+  it('批次请求按规范化 payload 复用或更换幂等键', () => {
+    const generated = ['key-1', 'key-2', 'key-3', 'key-4'];
+    const lifecycle = new IdempotencyKeyLifecycle(() => generated.shift()!);
+    lifecycle.start();
+    const first = prepareModelStorageSyncBatchRequest(lifecycle, {
+      profile_id: 3,
+      scope: 'selected_models',
+      model_file_ids: [9, 7, 9, 8]
+    });
+    expect(first.payload.model_file_ids).toEqual([7, 8, 9]);
+    expect(
+      prepareModelStorageSyncBatchRequest(lifecycle, {
+        profile_id: 3,
+        scope: 'selected_models',
+        model_file_ids: [8, 7, 9]
+      }).idempotencyKey
+    ).toBe(first.idempotencyKey);
+    expect(
+      prepareModelStorageSyncBatchRequest(lifecycle, {
+        profile_id: 4,
+        scope: 'selected_models',
+        model_file_ids: [7, 8, 9]
+      }).idempotencyKey
+    ).not.toBe(first.idempotencyKey);
+    const scopeChanged = prepareModelStorageSyncBatchRequest(lifecycle, {
+      profile_id: 4,
+      scope: 'all_ready_workers'
+    }).idempotencyKey;
+    expect(scopeChanged).not.toBe(first.idempotencyKey);
+    expect(
+      prepareModelStorageSyncBatchRequest(lifecycle, {
+        profile_id: 4,
+        scope: 'selected_models',
+        model_file_ids: [7, 8, 10]
+      }).idempotencyKey
+    ).not.toBe(scopeChanged);
+  });
+
+  it('跨页选择保留历史记录并使用当前页最新数据', () => {
+    expect(
+      mergeSelectedModelFileRecords(
+        [1, 3],
+        [
+          { id: 1, name: 'page-one' },
+          { id: 2, name: 'removed' },
+          { id: 3, name: 'stale' }
+        ],
+        [
+          { id: 3, name: 'refreshed' },
+          { id: 4, name: 'not-selected' }
+        ]
+      )
+    ).toEqual([
+      { id: 1, name: 'page-one' },
+      { id: 3, name: 'refreshed' }
+    ]);
+  });
+
   it('Ready Hub 模型缺少 revision 仍可同步，原节点不可用时禁用', () => {
     const base = {
       state: 'ready',

@@ -394,10 +394,13 @@ export default {
   'resources.storage.syncBatch.create': '新建同步任务',
   'resources.storage.syncBatch.scope': '同步范围',
   'resources.storage.syncBatch.scope.single_model': '单个模型',
+  'resources.storage.syncBatch.scope.selected_models': '指定模型',
   'resources.storage.syncBatch.scope.selected_workers': '指定节点',
   'resources.storage.syncBatch.scope.all_ready_workers': '全部就绪节点',
   'resources.storage.syncBatch.description.single_model':
     '将所选 Ready 节点上的一个已有模型上传到目标 S3，不会向其他节点分发。',
+  'resources.storage.syncBatch.description.selected_models':
+    '在一个批次中为选中的模型创建同步任务。',
   'resources.storage.syncBatch.description.selected_workers':
     '将所选 Ready 节点已有模型上传到目标 S3，不会向其他节点分发。',
   'resources.storage.syncBatch.description.all_ready_workers':
@@ -406,6 +409,9 @@ export default {
   'resources.storage.syncBatch.selectModel': '选择模型',
   'resources.storage.syncBatch.noSyncableModels':
     '该节点没有可同步的 Ready 模型。',
+  'resources.storage.syncBatch.selectedModelCount': '已选 {count} 个模型',
+  'resources.storage.syncBatch.selectionLimit': '每次最多选择 500 个模型。',
+  'resources.storage.syncBatch.syncSelected': '一键同步',
   'resources.storage.syncBatch.planned': '计划处理',
   'resources.storage.syncBatch.created': '已创建',
   'resources.storage.syncBatch.skipped': '已跳过',
@@ -490,6 +496,15 @@ export default {
   'resources.storage.syncTask.state.ready': '已完成',
   'resources.storage.syncTask.state.error': '失败',
   'resources.storage.syncTask.state.canceled': '已取消',
+  'resources.storage.syncTask.batch.selectedCount': '已选 {count} 个任务',
+  'resources.storage.syncTask.batch.action': '批量处理',
+  'resources.storage.syncTask.batch.confirmTitle': '批量处理同步任务',
+  'resources.storage.syncTask.batch.confirmContent':
+    '确认处理选中的 {total} 个同步任务吗？',
+  'resources.storage.syncTask.batch.confirmCounts':
+    '将取消 {cancel} 个进行中任务，并删除 {delete} 个终态任务。',
+  'resources.storage.syncTask.batch.failedSummary':
+    '{total} 个任务中有 {failed} 个处理失败，已保留选择。',
   'resources.storage.createStrategy': '基于此同步记录创建策略',
   'resources.storage.syncTask.errorCode': '失败原因',
   'resources.storage.syncTask.error.worker_execution_failed':
@@ -673,7 +688,7 @@ export default {
   'resources.storage.distributionPolicy.selectedCount': '已选 {count} 个模型',
   'resources.storage.distributionPolicy.createSelected': '基于所选新建策略',
   'resources.storage.distributionPolicy.createAllCurrent': '全部当前有效模型',
-  'resources.storage.pagination.total': '共 {total} 个模型',
+  'resources.storage.pagination.total': '共 {total} 条',
   'resources.storage.distributionPolicy.edit': '编辑分发策略',
   'resources.storage.distributionPolicy.selectionMode': '模型选择模式',
   'resources.storage.distributionPolicy.selectionMode.fixed': '单个模型',

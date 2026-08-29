@@ -246,10 +246,13 @@ export default {
   'resources.storage.syncBatch.create': 'Создать задачу синхронизации',
   'resources.storage.syncBatch.scope': 'Область синхронизации',
   'resources.storage.syncBatch.scope.single_model': 'Одна модель',
+  'resources.storage.syncBatch.scope.selected_models': 'Выбранные модели',
   'resources.storage.syncBatch.scope.selected_workers': 'Выбранные воркеры',
   'resources.storage.syncBatch.scope.all_ready_workers': 'Все Ready-воркеры',
   'resources.storage.syncBatch.description.single_model':
     'Загрузить существующую модель выбранного Ready-воркера в целевой S3. Модель не будет разослана на другие воркеры.',
+  'resources.storage.syncBatch.description.selected_models':
+    'Создать задачи синхронизации для выбранных моделей одним пакетом.',
   'resources.storage.syncBatch.description.selected_workers':
     'Загрузить существующие модели выбранных Ready-воркеров в целевой S3. Они не будут разосланы на другие воркеры.',
   'resources.storage.syncBatch.description.all_ready_workers':
@@ -258,6 +261,10 @@ export default {
   'resources.storage.syncBatch.selectModel': 'Выберите модель',
   'resources.storage.syncBatch.noSyncableModels':
     'На этом воркере нет готовых к синхронизации моделей.',
+  'resources.storage.syncBatch.selectedModelCount': 'Выбрано моделей: {count}',
+  'resources.storage.syncBatch.selectionLimit':
+    'За один раз можно выбрать не более 500 моделей.',
+  'resources.storage.syncBatch.syncSelected': 'Синхронизировать выбранные',
   'resources.storage.syncBatch.planned': 'Запланировано',
   'resources.storage.syncBatch.created': 'Создано',
   'resources.storage.syncBatch.skipped': 'Пропущено',
@@ -287,6 +294,16 @@ export default {
   'resources.storage.syncTask.state.ready': 'Завершено',
   'resources.storage.syncTask.state.error': 'Ошибка',
   'resources.storage.syncTask.state.canceled': 'Отменено',
+  'resources.storage.syncTask.batch.selectedCount': 'Выбрано задач: {count}',
+  'resources.storage.syncTask.batch.action': 'Обработать выбранные',
+  'resources.storage.syncTask.batch.confirmTitle':
+    'Пакетная обработка задач синхронизации',
+  'resources.storage.syncTask.batch.confirmContent':
+    'Обработать все выбранные задачи синхронизации ({total})?',
+  'resources.storage.syncTask.batch.confirmCounts':
+    'Будет отменено активных задач: {cancel}; удалено завершённых: {delete}.',
+  'resources.storage.syncTask.batch.failedSummary':
+    'Не удалось обработать {failed} из {total} задач; они остались выбранными.',
   'resources.storage.createStrategy':
     'Создать стратегию из этой записи синхронизации',
   'resources.preheat.policy.create': 'Новая стратегия',
@@ -507,7 +524,7 @@ export default {
     'Создать политику из выбранных',
   'resources.storage.distributionPolicy.createAllCurrent':
     'Все текущие допустимые модели',
-  'resources.storage.pagination.total': 'Всего моделей: {total}',
+  'resources.storage.pagination.total': 'Всего: {total}',
   'resources.storage.distributionPolicy.edit': 'Изменить политику доставки',
   'resources.storage.distributionPolicy.selectionMode': 'Выбор моделей',
   'resources.storage.distributionPolicy.selectionMode.fixed': 'Одна модель',

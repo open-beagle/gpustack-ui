@@ -206,6 +206,61 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('预热策略触发方式', () => {
+  it('同步策略使用服务端分页并在筛选、刷新和页大小变化时保留参数', async () => {
+    const user = userEvent.setup();
+    api.queryModelStorageSyncPolicies.mockResolvedValue({
+      ...page([]),
+      pagination: { page: 1, perPage: 10, total: 21, totalPage: 3 }
+    });
+    render(<ModelStorageSyncPolicies />);
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenCalledWith({
+        page: 1,
+        perPage: 10
+      })
+    );
+
+    await user.click(screen.getByTitle('2'));
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenLastCalledWith({
+        page: 2,
+        perPage: 10
+      })
+    );
+
+    const search = screen.getByRole('searchbox', {
+      name: 'common.search.name.placeholder'
+    });
+    await user.type(search, 'team-a{enter}');
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 10,
+        search: 'team-a'
+      })
+    );
+    await user.click(
+      screen.getByRole('button', { name: /common\.button\.refresh/ })
+    );
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 10,
+        search: 'team-a'
+      })
+    );
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(await screen.findByText('20 / page'));
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 20,
+        search: 'team-a'
+      })
+    );
+  });
+
   it('服务能力字段关闭时仍允许新建和立即执行', async () => {
     api.queryModelStorageCapabilities.mockResolvedValue({
       credential_encryption_available: true,

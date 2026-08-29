@@ -247,11 +247,14 @@ export default {
   'resources.storage.syncBatch.create': '同期タスクを作成',
   'resources.storage.syncBatch.scope': '同期範囲',
   'resources.storage.syncBatch.scope.single_model': '単一モデル',
+  'resources.storage.syncBatch.scope.selected_models': '指定したモデル',
   'resources.storage.syncBatch.scope.selected_workers': '指定ワーカー',
   'resources.storage.syncBatch.scope.all_ready_workers':
     'すべての Ready ワーカー',
   'resources.storage.syncBatch.description.single_model':
     '選択した Ready ワーカーの既存モデルを対象 S3 にアップロードします。他のワーカーには配布しません。',
+  'resources.storage.syncBatch.description.selected_models':
+    '選択したモデルの同期タスクを 1 つのバッチで作成します。',
   'resources.storage.syncBatch.description.selected_workers':
     '選択した Ready ワーカーの既存モデルを対象 S3 にアップロードします。他のワーカーには配布しません。',
   'resources.storage.syncBatch.description.all_ready_workers':
@@ -260,6 +263,11 @@ export default {
   'resources.storage.syncBatch.selectModel': 'モデルを選択',
   'resources.storage.syncBatch.noSyncableModels':
     'このワーカーに同期可能な Ready モデルはありません。',
+  'resources.storage.syncBatch.selectedModelCount':
+    '{count} 件のモデルを選択済み',
+  'resources.storage.syncBatch.selectionLimit':
+    '一度に選択できるモデルは 500 件までです。',
+  'resources.storage.syncBatch.syncSelected': '選択項目を一括同期',
   'resources.storage.syncBatch.planned': '予定',
   'resources.storage.syncBatch.created': '作成済み',
   'resources.storage.syncBatch.skipped': 'スキップ',
@@ -291,6 +299,16 @@ export default {
   'resources.storage.syncTask.state.ready': '完了',
   'resources.storage.syncTask.state.error': '失敗',
   'resources.storage.syncTask.state.canceled': 'キャンセル済み',
+  'resources.storage.syncTask.batch.selectedCount':
+    '{count} 件のタスクを選択済み',
+  'resources.storage.syncTask.batch.action': '一括処理',
+  'resources.storage.syncTask.batch.confirmTitle': '同期タスクを一括処理',
+  'resources.storage.syncTask.batch.confirmContent':
+    '選択した {total} 件の同期タスクを処理しますか？',
+  'resources.storage.syncTask.batch.confirmCounts':
+    '実行中の {cancel} 件をキャンセルし、完了済みの {delete} 件を削除します。',
+  'resources.storage.syncTask.batch.failedSummary':
+    '{total} 件中 {failed} 件が失敗し、選択状態を保持しました。',
   'resources.storage.createStrategy': 'この同期記録からポリシーを作成',
   'resources.preheat.policy.create': '新しいポリシー',
   'resources.preheat.policy.createContinuous': '継続ポリシーを作成',
