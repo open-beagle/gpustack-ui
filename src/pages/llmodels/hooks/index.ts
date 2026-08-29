@@ -27,6 +27,7 @@ import {
   GPUListItem,
   ListItem
 } from '../config/types';
+import { getEditScheduleType } from './edit-form-schedule';
 
 export type MessageStatus = {
   show: boolean;
@@ -140,7 +141,7 @@ export const useGenerateFormEditInitialValues = () => {
     const formData = {
       ...result.values,
       categories: data?.categories?.length ? data.categories[0] : null,
-      scheduleType: data?.gpu_selector ? 'manual' : 'auto',
+      scheduleType: getEditScheduleType(data?.gpu_selector),
       gpu_selector: data?.gpu_selector?.gpu_ids?.length
         ? {
             gpu_ids: generateGPUSelector(data, gpuOptions)
