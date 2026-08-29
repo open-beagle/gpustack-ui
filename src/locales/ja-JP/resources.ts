@@ -489,7 +489,68 @@ export default {
   'resources.storage.taskState.paused': '一時停止',
   'resources.storage.taskState.partial': '一部完了',
   'resources.storage.taskState.unknown': '不明な状態',
-  'resources.storage.syncTask.state.running': '実行中'
+  'resources.storage.syncTask.state.running': '実行中',
+  'resources.storage.distributionPolicy.tab': '配布ポリシー',
+  'resources.storage.distributionPolicy.kind': '継続配布',
+  'resources.storage.distributionPolicy.create': '配布ポリシーを作成',
+  'resources.storage.distributionPolicy.hint':
+    'S3 モデルを選択し、対象ノードへの継続配布を設定します。',
+  'resources.storage.distributionPolicy.source': 'ソースモデル',
+  'resources.storage.distributionPolicy.artifact': 'S3 モデル',
+  'resources.storage.distributionPolicy.syncTask': '同期タスク',
+  'resources.storage.distributionPolicy.selectedCount':
+    '{count} 件のモデルを選択済み',
+  'resources.storage.distributionPolicy.createSelected':
+    '選択したモデルからポリシーを作成',
+  'resources.storage.distributionPolicy.createAllCurrent':
+    '現在の有効なモデルをすべて選択',
+  'resources.storage.pagination.total': '全 {total} 件',
+  'resources.storage.distributionPolicy.edit': '配布ポリシーを編集',
+  'resources.storage.distributionPolicy.selectionMode': 'モデルの選択方法',
+  'resources.storage.distributionPolicy.selectionMode.fixed': '単一モデル',
+  'resources.storage.distributionPolicy.selectionMode.selected':
+    '指定したモデル',
+  'resources.storage.distributionPolicy.selectionMode.all_current':
+    '現在の有効なモデルすべて',
+  'resources.storage.distributionPolicy.artifacts': 'S3 モデル',
+  'resources.storage.distributionPolicy.structureLocked':
+    'このポリシーは実行済みです。モデル範囲、プロファイル、対象ノードは変更できません。名前と実行スケジュールは変更できます。',
+  'resources.storage.distributionPolicy.confirm.allCurrent':
+    '{profile} にある現在の有効なモデルをすべて使用します',
+  'resources.storage.distributionPolicy.confirm.selected':
+    '{profile} で選択した {count} 件のモデルを使用します',
+  'resources.storage.distributionPolicy.latestRun': '最新の実行',
+  'resources.storage.distributionPolicy.notExecuted': '未実行',
+  'resources.storage.distributionPolicy.execution.waiting': '待機中',
+  'resources.storage.distributionPolicy.execution.running': '実行中',
+  'resources.storage.distributionPolicy.execution.paused': '一時停止中',
+  'resources.storage.distributionPolicy.execution.ready': '完了',
+  'resources.storage.distributionPolicy.execution.partial_error': '一部失敗',
+  'resources.storage.distributionPolicy.execution.error': '失敗',
+  'resources.storage.distributionPolicy.execution.skipped': 'スキップ済み',
+  'resources.storage.distributionPolicy.progress': '進捗',
+  'resources.storage.distributionPolicy.progressCount':
+    '完了 {completed}/{total}',
+  'resources.storage.distributionPolicy.latestError': '最新のエラー',
+  'resources.storage.distributionPolicy.runTimes': '実行日時',
+  'resources.storage.distributionPolicy.lastRunAt': '前回の実行',
+  'resources.storage.distributionPolicy.nextRunAt': '次回の実行',
+  'resources.storage.distributionPolicy.runDetail': '実行詳細',
+  'resources.storage.distributionPolicy.executionState': '実行状態',
+  'resources.storage.distributionPolicy.startedAt': '開始日時',
+  'resources.storage.distributionPolicy.finishedAt': '完了日時',
+  'resources.storage.distributionPolicy.worker': 'ノード',
+  'resources.storage.distributionPolicy.failureReason': '失敗理由',
+  'resources.storage.distributionPolicy.taskState.pending': '待機中',
+  'resources.storage.distributionPolicy.taskState.running': '実行中',
+  'resources.storage.distributionPolicy.taskState.paused': '一時停止中',
+  'resources.storage.distributionPolicy.taskState.ready': '完了',
+  'resources.storage.distributionPolicy.taskState.error': '失敗',
+  'resources.storage.distributionPolicy.taskState.canceled': 'キャンセル済み',
+  'resources.storage.distributionPolicy.taskState.skipped': 'スキップ済み',
+  'resources.storage.distributionPolicy.taskState.skipped_worker_removed':
+    'スキップ済み（ノード削除）',
+  'resources.storage.distributionPolicy.taskState.unknown': '不明な状態'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

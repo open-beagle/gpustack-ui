@@ -1,5 +1,10 @@
 import { convertFileSize } from '@/utils';
-import { EyeOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import {
+  DatabaseOutlined,
+  EyeOutlined,
+  ReloadOutlined,
+  SendOutlined
+} from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
   Alert,
@@ -33,6 +38,7 @@ import {
 } from '../config/model-preheat';
 import type {
   ModelPreheatConnectivityCheck,
+  ModelPreheatDistributionSelectionMode,
   ModelPreheatS3Profile,
   ModelStorageArtifact
 } from '../config/types';
@@ -62,13 +68,22 @@ const ModelStorage: React.FC = () => {
   const [artifactPage, setArtifactPage] = useState(1);
   const [artifactSearchInput, setArtifactSearchInput] = useState('');
   const [artifactSearch, setArtifactSearch] = useState('');
-  const [artifactSource, setArtifactSource] = useState<string>();
+  const [artifactSource, setArtifactSource] =
+    useState<ModelStorageArtifact['source']>();
   const [artifactState, setArtifactState] = useState<string>();
   const [artifactTotal, setArtifactTotal] = useState(0);
   const [artifactDetail, setArtifactDetail] =
     useState<ModelStorageArtifact | null>(null);
-  const [distributionArtifact, setDistributionArtifact] =
-    useState<ModelStorageArtifact | null>(null);
+  const [selectedArtifactKeys, setSelectedArtifactKeys] = useState<string[]>(
+    []
+  );
+  const [selectedArtifacts, setSelectedArtifacts] = useState<
+    ModelStorageArtifact[]
+  >([]);
+  const [distributionDraft, setDistributionDraft] = useState<{
+    selectionMode: ModelPreheatDistributionSelectionMode;
+    artifacts: ModelStorageArtifact[];
+  } | null>(null);
   const [checking, setChecking] = useState(false);
   const [connectivityOpen, setConnectivityOpen] = useState(false);
   const [connectivity, setConnectivity] =
@@ -216,6 +231,11 @@ const ModelStorage: React.FC = () => {
     setArtifactPage(1);
   }, [artifactProfileId]);
 
+  useEffect(() => {
+    setSelectedArtifactKeys([]);
+    setSelectedArtifacts([]);
+  }, [artifactProfileId]);
+
   const refresh = async () => {
     const profileId = artifactProfileId;
     if (!profileId) return;
@@ -335,6 +355,8 @@ const ModelStorage: React.FC = () => {
                     onChange={(value) => {
                       refreshRequest.current.generation += 1;
                       refreshRequest.current.controller?.abort();
+                      setSelectedArtifactKeys([]);
+                      setSelectedArtifacts([]);
                       setArtifactProfileId(value);
                       setArtifactPage(1);
                     }}
@@ -350,6 +372,45 @@ const ModelStorage: React.FC = () => {
                     disabled={!selectedArtifact || refreshing}
                   >
                     {intl.formatMessage({ id: 'resources.storage.refresh' })}
+                  </Button>
+                  {selectedArtifactKeys.length > 0 && (
+                    <Typography.Text>
+                      {intl.formatMessage(
+                        {
+                          id: 'resources.storage.distributionPolicy.selectedCount'
+                        },
+                        { count: selectedArtifactKeys.length }
+                      )}
+                    </Typography.Text>
+                  )}
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    disabled={!selectedArtifactKeys.length}
+                    onClick={() =>
+                      setDistributionDraft({
+                        selectionMode: 'selected',
+                        artifacts: selectedArtifacts
+                      })
+                    }
+                  >
+                    {intl.formatMessage({
+                      id: 'resources.storage.distributionPolicy.createSelected'
+                    })}
+                  </Button>
+                  <Button
+                    icon={<DatabaseOutlined />}
+                    disabled={!artifactProfileId}
+                    onClick={() =>
+                      setDistributionDraft({
+                        selectionMode: 'all_current',
+                        artifacts: []
+                      })
+                    }
+                  >
+                    {intl.formatMessage({
+                      id: 'resources.storage.distributionPolicy.createAllCurrent'
+                    })}
                   </Button>
                   {refreshing && <Spin size="small" />}
                   <Input.Search
@@ -432,12 +493,42 @@ const ModelStorage: React.FC = () => {
                     rowKey="artifact_id"
                     loading={loading}
                     dataSource={artifacts}
+                    rowSelection={{
+                      selectedRowKeys: selectedArtifactKeys,
+                      preserveSelectedRowKeys: true,
+                      getCheckboxProps: (record) => ({
+                        disabled: record.manifest_state !== 'valid'
+                      }),
+                      onChange: (keys, rows) => {
+                        const selectedKeys = keys.map(String);
+                        const selectedKeySet = new Set(selectedKeys);
+                        const records = new Map(
+                          selectedArtifacts
+                            .filter((item) =>
+                              selectedKeySet.has(item.artifact_id)
+                            )
+                            .map((item) => [item.artifact_id, item])
+                        );
+                        rows
+                          .filter((item) => item.manifest_state === 'valid')
+                          .forEach((item) =>
+                            records.set(item.artifact_id, item)
+                          );
+                        setSelectedArtifactKeys(selectedKeys);
+                        setSelectedArtifacts(Array.from(records.values()));
+                      }
+                    }}
                     scroll={{ x: 1040 }}
                     pagination={{
                       current: artifactPage,
                       pageSize: 20,
                       total: artifactTotal,
                       showSizeChanger: false,
+                      showTotal: (value) =>
+                        intl.formatMessage(
+                          { id: 'resources.storage.pagination.total' },
+                          { total: value }
+                        ),
                       onChange: setArtifactPage
                     }}
                     columns={[
@@ -560,7 +651,12 @@ const ModelStorage: React.FC = () => {
                                 type="text"
                                 icon={<SendOutlined />}
                                 disabled={record.manifest_state !== 'valid'}
-                                onClick={() => setDistributionArtifact(record)}
+                                onClick={() =>
+                                  setDistributionDraft({
+                                    selectionMode: 'fixed',
+                                    artifacts: [record]
+                                  })
+                                }
                               />
                             </Tooltip>
                           </Space>
@@ -732,11 +828,17 @@ const ModelStorage: React.FC = () => {
         </Descriptions>
       </Modal>
       <ModelDistributionPolicyModal
-        open={Boolean(distributionArtifact)}
+        open={Boolean(distributionDraft)}
         initialProfileId={artifactProfileId}
-        initialArtifactId={distributionArtifact?.artifact_id}
-        onCancel={() => setDistributionArtifact(null)}
-        onSaved={() => setDistributionArtifact(null)}
+        initialSelectionMode={distributionDraft?.selectionMode}
+        initialArtifactId={distributionDraft?.artifacts[0]?.artifact_id}
+        initialArtifacts={distributionDraft?.artifacts}
+        onCancel={() => setDistributionDraft(null)}
+        onSaved={() => {
+          setDistributionDraft(null);
+          setSelectedArtifactKeys([]);
+          setSelectedArtifacts([]);
+        }}
       />
     </>
   );

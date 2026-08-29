@@ -80,6 +80,7 @@ const schedule = (
   id,
   name: `${triggerMode}-policy`,
   enabled: true,
+  selection_mode: 'fixed',
   trigger_mode: triggerMode,
   cron_expression: triggerMode === 'scheduled' ? '0 1 * * *' : null,
   timezone: 'UTC',
@@ -120,6 +121,9 @@ const distributionPolicy: ModelPreheatDistributionPolicy = {
   worker_selector: {},
   gpu_selector: {},
   created_by_task_id: null,
+  artifact_ids: [],
+  structural_editable: true,
+  latest_run: null,
   last_reconciled_at: null,
   created_at: '',
   updated_at: ''

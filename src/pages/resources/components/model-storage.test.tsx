@@ -481,4 +481,107 @@ describe('统一模型存储交互', () => {
     expect(await screen.findByText('Ollama Library')).toBeInTheDocument();
     expect(screen.getByText('qwen3:32b')).toBeInTheDocument();
   });
+
+  it('S3 模型跨页保留有效选择并在切换 Profile 时清空', async () => {
+    const user = userEvent.setup();
+    const backup = { ...profile, id: 4, name: '备份模型库', is_default: false };
+    const artifact = (id: string, manifestState = 'valid') => ({
+      artifact_id: id,
+      source: 'modelscope',
+      model_id: `team/${id}`,
+      resolved_revision: 'main',
+      include_patterns: [],
+      exclude_patterns: [],
+      manifest_digest: `digest-${id}`,
+      manifest_path: `manifests/${id}.json`,
+      manifest_state: manifestState,
+      file_count: 1,
+      total_size: 1024,
+      last_verified_at: '',
+      created_by_task_id: null,
+      created_at: '',
+      updated_at: ''
+    });
+    api.queryModelPreheatS3Profiles.mockResolvedValue({
+      ...page,
+      items: [profile, backup],
+      pagination: { ...page.pagination, total: 2 }
+    });
+    api.queryModelStorageArtifacts.mockImplementation(
+      (profileId: number, params: { page: number; perPage: number }) => {
+        const items =
+          profileId === backup.id
+            ? []
+            : params.page === 1
+              ? [
+                  artifact('artifact-a'),
+                  artifact('artifact-invalid', 'invalid')
+                ]
+              : [artifact('artifact-b')];
+        return Promise.resolve({
+          items,
+          pagination: {
+            page: params.page,
+            perPage: 20,
+            total: 21,
+            totalPage: 2
+          }
+        });
+      }
+    );
+
+    render(<ModelStorage />);
+    await user.click(
+      await screen.findByRole('tab', { name: 'resources.storage.artifacts' })
+    );
+    const firstRow = (await screen.findByText('team/artifact-a')).closest(
+      'tr'
+    )!;
+    const artifactTable = firstRow.closest('.ant-table-wrapper') as HTMLElement;
+    const invalidRow = screen.getByText('team/artifact-invalid').closest('tr')!;
+    expect(within(invalidRow).getByRole('checkbox')).toBeDisabled();
+    await user.click(within(firstRow).getByRole('checkbox'));
+    expect(
+      screen.getByText('resources.storage.distributionPolicy.selectedCount')
+    ).toBeInTheDocument();
+
+    await user.click(within(artifactTable).getByTitle('2'));
+    const secondRow = (await screen.findByText('team/artifact-b')).closest(
+      'tr'
+    )!;
+    await user.click(within(secondRow).getByRole('checkbox'));
+    await user.click(within(artifactTable).getByTitle('1'));
+    expect(
+      within(
+        (await screen.findByText('team/artifact-a')).closest('tr')!
+      ).getByRole('checkbox')
+    ).toBeChecked();
+
+    const activeArtifactPane = screen.getByRole('tabpanel', {
+      name: 'resources.storage.artifacts'
+    });
+    const profileSelector = within(activeArtifactPane)
+      .getByText(profile.name)
+      .closest('.ant-select')!
+      .querySelector<HTMLElement>('[role="combobox"]')!;
+    await user.click(profileSelector);
+    const backupOption = (await screen.findAllByText(backup.name)).find(
+      (element) =>
+        element.closest('.ant-select-dropdown') &&
+        !element.closest('.ant-select-dropdown-hidden')
+    )!;
+    await user.click(backupOption);
+    await waitFor(() =>
+      expect(api.queryModelStorageArtifacts).toHaveBeenCalledWith(
+        backup.id,
+        expect.objectContaining({ page: 1 }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText('resources.storage.distributionPolicy.selectedCount')
+      ).not.toBeInTheDocument()
+    );
+  });
 });

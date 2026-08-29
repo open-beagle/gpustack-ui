@@ -507,6 +507,7 @@ export interface ModelPreheatDistributionPolicy {
   id: number;
   name: string;
   enabled: boolean;
+  selection_mode: ModelPreheatDistributionSelectionMode;
   trigger_mode: 'manual' | 'scheduled' | 'continuous';
   cron_expression: string | null;
   timezone: string;
@@ -520,12 +521,76 @@ export interface ModelPreheatDistributionPolicy {
   created_by_task_id: number | null;
   source_artifact_id?: number | null;
   source_artifact?: string | null;
+  artifact_ids: string[];
   source_sync_task_id?: number | null;
   profile_version_stale?: boolean;
   blocked_reason?: string | null;
+  structural_editable: boolean;
+  latest_run: ModelPreheatDistributionPolicyRun | null;
   last_reconciled_at: string | null;
   next_run_at?: string | null;
   last_run_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ModelPreheatDistributionSelectionMode =
+  | 'fixed'
+  | 'selected'
+  | 'all_current';
+
+export type PolicyRunExecutionState =
+  | 'waiting'
+  | 'running'
+  | 'paused'
+  | 'ready'
+  | 'partial_error'
+  | 'error'
+  | 'skipped';
+
+export interface PolicyRunSummary {
+  total: number;
+  pending: number;
+  running: number;
+  paused: number;
+  ready: number;
+  error: number;
+  failed: number;
+  skipped: number;
+  progress: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+}
+
+export interface PolicyRunTask {
+  id: number | null;
+  model_file_id: number | null;
+  worker_id: number | null;
+  worker_uuid: string | null;
+  artifact_id: string | null;
+  state: string;
+  progress: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+  error_code: string | null;
+  state_message: string | null;
+}
+
+export interface ModelPreheatDistributionPolicyRun {
+  id: number;
+  policy_id: number;
+  policy_name: string | null;
+  model_id: string | null;
+  trigger: 'manual' | 'scheduled' | 'continuous';
+  state: 'pending' | 'ready' | 'error';
+  execution_state: PolicyRunExecutionState;
+  summary: PolicyRunSummary;
+  tasks: PolicyRunTask[];
+  error_code: string | null;
+  outcome: Record<string, unknown> | null;
+  window_start_utc: string;
+  started_at: string | null;
+  finished_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -569,11 +634,28 @@ export interface ModelPreheatDistributionPolicyCreate {
   cron_expression?: string | null;
   timezone?: string;
   profile_id?: number;
+  selection_mode?: ModelPreheatDistributionSelectionMode;
   artifact_id?: string;
+  artifact_ids?: string[];
   sync_task_id?: number;
   target_scope: ModelPreheatTargetScope;
   worker_selector: { worker_uuids?: string[] };
   gpu_selector: { gpu_names?: string[] };
+}
+
+export interface ModelPreheatDistributionPolicyUpdate {
+  name?: string;
+  enabled?: boolean;
+  trigger_mode?: 'manual' | 'scheduled' | 'continuous';
+  cron_expression?: string | null;
+  timezone?: string;
+  profile_id?: number;
+  selection_mode?: ModelPreheatDistributionSelectionMode;
+  artifact_id?: string;
+  artifact_ids?: string[];
+  target_scope?: ModelPreheatTargetScope;
+  worker_selector?: { worker_uuids?: string[] };
+  gpu_selector?: { gpu_names?: string[] };
 }
 
 export type ModelPreheatScheduleRunState =

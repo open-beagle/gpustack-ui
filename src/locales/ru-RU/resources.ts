@@ -492,7 +492,70 @@ export default {
   'resources.storage.taskState.paused': 'Приостановлено',
   'resources.storage.taskState.partial': 'Частично завершено',
   'resources.storage.taskState.unknown': 'Неизвестное состояние',
-  'resources.storage.syncTask.state.running': 'Выполняется'
+  'resources.storage.syncTask.state.running': 'Выполняется',
+  'resources.storage.distributionPolicy.tab': 'Политики доставки',
+  'resources.storage.distributionPolicy.kind': 'Непрерывная доставка',
+  'resources.storage.distributionPolicy.create': 'Создать политику доставки',
+  'resources.storage.distributionPolicy.hint':
+    'Выберите модель S3 и настройте её непрерывную доставку на целевые узлы.',
+  'resources.storage.distributionPolicy.source': 'Исходная модель',
+  'resources.storage.distributionPolicy.artifact': 'Модель S3',
+  'resources.storage.distributionPolicy.syncTask': 'Задача синхронизации',
+  'resources.storage.distributionPolicy.selectedCount':
+    'Выбрано моделей: {count}',
+  'resources.storage.distributionPolicy.createSelected':
+    'Создать политику из выбранных',
+  'resources.storage.distributionPolicy.createAllCurrent':
+    'Все текущие допустимые модели',
+  'resources.storage.pagination.total': 'Всего моделей: {total}',
+  'resources.storage.distributionPolicy.edit': 'Изменить политику доставки',
+  'resources.storage.distributionPolicy.selectionMode': 'Выбор моделей',
+  'resources.storage.distributionPolicy.selectionMode.fixed': 'Одна модель',
+  'resources.storage.distributionPolicy.selectionMode.selected':
+    'Выбранные модели',
+  'resources.storage.distributionPolicy.selectionMode.all_current':
+    'Все текущие допустимые модели',
+  'resources.storage.distributionPolicy.artifacts': 'Модели S3',
+  'resources.storage.distributionPolicy.structureLocked':
+    'Эта политика уже выполнялась. Набор моделей, профиль и целевые узлы заблокированы; имя и расписание можно изменить.',
+  'resources.storage.distributionPolicy.confirm.allCurrent':
+    'Использовать все текущие допустимые модели из {profile}',
+  'resources.storage.distributionPolicy.confirm.selected':
+    'Использовать выбранные модели из {profile}: {count}',
+  'resources.storage.distributionPolicy.latestRun': 'Последний запуск',
+  'resources.storage.distributionPolicy.notExecuted': 'Ещё не запускалась',
+  'resources.storage.distributionPolicy.execution.waiting': 'Ожидание',
+  'resources.storage.distributionPolicy.execution.running': 'Выполняется',
+  'resources.storage.distributionPolicy.execution.paused': 'Приостановлено',
+  'resources.storage.distributionPolicy.execution.ready': 'Завершено',
+  'resources.storage.distributionPolicy.execution.partial_error':
+    'Частично завершено с ошибкой',
+  'resources.storage.distributionPolicy.execution.error': 'Ошибка',
+  'resources.storage.distributionPolicy.execution.skipped': 'Пропущено',
+  'resources.storage.distributionPolicy.progress': 'Ход выполнения',
+  'resources.storage.distributionPolicy.progressCount':
+    'Завершено {completed}/{total}',
+  'resources.storage.distributionPolicy.latestError': 'Последняя ошибка',
+  'resources.storage.distributionPolicy.runTimes': 'Время запуска',
+  'resources.storage.distributionPolicy.lastRunAt': 'Последний запуск',
+  'resources.storage.distributionPolicy.nextRunAt': 'Следующий запуск',
+  'resources.storage.distributionPolicy.runDetail': 'Сведения о запуске',
+  'resources.storage.distributionPolicy.executionState': 'Состояние выполнения',
+  'resources.storage.distributionPolicy.startedAt': 'Время начала',
+  'resources.storage.distributionPolicy.finishedAt': 'Время завершения',
+  'resources.storage.distributionPolicy.worker': 'Узел',
+  'resources.storage.distributionPolicy.failureReason': 'Причина ошибки',
+  'resources.storage.distributionPolicy.taskState.pending': 'Ожидание',
+  'resources.storage.distributionPolicy.taskState.running': 'Выполняется',
+  'resources.storage.distributionPolicy.taskState.paused': 'Приостановлено',
+  'resources.storage.distributionPolicy.taskState.ready': 'Завершено',
+  'resources.storage.distributionPolicy.taskState.error': 'Ошибка',
+  'resources.storage.distributionPolicy.taskState.canceled': 'Отменено',
+  'resources.storage.distributionPolicy.taskState.skipped': 'Пропущено',
+  'resources.storage.distributionPolicy.taskState.skipped_worker_removed':
+    'Пропущено (узел удалён)',
+  'resources.storage.distributionPolicy.taskState.unknown':
+    'Неизвестное состояние'
 };
 
 // ========== To-Do: Translate Keys (Remove After Translation) ==========

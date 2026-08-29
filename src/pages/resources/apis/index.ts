@@ -7,6 +7,8 @@ import {
   ModelPreheatCreate,
   ModelPreheatDistributionPolicy,
   ModelPreheatDistributionPolicyCreate,
+  ModelPreheatDistributionPolicyRun,
+  ModelPreheatDistributionPolicyUpdate,
   ModelPreheatS3Profile,
   ModelPreheatS3ProfileWrite,
   ModelPreheatSchedule,
@@ -373,11 +375,18 @@ export async function createModelPreheatPolicy(
 
 export async function updateModelPreheatPolicy(
   id: number,
-  data: { name?: string; enabled?: boolean }
+  data: ModelPreheatDistributionPolicyUpdate
 ) {
   return request<ModelPreheatDistributionPolicy>(
     `${MODEL_PREHEAT_POLICIES_API}/${id}`,
     { method: 'PATCH', data }
+  );
+}
+
+export async function queryModelPreheatPolicyRun(id: number) {
+  return request<ModelPreheatDistributionPolicyRun>(
+    `${MODEL_PREHEAT_POLICIES_API}/runs/${id}`,
+    { method: 'GET' }
   );
 }
 

@@ -720,5 +720,58 @@ export default {
   'resources.storage.taskState.paused': 'Paused',
   'resources.storage.taskState.partial': 'Partially Completed',
   'resources.storage.taskState.unknown': 'Unknown state',
-  'resources.storage.syncTask.state.running': 'Running'
+  'resources.storage.syncTask.state.running': 'Running',
+  'resources.storage.distributionPolicy.selectedCount':
+    '{count} models selected',
+  'resources.storage.distributionPolicy.createSelected': 'Create from selected',
+  'resources.storage.distributionPolicy.createAllCurrent':
+    'All current valid models',
+  'resources.storage.pagination.total': '{total} models',
+  'resources.storage.distributionPolicy.edit': 'Edit Distribution Policy',
+  'resources.storage.distributionPolicy.selectionMode': 'Model selection',
+  'resources.storage.distributionPolicy.selectionMode.fixed': 'Single model',
+  'resources.storage.distributionPolicy.selectionMode.selected':
+    'Selected models',
+  'resources.storage.distributionPolicy.selectionMode.all_current':
+    'All current valid models',
+  'resources.storage.distributionPolicy.artifacts': 'S3 Models',
+  'resources.storage.distributionPolicy.structureLocked':
+    'This policy has run. Model scope, profile, and targets are locked; name and schedule remain editable.',
+  'resources.storage.distributionPolicy.confirm.allCurrent':
+    'Use all current valid models in {profile}',
+  'resources.storage.distributionPolicy.confirm.selected':
+    'Use {count} selected models in {profile}',
+  'resources.storage.distributionPolicy.latestRun': 'Latest Run',
+  'resources.storage.distributionPolicy.notExecuted': 'Not run yet',
+  'resources.storage.distributionPolicy.execution.waiting': 'Waiting',
+  'resources.storage.distributionPolicy.execution.running': 'Running',
+  'resources.storage.distributionPolicy.execution.paused': 'Paused',
+  'resources.storage.distributionPolicy.execution.ready': 'Completed',
+  'resources.storage.distributionPolicy.execution.partial_error':
+    'Partially failed',
+  'resources.storage.distributionPolicy.execution.error': 'Failed',
+  'resources.storage.distributionPolicy.execution.skipped': 'Skipped',
+  'resources.storage.distributionPolicy.progress': 'Progress',
+  'resources.storage.distributionPolicy.progressCount':
+    'Completed {completed}/{total}',
+  'resources.storage.distributionPolicy.latestError': 'Latest Error',
+  'resources.storage.distributionPolicy.runTimes': 'Run Times',
+  'resources.storage.distributionPolicy.lastRunAt': 'Last run',
+  'resources.storage.distributionPolicy.nextRunAt': 'Next run',
+  'resources.storage.distributionPolicy.runDetail': 'Run Details',
+  'resources.storage.distributionPolicy.executionState': 'Execution State',
+  'resources.storage.distributionPolicy.startedAt': 'Started At',
+  'resources.storage.distributionPolicy.finishedAt': 'Finished At',
+  'resources.storage.distributionPolicy.worker': 'Worker',
+  'resources.storage.distributionPolicy.failureReason': 'Failure Reason',
+  'resources.storage.distributionPolicy.taskState.pending': 'Pending',
+  'resources.storage.distributionPolicy.taskState.running': 'Running',
+  'resources.storage.distributionPolicy.taskState.paused': 'Paused',
+  'resources.storage.distributionPolicy.taskState.ready': 'Completed',
+  'resources.storage.distributionPolicy.taskState.error': 'Failed',
+  'resources.storage.distributionPolicy.taskState.canceled': 'Canceled',
+  'resources.storage.distributionPolicy.taskState.skipped': 'Skipped',
+  'resources.storage.distributionPolicy.taskState.skipped_worker_removed':
+    'Skipped (worker removed)',
+  'resources.storage.distributionPolicy.taskState.unknown': 'Unknown'
 };
