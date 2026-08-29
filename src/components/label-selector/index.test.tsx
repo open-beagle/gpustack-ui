@@ -59,4 +59,22 @@ describe('LabelSelector 受控值同步', () => {
     expect(form.getByText('beijing')).toBeInTheDocument();
     expect(form.getAllByRole('combobox')).toHaveLength(2);
   });
+
+  it('编辑态点击已回显的选择器标签可直接打开候选项', async () => {
+    const { container } = render(
+      <LabelSelector
+        labels={{ os: 'linux' }}
+        labelOptions={{
+          os: ['linux'],
+          arch: ['amd64'],
+          'worker-name': ['xny-a100']
+        }}
+      />
+    );
+
+    fireEvent.click(within(container).getByText('common.input.key'));
+
+    expect(await screen.findAllByText('arch')).not.toHaveLength(0);
+    expect(screen.getAllByText('worker-name')).not.toHaveLength(0);
+  });
 });

@@ -22,6 +22,7 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
   } = props;
   const intl = useIntl();
   const [isFocus, setIsFocus] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const inputRef = useRef<any>(null);
   const boxRef = useRef<any>(null);
   let status = '';
@@ -52,10 +53,20 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
   }, [props.value, allowNull]);
 
   const handleClickWrapper = () => {
-    if (!props.disabled && !isFocus) {
+    if (!props.disabled) {
       inputRef.current?.focus?.();
       setIsFocus(true);
+      if (props.open === undefined) {
+        setDropdownOpen(true);
+      }
     }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (props.open === undefined) {
+      setDropdownOpen(open);
+    }
+    props.onOpenChange?.(open);
   };
 
   const handleChange = (val: any, options: any) => {
@@ -97,9 +108,11 @@ const SealSelect: React.FC<SelectProps & SealFormItemProps> = (props) => {
           {...rest}
           ref={inputRef}
           options={children ? null : _options}
+          open={props.open ?? dropdownOpen}
           onFocus={handleOnFocus}
           onBlur={handleOnBlur}
           onChange={handleChange}
+          onOpenChange={handleOpenChange}
           notFoundContent={null}
         >
           {children}
