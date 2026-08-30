@@ -436,6 +436,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       await loadSchedules();
     } catch (error) {
       setActionError(extractModelStorageErrorCode(error) || 'unknown');
+      if (scheduleConfirm?.action === 'run') runIdempotency.current.start();
     } finally {
       actionInFlight.current.delete(actionKey);
       setActionLoading(null);

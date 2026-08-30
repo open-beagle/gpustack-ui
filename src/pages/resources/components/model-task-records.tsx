@@ -1,7 +1,8 @@
 import { useIntl, useLocation, useNavigate } from '@umijs/max';
-import { Empty, Tabs } from 'antd';
+import { Tabs } from 'antd';
 import React from 'react';
 import { taskRecordTabFromSearch } from '../config/model-policy';
+import ModelDistributionPolicyRuns from './model-distribution-policy-runs';
 import ModelPreheatTasks from './model-preheat-tasks';
 import ModelStorageSyncTasks from './model-storage-sync-tasks';
 
@@ -37,13 +38,7 @@ const ModelTaskRecords: React.FC = () => {
           label: intl.formatMessage({
             id: 'resources.storage.distributionTasks'
           }),
-          children: (
-            <Empty
-              description={intl.formatMessage({
-                id: 'resources.storage.distributionTasks.unavailable'
-              })}
-            />
-          )
+          children: <ModelDistributionPolicyRuns />
         }
       ]}
     />

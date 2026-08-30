@@ -734,7 +734,7 @@ describe('预热策略触发方式', () => {
     );
   });
 
-  it('立即执行失败后重试复用同一个幂等键', async () => {
+  it('立即执行失败后重试使用新的幂等键', async () => {
     const user = userEvent.setup();
     api.runModelPreheatScheduleNow
       .mockRejectedValueOnce({
@@ -777,7 +777,7 @@ describe('预热策略触发方式', () => {
       expect(api.runModelPreheatScheduleNow).toHaveBeenCalledTimes(2)
     );
 
-    expect(api.runModelPreheatScheduleNow.mock.calls[0][1]).toBe(
+    expect(api.runModelPreheatScheduleNow.mock.calls[0][1]).not.toBe(
       api.runModelPreheatScheduleNow.mock.calls[1][1]
     );
   });
@@ -971,8 +971,12 @@ describe('预热策略触发方式', () => {
       })
     );
 
-    expect(await screen.findByText('worker_protocol_unsupported')).toBeInTheDocument();
-    expect(screen.queryByText('common.message.success')).not.toBeInTheDocument();
+    expect(
+      await screen.findByText('worker_protocol_unsupported')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('common.message.success')
+    ).not.toBeInTheDocument();
   });
 
   it('新建同步策略等待依赖完成后再打开且不闪现旧编辑值', async () => {

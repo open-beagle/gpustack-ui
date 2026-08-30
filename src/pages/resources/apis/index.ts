@@ -400,6 +400,13 @@ export async function queryModelPreheatPolicyRun(id: number) {
   );
 }
 
+export async function queryModelPreheatPolicyRuns(params: Global.SearchParams) {
+  return request<Global.PageResponse<ModelPreheatDistributionPolicyRun>>(
+    `${MODEL_PREHEAT_POLICIES_API}/runs`,
+    { method: 'GET', params }
+  );
+}
+
 export async function deleteModelPreheatPolicy(id: number) {
   return request<{ ok: boolean }>(`${MODEL_PREHEAT_POLICIES_API}/${id}`, {
     method: 'DELETE'

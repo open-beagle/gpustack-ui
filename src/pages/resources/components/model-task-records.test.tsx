@@ -22,6 +22,9 @@ vi.mock('./model-preheat-tasks', () => ({
 vi.mock('./model-storage-sync-tasks', () => ({
   default: () => <div>sync-task-list</div>
 }));
+vi.mock('./model-distribution-policy-runs', () => ({
+  default: () => <div>distribution-run-list</div>
+}));
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -44,13 +47,11 @@ describe('模型任务记录', () => {
     );
   });
 
-  it('分发记录在没有后端列表接口时展示明确空态，不复用预热记录', () => {
+  it('分发记录展示独立分发运行列表，不复用预热记录', () => {
     router.location.search = '?tab=tasks&task_tab=distribution';
     render(<ModelTaskRecords />);
 
-    expect(
-      screen.getByText('resources.storage.distributionTasks.unavailable')
-    ).toBeInTheDocument();
+    expect(screen.getByText('distribution-run-list')).toBeInTheDocument();
     expect(screen.queryByText('preheat-task-list')).not.toBeInTheDocument();
   });
 });

@@ -397,6 +397,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
       message.success(intl.formatMessage({ id: 'common.message.success' }));
     } catch (error) {
       setActionError(extractModelStorageErrorCode(error) || 'unknown');
+      if (confirm.action === 'run') key.current.start();
     } finally {
       setActionLoadingId(undefined);
     }
