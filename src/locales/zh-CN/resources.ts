@@ -351,6 +351,8 @@ export default {
     '确定对同步策略“{name}”执行此操作吗？',
   'resources.storage.syncPolicy.maintenanceReadonly':
     '当前 S3 配置处于维护模式，仅可修改策略名称；停用后不能重新启用或立即执行。',
+  'resources.storage.syncPolicy.windowStart': '执行窗口',
+  'resources.storage.syncPolicy.modelFile': '模型文件',
   'resources.storage.distributionPolicy.tab': '分发策略（持续补齐）',
   'resources.storage.preheatPolicy.tab': '预热策略（手动 / Cron）',
   'resources.storage.distributionPolicy.kind': '分发已有 S3 模型',

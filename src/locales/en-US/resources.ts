@@ -444,6 +444,8 @@ export default {
     'Apply this action to sync policy “{name}”?',
   'resources.storage.syncPolicy.maintenanceReadonly':
     'The current S3 profile is in maintenance mode. Only the policy name can be changed; a disabled policy cannot be re-enabled or run.',
+  'resources.storage.syncPolicy.windowStart': 'Window Start',
+  'resources.storage.syncPolicy.modelFile': 'Model File',
   'resources.storage.distributionPolicy.tab':
     'Distribution Policies (Continuous)',
   'resources.storage.preheatPolicy.tab': 'Preheat Policies (Manual / Cron)',

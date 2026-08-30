@@ -3,6 +3,7 @@ import ScrollerModal from '@/components/scroller-modal';
 import {
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   PlusOutlined,
@@ -13,14 +14,18 @@ import { useIntl } from '@umijs/max';
 import {
   Alert,
   Button,
+  Descriptions,
   Form,
   Input,
   message,
+  Modal,
+  Progress,
   Select,
   Space,
   Table,
   Tag,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd';
 import dayjs from 'dayjs';
 import React, {
@@ -36,6 +41,7 @@ import {
   queryModelFilesList,
   queryModelPreheatS3Profiles,
   queryModelStorageSyncPolicies,
+  queryModelStorageSyncPolicyRun,
   queryWorkersList,
   runModelStorageSyncPolicyNow,
   updateModelStorageSyncPolicy
@@ -45,6 +51,8 @@ import {
   extractModelStorageErrorCode,
   getModelFileStorageModelId,
   getModelFileSyncActionState,
+  getModelStorageErrorPresentation,
+  getModelStorageTaskStatusPresentation,
   IdempotencyKeyLifecycle,
   LatestRequestGate,
   loadAllPaginated
@@ -55,6 +63,7 @@ import type {
   ModelPreheatS3Profile,
   ModelStorageSyncPolicy,
   ModelStorageSyncPolicyCreate,
+  ModelStorageSyncPolicyRun,
   ModelStorageSyncScope
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
@@ -67,6 +76,9 @@ import ScheduleEditor, {
 } from './model-storage-schedule-editor';
 
 type Action = 'enable' | 'disable' | 'run' | 'delete';
+
+const ACTIVE_RUN_STATES = new Set(['waiting', 'running', 'paused']);
+const FAILED_RUN_STATES = new Set(['error', 'partial_error']);
 
 const defaults: ModelStorageSyncPolicyCreate = {
   name: '',
@@ -106,16 +118,33 @@ const ModelStorageSyncPolicies: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const key = useRef(new IdempotencyKeyLifecycle());
   const policyRequests = useRef(new LatestRequestGate());
+  const runDetailRequests = useRef(new LatestRequestGate());
   const editorRequestId = useRef(0);
   const scope = Form.useWatch('scope', form);
+  const [runDetail, setRunDetail] = useState<ModelStorageSyncPolicyRun | null>(
+    null
+  );
+  const [runDetailOpen, setRunDetailOpen] = useState(false);
+  const [runDetailLoading, setRunDetailLoading] = useState(false);
+  const [runDetailError, setRunDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (confirm) setActionError(null);
   }, [confirm?.action, confirm?.policy.id]);
 
-  const load = useCallback(() => {
+  useEffect(
+    () => () => {
+      policyRequests.current.invalidate();
+      runDetailRequests.current.invalidate();
+      key.current.abandon();
+    },
+    []
+  );
+
+  const load = useCallback(async () => {
     setLoading(true);
-    return policyRequests.current.run(
+    let hasActiveRuns = false;
+    const accepted = await policyRequests.current.run(
       () =>
         Promise.all([
           queryModelStorageSyncPolicies({
@@ -131,15 +160,48 @@ const ModelStorageSyncPolicies: React.FC = () => {
         setItems(result.items);
         setTotal(result.pagination.total);
         setProfiles(profileItems);
+        hasActiveRuns = result.items.some((policy) =>
+          ['waiting', 'running'].includes(
+            policy.latest_run?.execution_state || ''
+          )
+        );
       },
       () => setLoading(false)
     );
+    return accepted ? hasActiveRuns : false;
   }, [page, pageSize, search]);
 
   useEffect(() => {
     void load();
     return () => policyRequests.current.invalidate();
   }, [load]);
+
+  const hasActiveRuns = items.some((policy) =>
+    ['waiting', 'running'].includes(policy.latest_run?.execution_state || '')
+  );
+
+  useEffect(() => {
+    if (!hasActiveRuns) return;
+    let stopped = false;
+    let timer: number | undefined;
+    const schedule = () => {
+      if (stopped) return;
+      timer = window.setTimeout(async () => {
+        let continuePolling = true;
+        try {
+          continuePolling = await load();
+        } catch {
+          continuePolling = true;
+        }
+        if (!stopped && continuePolling) schedule();
+      }, 2000);
+    };
+    schedule();
+    return () => {
+      stopped = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [hasActiveRuns, load]);
 
   const openEditor = async (record?: ModelStorageSyncPolicy) => {
     const requestId = ++editorRequestId.current;
@@ -197,6 +259,52 @@ const ModelStorageSyncPolicies: React.FC = () => {
     setDependencyLoading(false);
     setOpen(false);
   };
+
+  const openRunDetail = async (policyId: number, runId: number) => {
+    setRunDetailOpen(true);
+    setRunDetail(null);
+    setRunDetailError(null);
+    setRunDetailLoading(true);
+    try {
+      await runDetailRequests.current.run(
+        () => queryModelStorageSyncPolicyRun(policyId, runId),
+        setRunDetail,
+        () => setRunDetailLoading(false)
+      );
+    } catch (error) {
+      setRunDetailError(extractModelStorageErrorCode(error) || 'unknown');
+      setRunDetailLoading(false);
+    }
+  };
+
+  const closeRunDetail = () => {
+    runDetailRequests.current.invalidate();
+    setRunDetailOpen(false);
+    setRunDetail(null);
+    setRunDetailError(null);
+    setRunDetailLoading(false);
+  };
+
+  useEffect(() => {
+    if (!runDetailOpen || !runDetail) return;
+    if (!ACTIVE_RUN_STATES.has(runDetail.execution_state)) return;
+    let stopped = false;
+    const timer = window.setTimeout(async () => {
+      if (stopped) return;
+      try {
+        await runDetailRequests.current.run(
+          () => queryModelStorageSyncPolicyRun(runDetail.policy_id, runDetail.id),
+          setRunDetail
+        );
+      } catch (error) {
+        setRunDetailError(extractModelStorageErrorCode(error) || 'unknown');
+      }
+    }, 2000);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [runDetail, runDetailOpen]);
 
   const profileInMaintenance = (policy: ModelStorageSyncPolicy) =>
     profiles.find((item) => item.id === policy.profile_id)?.lifecycle_state ===
@@ -268,11 +376,17 @@ const ModelStorageSyncPolicies: React.FC = () => {
       if (confirm.action === 'delete')
         await deleteModelStorageSyncPolicy(confirm.policy.id);
       else if (confirm.action === 'run') {
-        await runModelStorageSyncPolicyNow(
+        const run = await runModelStorageSyncPolicyNow(
           confirm.policy.id,
           key.current.current()
         );
         key.current.complete();
+        void openRunDetail(confirm.policy.id, run.id);
+        if (FAILED_RUN_STATES.has(run.execution_state)) {
+          setConfirm(null);
+          await load();
+          return;
+        }
       } else
         await updateModelStorageSyncPolicy(confirm.policy.id, {
           enabled: confirm.action === 'enable'
@@ -387,6 +501,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
         rowKey="id"
         loading={loading}
         dataSource={items}
+        scroll={{ x: 1050 }}
         pagination={{
           current: page,
           pageSize,
@@ -429,11 +544,118 @@ const ModelStorageSyncPolicies: React.FC = () => {
           },
           {
             title: intl.formatMessage({
-              id: 'resources.preheat.schedule.nextRun'
+              id: 'resources.storage.distributionPolicy.latestRun'
             }),
-            dataIndex: 'next_run_at',
-            render: (value) =>
-              value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+            key: 'latest_run',
+            width: 140,
+            render: (_, record) =>
+              record.latest_run ? (
+                <Tag
+                  color={
+                    ['error', 'partial_error'].includes(
+                      record.latest_run.execution_state
+                    )
+                      ? 'error'
+                      : ['waiting', 'running', 'paused'].includes(
+                            record.latest_run.execution_state
+                          )
+                        ? 'processing'
+                        : 'success'
+                  }
+                >
+                  {intl.formatMessage({
+                    id: `resources.storage.distributionPolicy.execution.${record.latest_run.execution_state}`
+                  })}
+                </Tag>
+              ) : (
+                intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.notExecuted'
+                })
+              )
+          },
+          {
+            title: intl.formatMessage({
+              id: 'resources.storage.distributionPolicy.progress'
+            }),
+            key: 'progress',
+            width: 190,
+            render: (_, record) => {
+              const summary = record.latest_run?.summary;
+              if (!summary) return '-';
+              const completed = summary.ready + summary.error + summary.skipped;
+              return (
+                <Space direction="vertical" size={0} style={{ width: 150 }}>
+                  <Typography.Text type="secondary">
+                    {intl.formatMessage(
+                      {
+                        id: 'resources.storage.distributionPolicy.progressCount'
+                      },
+                      { completed, total: summary.total }
+                    )}
+                  </Typography.Text>
+                  <Progress
+                    percent={Math.max(
+                      0,
+                      Math.min(100, Math.round(summary.progress))
+                    )}
+                    size="small"
+                    showInfo={false}
+                  />
+                </Space>
+              );
+            }
+          },
+          {
+            title: intl.formatMessage({
+              id: 'resources.storage.distributionPolicy.latestError'
+            }),
+            key: 'latest_error',
+            width: 210,
+            render: (_, record) => {
+              const errorCode = record.latest_run?.error_code;
+              if (!errorCode) return '-';
+              const presentation = getModelStorageErrorPresentation(errorCode);
+              return (
+                <Typography.Text
+                  type="danger"
+                  copyable={{ text: presentation.value }}
+                  ellipsis={{
+                    tooltip: intl.formatMessage({ id: presentation.messageId })
+                  }}
+                >
+                  {intl.formatMessage({ id: presentation.messageId })}
+                </Typography.Text>
+              );
+            }
+          },
+          {
+            title: intl.formatMessage({
+              id: 'resources.storage.distributionPolicy.runTimes'
+            }),
+            key: 'run_times',
+            width: 180,
+            render: (_, record) => (
+              <Space direction="vertical" size={0}>
+                <Typography.Text type="secondary">
+                  {intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.lastRunAt'
+                  })}
+                  :{' '}
+                  {record.last_run_at
+                    ? dayjs(record.last_run_at).format('YYYY-MM-DD HH:mm:ss')
+                    : '-'}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  {intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.nextRunAt'
+                  })}
+                  :{' '}
+                  {record.next_run_at
+                    ? dayjs(record.next_run_at).format('YYYY-MM-DD HH:mm:ss')
+                    : '-'}
+                </Typography.Text>
+              </Space>
+            )
           },
           {
             title: intl.formatMessage({ id: 'common.table.status' }),
@@ -452,9 +674,9 @@ const ModelStorageSyncPolicies: React.FC = () => {
           },
           {
             title: intl.formatMessage({ id: 'common.table.operation' }),
-            width: 190,
+            width: 230,
             render: (_, record) => (
-              <Space size={2}>
+              <Space size={4}>
                 <Tooltip
                   title={intl.formatMessage({ id: 'common.button.edit' })}
                 >
@@ -465,6 +687,28 @@ const ModelStorageSyncPolicies: React.FC = () => {
                       id: 'common.button.edit'
                     })}
                     onClick={() => void openEditor(record)}
+                  />
+                </Tooltip>
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: record.latest_run
+                      ? 'resources.storage.distributionPolicy.runDetail'
+                      : 'resources.storage.distributionPolicy.notExecuted'
+                  })}
+                >
+                  <Button
+                    type="text"
+                    icon={<EyeOutlined />}
+                    disabled={
+                      actionLoadingId === record.id || !record.latest_run
+                    }
+                    aria-label={intl.formatMessage({
+                      id: 'resources.storage.distributionPolicy.runDetail'
+                    })}
+                    onClick={() =>
+                      record.latest_run &&
+                      void openRunDetail(record.id, record.latest_run.id)
+                    }
                   />
                 </Tooltip>
                 <Tooltip
@@ -698,6 +942,178 @@ const ModelStorageSyncPolicies: React.FC = () => {
           )}
         </Form>
       </ScrollerModal>
+      <Modal
+        open={runDetailOpen}
+        centered
+        width={860}
+        title={intl.formatMessage({
+          id: 'resources.storage.distributionPolicy.runDetail'
+        })}
+        footer={null}
+        loading={runDetailLoading}
+        styles={{ body: { maxHeight: '68vh', overflowY: 'auto' } }}
+        onCancel={closeRunDetail}
+      >
+        {runDetailError && (
+          <ModelStorageErrorAlert
+            errorCode={runDetailError}
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {runDetail && (
+          <>
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.executionState'
+                })}
+              >
+                {intl.formatMessage({
+                  id: `resources.storage.distributionPolicy.execution.${runDetail.execution_state}`
+                })}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.progress'
+                })}
+              >
+                {Math.round(runDetail.summary.progress)}%
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.preheat.schedule.triggerMode'
+                })}
+              >
+                {intl.formatMessage({
+                  id: `resources.preheat.schedule.triggerMode.${runDetail.trigger}`
+                })}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({ id: 'resources.preheat.attempt' })}
+              >
+                {runDetail.attempt}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.storage.syncPolicy.windowStart'
+                })}
+              >
+                {runDetail.window_start_utc
+                  ? dayjs(runDetail.window_start_utc).format(
+                      'YYYY-MM-DD HH:mm:ss'
+                    )
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.startedAt'
+                })}
+              >
+                {runDetail.started_at
+                  ? dayjs(runDetail.started_at).format('YYYY-MM-DD HH:mm:ss')
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.finishedAt'
+                })}
+              >
+                {runDetail.finished_at
+                  ? dayjs(runDetail.finished_at).format('YYYY-MM-DD HH:mm:ss')
+                  : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+            {runDetail.error_code && (
+              <ModelStorageErrorAlert
+                errorCode={runDetail.error_code}
+                type="error"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+            <Table
+              rowKey={(task) =>
+                `${task.id || 'task'}:${task.model_file_id || ''}:${task.worker_uuid || task.worker_id || ''}:${task.error_code || ''}`
+              }
+              style={{ marginTop: 16 }}
+              size="small"
+              pagination={false}
+              dataSource={runDetail.tasks}
+              scroll={{ x: 760 }}
+              columns={[
+                {
+                  title: intl.formatMessage({
+                    id: 'resources.storage.syncPolicy.modelFile'
+                  }),
+                  dataIndex: 'model_file_id',
+                  width: 120,
+                  render: (value: number | null) => value ?? '-'
+                },
+                {
+                  title: intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.worker'
+                  }),
+                  key: 'worker',
+                  ellipsis: true,
+                  render: (_, task) => task.worker_uuid || task.worker_id || '-'
+                },
+                {
+                  title: intl.formatMessage({ id: 'common.table.status' }),
+                  dataIndex: 'state',
+                  width: 120,
+                  render: (value: string) =>
+                    intl.formatMessage({
+                      id:
+                        value === 'skipped'
+                          ? 'resources.storage.distributionPolicy.taskState.skipped'
+                          : getModelStorageTaskStatusPresentation(value).messageId
+                    })
+                },
+                {
+                  title: intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.progress'
+                  }),
+                  dataIndex: 'progress',
+                  width: 150,
+                  render: (value: number) => (
+                    <Progress percent={Math.round(value)} size="small" />
+                  )
+                },
+                {
+                  title: intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.failureReason'
+                  }),
+                  key: 'error',
+                  width: 240,
+                  render: (_, task) => {
+                    if (!task.error_code) return '-';
+                    const presentation = getModelStorageErrorPresentation(
+                      task.error_code
+                    );
+                    return (
+                      <Space direction="vertical" size={0}>
+                        <Typography.Text
+                          type={task.state === 'error' ? 'danger' : 'secondary'}
+                        >
+                          {intl.formatMessage({ id: presentation.messageId })}
+                        </Typography.Text>
+                        <Typography.Text
+                          code
+                          copyable={{ text: presentation.value }}
+                        >
+                          {presentation.value}
+                        </Typography.Text>
+                      </Space>
+                    );
+                  }
+                }
+              ]}
+            />
+          </>
+        )}
+      </Modal>
       <ModelPreheatConfirmModal
         open={Boolean(confirm)}
         title={intl.formatMessage({

@@ -37,6 +37,7 @@ import {
   deleteModelPreheatSchedule,
   queryModelPreheatPolicies,
   queryModelPreheatPolicyRun,
+  queryModelPreheatScheduleRun,
   queryModelPreheatSchedules,
   reconcileModelPreheatPolicy,
   runModelPreheatScheduleNow,
@@ -54,7 +55,8 @@ import type {
   ModelPreheatCreate,
   ModelPreheatDistributionPolicy,
   ModelPreheatDistributionPolicyRun,
-  ModelPreheatSchedule
+  ModelPreheatSchedule,
+  ModelPreheatScheduleRun
 } from '../config/types';
 import ModelDistributionPolicyModal from './model-distribution-policy-modal';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
@@ -69,6 +71,9 @@ type ActionLoading = {
   id: number;
   action: ContinuousAction | ScheduleAction;
 };
+
+const ACTIVE_RUN_STATES = new Set(['waiting', 'running', 'paused']);
+const FAILED_RUN_STATES = new Set(['error', 'partial_error']);
 
 const DISTRIBUTION_TASK_STATES = new Set([
   'pending',
@@ -111,8 +116,9 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const [continuousOpen, setContinuousOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] =
     useState<ModelPreheatDistributionPolicy | null>(null);
-  const [runDetail, setRunDetail] =
-    useState<ModelPreheatDistributionPolicyRun | null>(null);
+  const [runDetail, setRunDetail] = useState<
+    ModelPreheatDistributionPolicyRun | ModelPreheatScheduleRun | null
+  >(null);
   const [runDetailOpen, setRunDetailOpen] = useState(false);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
@@ -187,7 +193,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     setScheduleLoading(true);
     setScheduleError(false);
     try {
-      return await scheduleRequests.current.run(
+      let hasActiveRuns = false;
+      const accepted = await scheduleRequests.current.run(
         () =>
           queryModelPreheatSchedules({
             page: schedulePage,
@@ -196,9 +203,15 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         (result) => {
           setSchedules(result.items);
           setScheduleTotal(result.pagination.total);
+          hasActiveRuns = result.items.some((schedule) =>
+            ['waiting', 'running'].includes(
+              schedule.latest_run?.execution_state || ''
+            )
+          );
         },
         () => setScheduleLoading(false)
       );
+      return accepted ? hasActiveRuns : false;
     } catch (error) {
       setScheduleError(true);
       throw error;
@@ -211,7 +224,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   }, [loadPolicies, mode]);
 
   const hasActivePolicyRuns = policies.some((policy) =>
-    ['waiting', 'running'].includes(policy.latest_run?.execution_state || '')
+    ACTIVE_RUN_STATES.has(policy.latest_run?.execution_state || '')
   );
 
   useEffect(() => {
@@ -241,6 +254,33 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     if (mode === 'distribution') return;
     void loadSchedules().catch(() => undefined);
   }, [loadSchedules, mode]);
+
+  const hasActiveScheduleRuns = schedules.some((schedule) =>
+    ACTIVE_RUN_STATES.has(schedule.latest_run?.execution_state || '')
+  );
+
+  useEffect(() => {
+    if (mode === 'distribution' || !hasActiveScheduleRuns) return;
+    let stopped = false;
+    let timer: number | undefined;
+    const schedule = () => {
+      if (stopped) return;
+      timer = window.setTimeout(async () => {
+        let continuePolling = true;
+        try {
+          continuePolling = await loadSchedules();
+        } catch {
+          continuePolling = true;
+        }
+        if (!stopped && continuePolling) schedule();
+      }, 2000);
+    };
+    schedule();
+    return () => {
+      stopped = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [hasActiveScheduleRuns, loadSchedules, mode]);
 
   useEffect(
     () => () => {
@@ -351,11 +391,17 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       if (scheduleConfirm.action === 'delete') {
         await deleteModelPreheatSchedule(scheduleConfirm.schedule.id);
       } else if (scheduleConfirm.action === 'run') {
-        await runModelPreheatScheduleNow(
+        const run = await runModelPreheatScheduleNow(
           scheduleConfirm.schedule.id,
           runIdempotency.current.current()
         );
         runIdempotency.current.complete();
+        void openScheduleRunDetail(scheduleConfirm.schedule.id, run.id);
+        if (FAILED_RUN_STATES.has(run.execution_state)) {
+          setScheduleConfirm(null);
+          await loadSchedules();
+          return;
+        }
       } else {
         await updateModelPreheatSchedule(scheduleConfirm.schedule.id, {
           enabled: scheduleConfirm.action === 'enable'
@@ -403,6 +449,23 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     }
   };
 
+  const openScheduleRunDetail = async (scheduleId: number, runId: number) => {
+    setRunDetailOpen(true);
+    setRunDetail(null);
+    setRunDetailError(null);
+    setRunDetailLoading(true);
+    try {
+      await runDetailRequests.current.run(
+        () => queryModelPreheatScheduleRun(scheduleId, runId),
+        setRunDetail,
+        () => setRunDetailLoading(false)
+      );
+    } catch (error) {
+      setRunDetailError(extractModelStorageErrorCode(error) || 'unknown');
+      setRunDetailLoading(false);
+    }
+  };
+
   const closeRunDetail = () => {
     runDetailRequests.current.invalidate();
     setRunDetailOpen(false);
@@ -410,6 +473,30 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
     setRunDetailError(null);
     setRunDetailLoading(false);
   };
+
+  useEffect(() => {
+    if (!runDetailOpen || !runDetail) return;
+    if (!ACTIVE_RUN_STATES.has(runDetail.execution_state)) return;
+    let stopped = false;
+    const timer = window.setTimeout(async () => {
+      if (stopped) return;
+      try {
+        await runDetailRequests.current.run(
+          () =>
+            'schedule_id' in runDetail
+              ? queryModelPreheatScheduleRun(runDetail.schedule_id, runDetail.id)
+              : queryModelPreheatPolicyRun(runDetail.id),
+          setRunDetail
+        );
+      } catch (error) {
+        setRunDetailError(extractModelStorageErrorCode(error) || 'unknown');
+      }
+    }, 2000);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [runDetail, runDetailOpen]);
 
   const continuousColumns = useMemo(
     () => [
@@ -483,8 +570,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         render: (_: unknown, policy: ModelPreheatDistributionPolicy) => {
           const summary = policy.latest_run?.summary;
           if (!summary) return '-';
-          const completed =
-            summary.ready + summary.error + summary.failed + summary.skipped;
+          const completed = summary.ready + summary.error + summary.skipped;
           return (
             <Space direction="vertical" size={0} style={{ width: 150 }}>
               <Typography.Text type="secondary">
@@ -733,6 +819,92 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
             : value
       },
       {
+        title: intl.formatMessage({
+          id: 'resources.storage.distributionPolicy.latestRun'
+        }),
+        key: 'latest_run',
+        width: 140,
+        render: (_: unknown, schedule: ModelPreheatSchedule) =>
+          schedule.latest_run ? (
+            <Tag
+              color={
+                ['error', 'partial_error'].includes(
+                  schedule.latest_run.execution_state
+                )
+                  ? 'error'
+                  : ['waiting', 'running', 'paused'].includes(
+                        schedule.latest_run.execution_state
+                      )
+                    ? 'processing'
+                    : 'success'
+              }
+            >
+              {intl.formatMessage({
+                id: `resources.storage.distributionPolicy.execution.${schedule.latest_run.execution_state}`
+              })}
+            </Tag>
+          ) : (
+            intl.formatMessage({
+              id: 'resources.storage.distributionPolicy.notExecuted'
+            })
+          )
+      },
+      {
+        title: intl.formatMessage({
+          id: 'resources.storage.distributionPolicy.progress'
+        }),
+        key: 'progress',
+        width: 190,
+        render: (_: unknown, schedule: ModelPreheatSchedule) => {
+          const summary = schedule.latest_run?.summary;
+          if (!summary) return '-';
+          const completed = summary.ready + summary.error + summary.skipped;
+          return (
+            <Space direction="vertical" size={0} style={{ width: 150 }}>
+              <Typography.Text type="secondary">
+                {intl.formatMessage(
+                  {
+                    id: 'resources.storage.distributionPolicy.progressCount'
+                  },
+                  { completed, total: summary.total }
+                )}
+              </Typography.Text>
+              <Progress
+                percent={Math.max(
+                  0,
+                  Math.min(100, Math.round(summary.progress))
+                )}
+                size="small"
+                showInfo={false}
+              />
+            </Space>
+          );
+        }
+      },
+      {
+        title: intl.formatMessage({
+          id: 'resources.storage.distributionPolicy.latestError'
+        }),
+        key: 'latest_error',
+        width: 210,
+        render: (_: unknown, schedule: ModelPreheatSchedule) => {
+          const errorCode = schedule.latest_run?.error_code;
+          if (!errorCode) return '-';
+          const presentation = getModelStorageErrorPresentation(errorCode);
+          return (
+            <Typography.Text
+              type="danger"
+              copyable={{ text: presentation.value }}
+              ellipsis={{
+                tooltip: intl.formatMessage({ id: presentation.messageId })
+              }}
+            >
+              {intl.formatMessage({ id: presentation.messageId })}
+            </Typography.Text>
+          );
+        }
+      },
+      {
         title: intl.formatMessage({ id: 'resources.preheat.schedule.nextRun' }),
         dataIndex: 'next_window_start_utc',
         width: 180,
@@ -753,7 +925,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       {
         title: intl.formatMessage({ id: 'common.table.operation' }),
         key: 'operation',
-        width: 170,
+        width: 210,
         render: (_: unknown, schedule: ModelPreheatSchedule) => {
           const toggleAction = schedule.enabled ? 'disable' : 'enable';
           const runReason = scheduleActionDisabledReason(schedule, 'run');
@@ -776,6 +948,29 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                     setEditingSchedule(schedule);
                     setScheduleOpen(true);
                   }}
+                />
+              </Tooltip>
+              <Tooltip
+                title={intl.formatMessage({
+                  id: schedule.latest_run
+                    ? 'resources.storage.distributionPolicy.runDetail'
+                    : 'resources.storage.distributionPolicy.notExecuted'
+                })}
+              >
+                <Button
+                  type="text"
+                  icon={<EyeOutlined />}
+                  aria-label={intl.formatMessage({
+                    id: 'resources.storage.distributionPolicy.runDetail'
+                  })}
+                  disabled={hasActionInFlight || !schedule.latest_run}
+                  onClick={() =>
+                    schedule.latest_run &&
+                    void openScheduleRunDetail(
+                      schedule.id,
+                      schedule.latest_run.id
+                    )
+                  }
                 />
               </Tooltip>
               <Tooltip
@@ -956,7 +1151,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                       columns={scheduleColumns}
                       dataSource={schedules}
                       loading={scheduleLoading}
-                      scroll={{ x: 900 }}
+                      scroll={{ x: 1250 }}
                       pagination={{
                         current: schedulePage,
                         pageSize: schedulePageSize,

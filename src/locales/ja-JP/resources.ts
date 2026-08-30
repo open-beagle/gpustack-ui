@@ -438,6 +438,8 @@ export default {
     '対象の S3 プロファイルはメンテナンス中です。',
   'resources.storage.syncPolicy.disabled.policyDisabled':
     'ポリシーは無効です。',
+  'resources.storage.syncPolicy.windowStart': '実行ウィンドウ',
+  'resources.storage.syncPolicy.modelFile': 'モデルファイル',
   'resources.preheat.policy.disabled.profileStale':
     'S3 プロファイルのバージョンが変更されています。先にポリシーを再調整してください。',
   'resources.preheat.policy.disabled.blocked':

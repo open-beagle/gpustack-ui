@@ -615,6 +615,7 @@ export interface ModelStorageSyncPolicy extends ModelStorageSyncPolicyCreate {
   id: number;
   next_run_at: string | null;
   last_run_at: string | null;
+  latest_run?: ModelStorageSyncPolicyRun | null;
   created_at: string;
   updated_at: string;
 }
@@ -624,7 +625,14 @@ export interface ModelStorageSyncPolicyRun {
   policy_id: number;
   trigger: 'manual' | 'scheduled';
   state: 'pending' | 'ready' | 'error';
+  execution_state: PolicyRunExecutionState;
+  summary: PolicyRunSummary;
+  tasks: PolicyRunTask[];
+  window_start_utc: string;
+  attempt: number;
+  response_payload: ModelStorageSyncBatchResult | null;
   error_code: string | null;
+  started_at: string | null;
   finished_at: string | null;
   created_at: string;
   updated_at: string;
@@ -696,6 +704,7 @@ export interface ModelPreheatSchedule extends ModelPreheatScheduleCreate {
   enabled: boolean;
   next_window_start_utc: string | null;
   last_window_start_utc: string | null;
+  latest_run?: ModelPreheatScheduleRun | null;
   created_at: string;
   updated_at: string;
 }
@@ -707,6 +716,9 @@ export interface ModelPreheatScheduleRun {
   window_end_utc: string;
   trigger: 'scheduled' | 'manual';
   state: ModelPreheatScheduleRunState;
+  execution_state: PolicyRunExecutionState;
+  summary: PolicyRunSummary;
+  tasks: PolicyRunTask[];
   task_id: number | null;
   error_code: string | null;
   started_at: string | null;

@@ -595,7 +595,7 @@ describe('分发策略 D1 闭环', () => {
     expect(screen.queryByText('artifact-a')).not.toBeInTheDocument();
   });
 
-  it('waiting/running 自动轮询，paused 和终态停止，手动执行后刷新真实状态', async () => {
+  it('waiting/running/paused 自动轮询，终态停止，手动执行后刷新真实状态', async () => {
     let poll: (() => void) | undefined;
     const nativeSetTimeout = window.setTimeout.bind(window);
     vi.spyOn(window, 'setTimeout').mockImplementation(((
@@ -641,7 +641,7 @@ describe('分发策略 D1 闭环', () => {
     await screen.findByText(
       'resources.storage.distributionPolicy.execution.paused'
     );
-    expect(timeout).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+    expect(timeout).toHaveBeenCalledWith(expect.any(Function), 2000);
 
     api.queryModelPreheatPolicies.mockResolvedValueOnce(
       page([policy({ latest_run: run('running') })])

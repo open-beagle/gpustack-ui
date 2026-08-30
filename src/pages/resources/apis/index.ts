@@ -275,6 +275,16 @@ export async function runModelStorageSyncPolicyNow(
   );
 }
 
+export async function queryModelStorageSyncPolicyRun(
+  policyId: number,
+  runId: number
+) {
+  return request<ModelStorageSyncPolicyRun>(
+    `${MODEL_STORAGE_SYNC_POLICIES_API}/${policyId}/runs/${runId}`,
+    { method: 'GET' }
+  );
+}
+
 export interface ModelStorageArtifactListParams extends Global.SearchParams {
   source?: ModelStorageArtifact['source'];
   manifest_state?: string;
@@ -446,5 +456,15 @@ export async function runModelPreheatScheduleNow(
       headers: { 'Idempotency-Key': idempotencyKey },
       skipErrorHandler: true
     }
+  );
+}
+
+export async function queryModelPreheatScheduleRun(
+  scheduleId: number,
+  runId: number
+) {
+  return request<ModelPreheatScheduleRun>(
+    `${MODEL_PREHEAT_SCHEDULES_API}/${scheduleId}/runs/${runId}`,
+    { method: 'GET' }
   );
 }

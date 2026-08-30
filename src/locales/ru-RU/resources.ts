@@ -440,6 +440,8 @@ export default {
   'resources.preheat.delivery.s3_and_workers': 'Публиковать в S3 и воркеры',
   'resources.preheat.connectivity.createAnyway': 'Всё равно создать',
   'resources.storage.syncPolicy.disabled.policyDisabled': 'Политика отключена.',
+  'resources.storage.syncPolicy.windowStart': 'Окно запуска',
+  'resources.storage.syncPolicy.modelFile': 'Файл модели',
   'resources.preheat.policy.disabled.profileStale':
     'Версия профиля S3 изменилась. Сначала выполните повторное согласование политики.',
   'resources.preheat.policy.disabled.blocked':

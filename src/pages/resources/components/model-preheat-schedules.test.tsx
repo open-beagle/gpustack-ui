@@ -8,6 +8,7 @@ import {
   within
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   ModelPreheatDistributionPolicy,
@@ -24,8 +25,10 @@ const api = vi.hoisted(() => ({
   queryModelFilesList: vi.fn(),
   queryModelPreheatS3Profile: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
+  queryModelPreheatScheduleRun: vi.fn(),
   queryModelPreheatS3Profiles: vi.fn(),
   queryModelPreheatSchedules: vi.fn(),
+  queryModelStorageSyncPolicyRun: vi.fn(),
   queryModelStorageSyncPolicies: vi.fn(),
   queryModelStorageArtifacts: vi.fn(),
   queryModelStorageCapabilities: vi.fn(),
@@ -141,6 +144,35 @@ beforeEach(() => {
   api.queryModelPreheatSchedules.mockResolvedValue(
     page([schedule(1, 'manual'), schedule(2, 'scheduled')])
   );
+  api.queryModelPreheatScheduleRun.mockResolvedValue({
+    id: 11,
+    schedule_id: 1,
+    window_start_utc: '2026-08-24T01:00:00Z',
+    window_end_utc: '2026-08-24T02:00:00Z',
+    trigger: 'manual',
+    state: 'ready',
+    execution_state: 'ready',
+    summary: {
+      total: 1,
+      pending: 0,
+      running: 0,
+      paused: 0,
+      ready: 1,
+      error: 0,
+      failed: 0,
+      skipped: 0,
+      progress: 100,
+      downloaded_bytes: 0,
+      total_bytes: 0
+    },
+    tasks: [],
+    task_id: 21,
+    error_code: null,
+    started_at: '2026-08-24T01:00:00Z',
+    finished_at: '2026-08-24T01:01:00Z',
+    created_at: '2026-08-24T01:00:00Z',
+    updated_at: '2026-08-24T01:01:00Z'
+  });
   api.queryModelStorageSyncPolicies.mockResolvedValue(
     page([
       {
@@ -156,11 +188,41 @@ beforeEach(() => {
         worker_uuids: [],
         next_run_at: null,
         last_run_at: null,
+        latest_run: null,
         created_at: '',
         updated_at: ''
       }
     ])
   );
+  api.queryModelStorageSyncPolicyRun.mockResolvedValue({
+    id: 12,
+    policy_id: 31,
+    trigger: 'manual',
+    state: 'ready',
+    execution_state: 'ready',
+    summary: {
+      total: 1,
+      pending: 0,
+      running: 0,
+      paused: 0,
+      ready: 1,
+      error: 0,
+      failed: 0,
+      skipped: 0,
+      progress: 100,
+      downloaded_bytes: 0,
+      total_bytes: 0
+    },
+    tasks: [],
+    window_start_utc: '2026-08-24T01:00:00Z',
+    attempt: 1,
+    response_payload: null,
+    error_code: null,
+    started_at: '2026-08-24T01:00:00Z',
+    finished_at: '2026-08-24T01:01:00Z',
+    created_at: '2026-08-24T01:00:00Z',
+    updated_at: '2026-08-24T01:01:00Z'
+  });
   api.queryModelPreheatS3Profiles.mockResolvedValue(
     page([
       {
@@ -203,7 +265,10 @@ beforeEach(() => {
   api.updateModelPreheatSchedule.mockResolvedValue(schedule(1, 'manual'));
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  message.destroy();
+});
 
 describe('预热策略触发方式', () => {
   it('同步策略使用服务端分页并在筛选、刷新和页大小变化时保留参数', async () => {
@@ -750,6 +815,166 @@ describe('预热策略触发方式', () => {
     ).not.toBeNull();
   });
 
+  it('同步策略立即执行成功后打开运行详情并轮询活动状态', async () => {
+    const user = userEvent.setup();
+    let poll: (() => void) | undefined;
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    vi.spyOn(window, 'setTimeout').mockImplementation(((
+      handler: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (typeof handler === 'function' && timeout === 2000) {
+        poll = handler;
+        return 7101;
+      }
+      return nativeSetTimeout(handler, timeout, ...args);
+    }) as typeof window.setTimeout);
+    api.runModelStorageSyncPolicyNow.mockResolvedValueOnce({ id: 12 });
+    api.queryModelStorageSyncPolicyRun
+      .mockResolvedValueOnce({
+        id: 12,
+        policy_id: 31,
+        trigger: 'manual',
+        state: 'pending',
+        execution_state: 'running',
+        summary: {
+          total: 1,
+          pending: 0,
+          running: 1,
+          paused: 0,
+          ready: 0,
+          error: 0,
+          failed: 0,
+          skipped: 0,
+          progress: 40,
+          downloaded_bytes: 400,
+          total_bytes: 1000
+        },
+        tasks: [],
+        window_start_utc: '2026-08-24T01:00:00Z',
+        attempt: 1,
+        response_payload: null,
+        error_code: null,
+        started_at: '2026-08-24T01:00:00Z',
+        finished_at: null,
+        created_at: '2026-08-24T01:00:00Z',
+        updated_at: '2026-08-24T01:00:30Z'
+      })
+      .mockResolvedValueOnce({
+        id: 12,
+        policy_id: 31,
+        trigger: 'manual',
+        state: 'ready',
+        execution_state: 'ready',
+        summary: {
+          total: 1,
+          pending: 0,
+          running: 0,
+          paused: 0,
+          ready: 1,
+          error: 0,
+          failed: 0,
+          skipped: 0,
+          progress: 100,
+          downloaded_bytes: 1000,
+          total_bytes: 1000
+        },
+        tasks: [],
+        window_start_utc: '2026-08-24T01:00:00Z',
+        attempt: 1,
+        response_payload: null,
+        error_code: null,
+        started_at: '2026-08-24T01:00:00Z',
+        finished_at: '2026-08-24T01:01:00Z',
+        created_at: '2026-08-24T01:00:00Z',
+        updated_at: '2026-08-24T01:01:00Z'
+      });
+    render(<ModelStorageSyncPolicies />);
+
+    const row = (await screen.findByText('sync-policy')).closest('tr')!;
+    await user.click(
+      within(row).getByRole('button', {
+        name: 'resources.preheat.schedule.runNow'
+      })
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'common.button.confirm' })
+    );
+
+    await screen.findByText('resources.storage.distributionPolicy.runDetail');
+    expect(api.runModelStorageSyncPolicyNow).toHaveBeenCalledTimes(1);
+    expect(api.queryModelStorageSyncPolicyRun).toHaveBeenCalledWith(31, 12);
+    expect(
+      await screen.findByText(
+        'resources.storage.distributionPolicy.execution.running'
+      )
+    ).toBeInTheDocument();
+    expect(poll).toBeDefined();
+    await act(async () => poll?.());
+    expect(api.queryModelStorageSyncPolicyRun).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText(
+        'resources.storage.distributionPolicy.execution.ready'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('同步策略立即执行返回失败状态时打开详情且不提示成功', async () => {
+    const user = userEvent.setup();
+    api.runModelStorageSyncPolicyNow.mockResolvedValueOnce({
+      id: 12,
+      execution_state: 'error',
+      error_code: 'worker_protocol_unsupported'
+    });
+    api.queryModelStorageSyncPolicyRun.mockResolvedValueOnce({
+      id: 12,
+      policy_id: 31,
+      trigger: 'manual',
+      state: 'error',
+      execution_state: 'error',
+      summary: {
+        total: 1,
+        pending: 0,
+        running: 0,
+        paused: 0,
+        ready: 0,
+        error: 1,
+        failed: 0,
+        skipped: 0,
+        progress: 100,
+        downloaded_bytes: 0,
+        total_bytes: 0
+      },
+      tasks: [],
+      window_start_utc: '2026-08-24T01:00:00Z',
+      attempt: 1,
+      response_payload: null,
+      error_code: 'worker_protocol_unsupported',
+      started_at: '2026-08-24T01:00:00Z',
+      finished_at: '2026-08-24T01:01:00Z',
+      created_at: '2026-08-24T01:00:00Z',
+      updated_at: '2026-08-24T01:01:00Z'
+    });
+    render(<ModelStorageSyncPolicies />);
+
+    const row = (await screen.findByText('sync-policy')).closest('tr')!;
+    await user.click(
+      within(row).getByRole('button', {
+        name: 'resources.preheat.schedule.runNow'
+      })
+    );
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'common.button.confirm'
+      })
+    );
+
+    expect(await screen.findByText('worker_protocol_unsupported')).toBeInTheDocument();
+    expect(screen.queryByText('common.message.success')).not.toBeInTheDocument();
+  });
+
   it('新建同步策略等待依赖完成后再打开且不闪现旧编辑值', async () => {
     const user = userEvent.setup();
     render(<ModelStorageSyncPolicies />);
@@ -930,9 +1155,13 @@ describe('预热策略触发方式', () => {
 
     expect(api.runModelPreheatScheduleNow).toHaveBeenCalledTimes(1);
     resolveRun({ id: 11 });
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    );
+    await screen.findByText('resources.storage.distributionPolicy.runDetail');
+    expect(api.queryModelPreheatScheduleRun).toHaveBeenCalledWith(1, 11);
+    expect(
+      await screen.findByText(
+        'resources.storage.distributionPolicy.execution.ready'
+      )
+    ).toBeInTheDocument();
   });
 
   it('一条 Schedule 操作提交中不锁定另一条记录', async () => {
