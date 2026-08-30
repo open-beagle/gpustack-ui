@@ -319,6 +319,8 @@ export interface ModelStorageSyncTask {
   model_file_id: number;
   worker_id: number;
   worker_uuid?: string;
+  worker_name?: string | null;
+  worker_ip?: string | null;
   profile_id: number;
   profile_config_version: number;
   source: ModelStorageModelSource;
@@ -336,6 +338,7 @@ export interface ModelStorageSyncTask {
   transfer_profile_id: number | null;
   source_worker_id: number | null;
   source_worker_name: string | null;
+  source_worker_ip?: string | null;
   profile_name: string | null;
   profile_endpoint: string | null;
   profile_bucket: string | null;
@@ -350,6 +353,8 @@ export interface ModelStorageSyncTaskDetail {
   id: number;
   model_file_id: number;
   worker_id: number;
+  worker_name?: string | null;
+  worker_ip?: string | null;
   profile_config_version: number;
   source: ModelStorageModelSource;
   model_id: string;
@@ -363,6 +368,7 @@ export interface ModelStorageSyncTaskDetail {
   transfer_profile_id: number | null;
   source_worker_id: number | null;
   source_worker_name: string | null;
+  source_worker_ip?: string | null;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;
@@ -400,7 +406,11 @@ export interface ModelStorageSyncBatchCreate {
 
 export interface ModelStorageSyncBatchItem {
   model_file_id: number | null;
+  model_id?: string | null;
   worker_id: number | null;
+  worker_uuid?: string | null;
+  worker_name?: string | null;
+  worker_ip?: string | null;
   task_id: number | null;
   reason: string | null;
 }
@@ -567,8 +577,11 @@ export interface PolicyRunSummary {
 export interface PolicyRunTask {
   id: number | null;
   model_file_id: number | null;
+  model_id: string | null;
   worker_id: number | null;
   worker_uuid: string | null;
+  worker_name: string | null;
+  worker_ip: string | null;
   artifact_id: string | null;
   state: string;
   progress: number;

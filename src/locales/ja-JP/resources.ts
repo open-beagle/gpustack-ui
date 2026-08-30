@@ -322,8 +322,14 @@ export default {
   'resources.preheat.schedule.cron': 'Cron 式',
   'resources.preheat.schedule.timezone': 'タイムゾーン',
   'resources.preheat.schedule.window': '実行ウィンドウ（分）',
+  'resources.preheat.schedule.window.help':
+    '定時トリガー後に実行を許可する時間範囲です。この範囲で開始できないバッチは今回の実行外になります。',
   'resources.preheat.schedule.concurrency': '最大同時実行数',
+  'resources.preheat.schedule.concurrency.help':
+    'このポリシーで同時に実行できる Worker サブタスク数です。',
   'resources.preheat.schedule.bandwidth': '帯域上限（Mbps）',
+  'resources.preheat.schedule.bandwidth.help':
+    'Worker ごとのダウンロード/配信帯域を制限します。空の場合は制限しません。',
   'resources.preheat.schedule.nextRun': '次回実行',
   'resources.preheat.schedule.lastRun': '前回実行',
   'resources.preheat.schedule.runNow': '今すぐ 1 回実行',
@@ -425,6 +431,19 @@ export default {
   'resources.preheat.delivery.s3_only': 'S3 のみに公開',
   'resources.preheat.delivery.s3_and_workers': 'S3 と Worker に配信',
   'resources.preheat.connectivity.createAnyway': 'それでも作成',
+  'resources.preheat.revision.help':
+    'リポジトリのブランチ、タグ、コミットを指定します。空の場合はデフォルト版を使用します。',
+  'resources.preheat.seedWorker.help':
+    'ソースリポジトリからダウンロードし、共有 Artifact を S3 に公開する Worker です。',
+  'resources.preheat.includePatterns.help':
+    '一致するファイルだけをダウンロードします。空の場合は全ファイルです。例: *.safetensors、*.json、tokenizer.*。',
+  'resources.preheat.includePatterns.placeholder':
+    '*.safetensors, *.json, tokenizer.*',
+  'resources.preheat.excludePatterns.help':
+    '含まれたファイルから一致するものを除外します。例: *.md、*.txt、original/**。',
+  'resources.preheat.excludePatterns.placeholder': '*.md, *.txt, original/**',
+  'resources.preheat.gguf.quantization.help':
+    '具体的な GGUF 量子化ファイルを選択します。選択内容は包含ルールに反映されます。',
   'resources.storage.sync.unsupportedSource':
     'このソースは S3 同期に対応していません。',
   'resources.storage.sync.modelNotReady':

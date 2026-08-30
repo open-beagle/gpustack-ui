@@ -8,6 +8,7 @@ import {
   Select,
   Space,
   Table,
+  Tooltip,
   Typography
 } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -305,12 +306,38 @@ const ModelStorageSyncBatchModal: React.FC<Props> = ({
               {
                 title: intl.formatMessage({ id: 'resources.storage.model' }),
                 dataIndex: 'model_file_id',
-                render: (value: number | null) => value || '-'
+                render: (_value: number | null, item) =>
+                  item.model_id || item.model_file_id || '-'
               },
               {
-                title: 'Worker ID',
+                title: intl.formatMessage({
+                  id: 'resources.storage.distributionPolicy.worker'
+                }),
                 dataIndex: 'worker_id',
-                render: (value: number | null) => value || '-'
+                render: (_value: number | null, item) => {
+                  const primary =
+                    item.worker_name ||
+                    item.worker_ip ||
+                    item.worker_id ||
+                    item.worker_uuid ||
+                    '-';
+                  const secondary =
+                    item.worker_name && item.worker_ip
+                      ? item.worker_ip
+                      : item.worker_uuid || '';
+                  return (
+                    <Tooltip title={item.worker_uuid || String(primary)}>
+                      <Space direction="vertical" size={0}>
+                        <Typography.Text>{primary}</Typography.Text>
+                        {secondary && secondary !== primary && (
+                          <Typography.Text type="secondary">
+                            {secondary}
+                          </Typography.Text>
+                        )}
+                      </Space>
+                    </Tooltip>
+                  );
+                }
               },
               {
                 title: 'Task ID',

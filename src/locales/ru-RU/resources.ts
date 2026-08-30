@@ -318,9 +318,15 @@ export default {
   'resources.preheat.schedule.cron': 'Выражение Cron',
   'resources.preheat.schedule.timezone': 'Часовой пояс',
   'resources.preheat.schedule.window': 'Окно выполнения (минуты)',
+  'resources.preheat.schedule.window.help':
+    'Окно, в течение которого задача может выполняться после запуска по расписанию.',
   'resources.preheat.schedule.concurrency': 'Максимальная параллельность',
+  'resources.preheat.schedule.concurrency.help':
+    'Максимальное число подзадач Worker, выполняемых одновременно.',
   'resources.preheat.schedule.bandwidth':
     'Лимит пропускной способности (Мбит/с)',
+  'resources.preheat.schedule.bandwidth.help':
+    'Ограничивает скорость загрузки/распространения на Worker. Пусто означает без лимита.',
   'resources.preheat.schedule.nextRun': 'Следующий запуск',
   'resources.preheat.schedule.lastRun': 'Последний запуск',
   'resources.preheat.schedule.runNow': 'Выполнить сейчас',
@@ -410,7 +416,7 @@ export default {
   'resources.storage.scanSucceededAt': 'Последний успех',
   'resources.storage.scanResult': 'Результат',
   'resources.storage.scanResult.success': 'Просканировано моделей: {count}',
-  'resources.storage.artifactId': 'ID модели',
+  'resources.storage.artifactId': 'Artifact ID',
   'resources.storage.manifestDigest': 'Хеш манифеста',
   'resources.storage.manifestPath': 'Путь манифеста',
   'resources.storage.includePatterns': 'Включаемые шаблоны',
@@ -439,6 +445,19 @@ export default {
   'resources.preheat.delivery.s3_only': 'Публиковать только в S3',
   'resources.preheat.delivery.s3_and_workers': 'Публиковать в S3 и воркеры',
   'resources.preheat.connectivity.createAnyway': 'Всё равно создать',
+  'resources.preheat.revision.help':
+    'Укажите ветку, тег или коммит репозитория. Оставьте пустым для версии по умолчанию.',
+  'resources.preheat.seedWorker.help':
+    'Worker, который загружает модель из исходного репозитория и публикует общий Artifact в S3.',
+  'resources.preheat.includePatterns.help':
+    'Загружать только подходящие файлы. Пусто означает все файлы. Примеры glob: *.safetensors, *.json, tokenizer.*.',
+  'resources.preheat.includePatterns.placeholder':
+    '*.safetensors, *.json, tokenizer.*',
+  'resources.preheat.excludePatterns.help':
+    'Исключить совпадающие файлы из выбранного набора. Примеры: *.md, *.txt, original/**.',
+  'resources.preheat.excludePatterns.placeholder': '*.md, *.txt, original/**',
+  'resources.preheat.gguf.quantization.help':
+    'Выберите конкретный квантованный GGUF-файл. Выбор будет записан в правила включения.',
   'resources.storage.syncPolicy.disabled.policyDisabled': 'Политика отключена.',
   'resources.storage.syncPolicy.windowStart': 'Окно запуска',
   'resources.storage.syncPolicy.modelFile': 'Файл модели',

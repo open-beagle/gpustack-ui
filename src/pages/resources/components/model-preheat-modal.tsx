@@ -634,8 +634,14 @@ const ModelPreheatModal: React.FC<Props> = ({
                         label={intl.formatMessage({
                           id: 'resources.preheat.revision'
                         })}
+                        extra={intl.formatMessage({
+                          id: 'resources.preheat.revision.help'
+                        })}
                       >
-                        <Input onChange={clearStaleGgufSelection} />
+                        <Input
+                          placeholder="main, v1.0.0, a1b2c3d4"
+                          onChange={clearStaleGgufSelection}
+                        />
                       </Form.Item>
                     </Col>
                     {draft.delivery_mode !== 's3_only' && (
@@ -644,6 +650,9 @@ const ModelPreheatModal: React.FC<Props> = ({
                           name="seed_worker_id"
                           label={intl.formatMessage({
                             id: 'resources.preheat.seedWorker'
+                          })}
+                          extra={intl.formatMessage({
+                            id: 'resources.preheat.seedWorker.help'
                           })}
                           rules={[
                             {
@@ -664,6 +673,9 @@ const ModelPreheatModal: React.FC<Props> = ({
                           label={intl.formatMessage({
                             id: 'resources.preheat.gguf.quantization'
                           })}
+                          extra={intl.formatMessage({
+                            id: 'resources.preheat.gguf.quantization.help'
+                          })}
                         >
                           <ModelGgufFileSelect
                             source={draft.source}
@@ -683,8 +695,17 @@ const ModelPreheatModal: React.FC<Props> = ({
                           label={intl.formatMessage({
                             id: 'resources.preheat.includePatterns'
                           })}
+                          extra={intl.formatMessage({
+                            id: 'resources.preheat.includePatterns.help'
+                          })}
                         >
-                          <Select mode="tags" tokenSeparators={[',']} />
+                          <Select
+                            mode="tags"
+                            tokenSeparators={[',']}
+                            placeholder={intl.formatMessage({
+                              id: 'resources.preheat.includePatterns.placeholder'
+                            })}
+                          />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={12}>
@@ -693,8 +714,17 @@ const ModelPreheatModal: React.FC<Props> = ({
                           label={intl.formatMessage({
                             id: 'resources.preheat.excludePatterns'
                           })}
+                          extra={intl.formatMessage({
+                            id: 'resources.preheat.excludePatterns.help'
+                          })}
                         >
-                          <Select mode="tags" tokenSeparators={[',']} />
+                          <Select
+                            mode="tags"
+                            tokenSeparators={[',']}
+                            placeholder={intl.formatMessage({
+                              id: 'resources.preheat.excludePatterns.placeholder'
+                            })}
+                          />
                         </Form.Item>
                       </Col>
                     </Row>

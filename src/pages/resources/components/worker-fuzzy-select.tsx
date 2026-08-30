@@ -11,13 +11,17 @@ interface Props {
   onChange: (value: number | undefined, worker?: ListItem) => void;
   disabled?: boolean;
   disabledReason?: string;
+  placeholder?: string;
+  style?: React.CSSProperties;
 }
 
 const WorkerFuzzySelect: React.FC<Props> = ({
   value,
   onChange,
   disabled,
-  disabledReason
+  disabledReason,
+  placeholder,
+  style
 }) => {
   const intl = useIntl();
   const requestId = useRef(0);
@@ -95,6 +99,8 @@ const WorkerFuzzySelect: React.FC<Props> = ({
         value={value}
         disabled={disabled}
         loading={loading}
+        placeholder={placeholder}
+        style={style}
         onSearch={(nextSearch) => void load(nextSearch, 1)}
         onChange={(nextValue) =>
           onChange(

@@ -86,6 +86,30 @@ const DISTRIBUTION_TASK_STATES = new Set([
   'skipped_worker_removed'
 ]);
 
+const shortInternalId = (value?: string | null) => {
+  if (!value) return '-';
+  return value.length > 16 ? `${value.slice(0, 12)}...` : value;
+};
+
+const formatPolicyTaskWorker = (task: {
+  worker_name?: string | null;
+  worker_ip?: string | null;
+  worker_uuid?: string | null;
+  worker_id?: number | null;
+}) => {
+  const primary =
+    task.worker_name ||
+    task.worker_ip ||
+    (task.worker_id != null ? `Worker #${task.worker_id}` : '') ||
+    task.worker_uuid ||
+    '-';
+  const secondary =
+    task.worker_name && task.worker_ip
+      ? task.worker_ip
+      : task.worker_uuid || '';
+  return { primary, secondary };
+};
+
 const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   const intl = useIntl();
   const location = useLocation();
@@ -484,7 +508,10 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
         await runDetailRequests.current.run(
           () =>
             'schedule_id' in runDetail
-              ? queryModelPreheatScheduleRun(runDetail.schedule_id, runDetail.id)
+              ? queryModelPreheatScheduleRun(
+                  runDetail.schedule_id,
+                  runDetail.id
+                )
               : queryModelPreheatPolicyRun(runDetail.id),
           setRunDetail
         );
@@ -1273,17 +1300,40 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
               columns={[
                 {
                   title: intl.formatMessage({
-                    id: 'resources.storage.artifactId'
+                    id: 'resources.storage.model'
                   }),
-                  dataIndex: 'artifact_id',
-                  ellipsis: true
+                  key: 'model',
+                  ellipsis: true,
+                  render: (_: unknown, task) => (
+                    <Tooltip title={task.artifact_id || task.model_id || '-'}>
+                      <Typography.Text>
+                        {task.model_id || shortInternalId(task.artifact_id)}
+                      </Typography.Text>
+                    </Tooltip>
+                  )
                 },
                 {
                   title: intl.formatMessage({
                     id: 'resources.storage.distributionPolicy.worker'
                   }),
-                  dataIndex: 'worker_uuid',
-                  ellipsis: true
+                  key: 'worker',
+                  ellipsis: true,
+                  render: (_: unknown, task) => {
+                    const worker = formatPolicyTaskWorker(task);
+                    return (
+                      <Tooltip title={task.worker_uuid || worker.primary}>
+                        <Space direction="vertical" size={0}>
+                          <Typography.Text>{worker.primary}</Typography.Text>
+                          {worker.secondary &&
+                            worker.secondary !== worker.primary && (
+                              <Typography.Text type="secondary">
+                                {worker.secondary}
+                              </Typography.Text>
+                            )}
+                        </Space>
+                      </Tooltip>
+                    );
+                  }
                 },
                 {
                   title: intl.formatMessage({ id: 'common.table.status' }),

@@ -216,7 +216,7 @@ const ModelStorageSyncPolicies: React.FC = () => {
           queryWorkersList({ page, perPage })
         ),
         loadAllPaginated<ModelFile>((page, perPage) =>
-          queryModelFilesList({ page, perPage })
+          queryModelFilesList({ page, perPage, state: 'ready' })
         )
       ]);
       if (requestId !== editorRequestId.current) return;
@@ -293,7 +293,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
       if (stopped) return;
       try {
         await runDetailRequests.current.run(
-          () => queryModelStorageSyncPolicyRun(runDetail.policy_id, runDetail.id),
+          () =>
+            queryModelStorageSyncPolicyRun(runDetail.policy_id, runDetail.id),
           setRunDetail
         );
       } catch (error) {
@@ -1049,7 +1050,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
                   }),
                   dataIndex: 'model_file_id',
                   width: 120,
-                  render: (value: number | null) => value ?? '-'
+                  render: (_value: number | null, task) =>
+                    task.model_id || task.model_file_id || '-'
                 },
                 {
                   title: intl.formatMessage({
@@ -1057,7 +1059,30 @@ const ModelStorageSyncPolicies: React.FC = () => {
                   }),
                   key: 'worker',
                   ellipsis: true,
-                  render: (_, task) => task.worker_uuid || task.worker_id || '-'
+                  render: (_, task) => {
+                    const primary =
+                      task.worker_name ||
+                      task.worker_ip ||
+                      task.worker_id ||
+                      task.worker_uuid ||
+                      '-';
+                    const secondary =
+                      task.worker_name && task.worker_ip
+                        ? task.worker_ip
+                        : task.worker_uuid || '';
+                    return (
+                      <Tooltip title={task.worker_uuid || String(primary)}>
+                        <Space direction="vertical" size={0}>
+                          <Typography.Text>{primary}</Typography.Text>
+                          {secondary && secondary !== primary && (
+                            <Typography.Text type="secondary">
+                              {secondary}
+                            </Typography.Text>
+                          )}
+                        </Space>
+                      </Tooltip>
+                    );
+                  }
                 },
                 {
                   title: intl.formatMessage({ id: 'common.table.status' }),
@@ -1068,7 +1093,8 @@ const ModelStorageSyncPolicies: React.FC = () => {
                       id:
                         value === 'skipped'
                           ? 'resources.storage.distributionPolicy.taskState.skipped'
-                          : getModelStorageTaskStatusPresentation(value).messageId
+                          : getModelStorageTaskStatusPresentation(value)
+                              .messageId
                     })
                 },
                 {

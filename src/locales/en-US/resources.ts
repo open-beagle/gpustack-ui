@@ -140,7 +140,20 @@ export default {
   'resources.preheat.targetWorkers': 'Target Workers',
   'resources.preheat.seedWorker': 'Seed Worker',
   'resources.preheat.includePatterns': 'Include Patterns',
+  'resources.preheat.revision.help':
+    'Set a repository branch, tag, or commit. Leave empty to use the repository default.',
+  'resources.preheat.seedWorker.help':
+    'The worker that downloads from the source repository and publishes the shared artifact to S3.',
+  'resources.preheat.includePatterns.help':
+    'Only download matching repository files. Leave empty for all files. Glob examples: *.safetensors, *.json, tokenizer.*.',
+  'resources.preheat.includePatterns.placeholder':
+    '*.safetensors, *.json, tokenizer.*',
+  'resources.preheat.excludePatterns.help':
+    'Exclude matching files from the included set. Examples: *.md, *.txt, original/**.',
+  'resources.preheat.excludePatterns.placeholder': '*.md, *.txt, original/**',
   'resources.preheat.gguf.quantization': 'GGUF Quantization',
+  'resources.preheat.gguf.quantization.help':
+    'Select a concrete quantized GGUF file. The selection is written to Include Patterns.',
   'resources.preheat.gguf.select': 'Select a GGUF file from this repository',
   'resources.preheat.gguf.empty': 'No selectable GGUF model files were found',
   'resources.preheat.gguf.loadFailed': 'Failed to load GGUF files. Try again.',
@@ -305,8 +318,14 @@ export default {
   'resources.preheat.schedule.cron': 'Cron Expression',
   'resources.preheat.schedule.timezone': 'Time Zone',
   'resources.preheat.schedule.window': 'Execution Window (minutes)',
+  'resources.preheat.schedule.window.help':
+    'The allowed run window after a scheduled trigger. Batches that cannot start in this window stay outside this run.',
   'resources.preheat.schedule.concurrency': 'Maximum Concurrency',
+  'resources.preheat.schedule.concurrency.help':
+    'Maximum worker subtasks this policy may run at the same time.',
   'resources.preheat.schedule.bandwidth': 'Bandwidth Limit (Mbps)',
+  'resources.preheat.schedule.bandwidth.help':
+    'Limits download/distribution bandwidth per worker. Leave empty for no limit.',
   'resources.preheat.schedule.nextRun': 'Next Run',
   'resources.preheat.schedule.lastRun': 'Last Run',
   'resources.preheat.schedule.runNow': 'Run Once Now',

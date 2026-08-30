@@ -106,11 +106,34 @@ const ModelStorageSyncTasks: React.FC = () => {
   const sourceWorker = (
     task: Pick<
       ModelStorageSyncTask,
-      'source_worker_id' | 'worker_id' | 'source_worker_name'
+      | 'source_worker_id'
+      | 'worker_id'
+      | 'worker_uuid'
+      | 'source_worker_name'
+      | 'source_worker_ip'
     >
   ) => {
     const workerId = task.source_worker_id || task.worker_id;
-    return task.source_worker_name || `Worker #${workerId}`;
+    const primary =
+      task.source_worker_name ||
+      task.source_worker_ip ||
+      (workerId ? `Worker #${workerId}` : '') ||
+      task.worker_uuid ||
+      '-';
+    const secondary =
+      task.source_worker_name && task.source_worker_ip
+        ? task.source_worker_ip
+        : '';
+    return (
+      <Tooltip title={task.worker_uuid || primary}>
+        <Space direction="vertical" size={0}>
+          <Typography.Text>{primary}</Typography.Text>
+          {secondary && (
+            <Typography.Text type="secondary">{secondary}</Typography.Text>
+          )}
+        </Space>
+      </Tooltip>
+    );
   };
 
   const load = useCallback(
@@ -580,13 +603,20 @@ const ModelStorageSyncTasks: React.FC = () => {
         ) : (
           <Descriptions column={1} size="small">
             <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.model' })}
+            >
+              {detail?.model_id || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item
               label={intl.formatMessage({
                 id: 'resources.storage.modelSource'
               })}
             >
               {detail ? getModelStorageSourceLabel(detail.source) : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Artifact ID">
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.artifactId' })}
+            >
               <Typography.Text copyable={Boolean(detail?.artifact_id)}>
                 {detail?.artifact_id || '-'}
               </Typography.Text>

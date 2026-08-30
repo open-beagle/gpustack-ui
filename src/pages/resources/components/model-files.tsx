@@ -1005,6 +1005,10 @@ const LocalModelFiles = () => {
             <WorkerFuzzySelect
               value={queryParams.worker_id as number | undefined}
               onChange={handleWorkerChange}
+              placeholder={intl.formatMessage({
+                id: 'resources.filter.worker'
+              })}
+              style={{ width: 250 }}
             />
             <Select
               allowClear

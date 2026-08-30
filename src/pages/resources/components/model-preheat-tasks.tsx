@@ -394,15 +394,13 @@ const ModelPreheatTasks: React.FC = () => {
   const targetColumns = [
     {
       title: intl.formatMessage({ id: 'resources.preheat.worker' }),
-      dataIndex: 'worker_name'
-    },
-    {
-      title: 'Worker ID',
-      dataIndex: 'worker_id'
-    },
-    {
-      title: 'UUID',
-      dataIndex: 'worker_uuid'
+      render: (_: unknown, worker: ModelPreheatTargetSnapshot) => (
+        <Tooltip title={worker.worker_uuid}>
+          <Typography.Text>
+            {worker.worker_name || `Worker #${worker.worker_id}`}
+          </Typography.Text>
+        </Tooltip>
+      )
     }
   ];
   const detailFailure = detail?.error_code
@@ -572,7 +570,10 @@ const ModelPreheatTasks: React.FC = () => {
             >
               {formatTransferMethod(detail)}
             </Descriptions.Item>
-            <Descriptions.Item label="Artifact ID" span={3}>
+            <Descriptions.Item
+              label={intl.formatMessage({ id: 'resources.storage.artifactId' })}
+              span={3}
+            >
               <Typography.Text copyable>
                 {detail?.artifact_id || '-'}
               </Typography.Text>

@@ -138,7 +138,20 @@ export default {
   'resources.preheat.targetWorkers': '目标节点',
   'resources.preheat.seedWorker': 'Seed 节点',
   'resources.preheat.includePatterns': '包含规则',
+  'resources.preheat.revision.help':
+    '指定仓库版本、标签或提交；留空使用仓库默认版本。',
+  'resources.preheat.seedWorker.help':
+    '负责从源仓库下载并发布到 S3 的节点；需要分发到其他节点时由它生成共享 Artifact。',
+  'resources.preheat.includePatterns.help':
+    '限制只下载匹配的仓库文件；留空表示全部文件。支持 glob，例如 *.safetensors、*.json、tokenizer.*。',
+  'resources.preheat.includePatterns.placeholder':
+    '*.safetensors, *.json, tokenizer.*',
+  'resources.preheat.excludePatterns.help':
+    '从已包含的文件中排除匹配项；例如 *.md、*.txt、original/**。',
+  'resources.preheat.excludePatterns.placeholder': '*.md, *.txt, original/**',
   'resources.preheat.gguf.quantization': 'GGUF 精度',
+  'resources.preheat.gguf.quantization.help':
+    '用于 GGUF 仓库选择具体量化文件；选择后会自动写入包含规则。',
   'resources.preheat.gguf.select': '选择仓库中的 GGUF 精度文件',
   'resources.preheat.gguf.empty': '该仓库未发现可选的 GGUF 模型文件',
   'resources.preheat.gguf.loadFailed': 'GGUF 文件列表加载失败，请重试',
@@ -300,8 +313,14 @@ export default {
   'resources.preheat.schedule.cron': 'Cron 表达式',
   'resources.preheat.schedule.timezone': '时区',
   'resources.preheat.schedule.window': '执行窗口（分钟）',
+  'resources.preheat.schedule.window.help':
+    '定时触发后允许任务运行的时间窗口；超过窗口仍未开始的批次会停在本轮窗口外。',
   'resources.preheat.schedule.concurrency': '最大并发数',
+  'resources.preheat.schedule.concurrency.help':
+    '同一策略同一时间最多执行的 Worker 子任务数量。',
   'resources.preheat.schedule.bandwidth': '带宽上限（Mbps）',
+  'resources.preheat.schedule.bandwidth.help':
+    '限制单个 Worker 下载/分发带宽；留空表示不限速。',
   'resources.preheat.schedule.nextRun': '下次执行时间',
   'resources.preheat.schedule.lastRun': '上次执行时间',
   'resources.preheat.schedule.runNow': '立即执行一次',
@@ -616,7 +635,7 @@ export default {
   'resources.storage.scanSucceededAt': '最近成功',
   'resources.storage.scanResult': '结果',
   'resources.storage.scanResult.success': '扫描到 {count} 个模型',
-  'resources.storage.artifactId': '模型 ID',
+  'resources.storage.artifactId': 'Artifact ID',
   'resources.storage.manifestDigest': '清单摘要',
   'resources.storage.manifestPath': '清单路径',
   'resources.storage.includePatterns': '包含规则',
