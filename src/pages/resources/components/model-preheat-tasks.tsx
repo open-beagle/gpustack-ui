@@ -14,6 +14,7 @@ import {
   Button,
   Descriptions,
   Modal,
+  Progress,
   Space,
   Spin,
   Table,
@@ -46,7 +47,8 @@ import {
 } from '../config/model-preheat';
 import type {
   ModelPreheatTargetSnapshot,
-  ModelPreheatTask
+  ModelPreheatTask,
+  ModelPreheatWorkerTask
 } from '../config/types';
 import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import ModelPreheatModal from './model-preheat-modal';
@@ -95,6 +97,7 @@ const ModelPreheatTasks: React.FC = () => {
   const [detail, setDetail] = useState<ModelPreheatTask | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
+  const [detailPollGeneration, setDetailPollGeneration] = useState(0);
   const [confirm, setConfirm] = useState<{
     task: ModelPreheatTask;
     action: PreheatTaskAction;
@@ -152,7 +155,7 @@ const ModelPreheatTasks: React.FC = () => {
           setTasks(result.items);
           setTotal(result.pagination.total);
           setLoadError(false);
-          // 空列表仍需发现策略新建的任务；只有可见记录均为终态才停止。
+          // 低频轮询用于发现定时策略新建的任务；活动任务期间切高频。
           shouldPollTasks.current =
             result.items.length === 0 ||
             result.items.some(
@@ -199,12 +202,10 @@ const ModelPreheatTasks: React.FC = () => {
         return;
       }
       if (generation !== pollingGeneration.current) return;
-      if (shouldPollTasks.current) {
-        pollingTimer.current = window.setTimeout(
-          () => void startPolling(true),
-          5000
-        );
-      }
+      pollingTimer.current = window.setTimeout(
+        () => void startPolling(true),
+        shouldPollTasks.current ? 5000 : 15000
+      );
     },
     [clearPollingTimer, loadTasks]
   );
@@ -230,14 +231,52 @@ const ModelPreheatTasks: React.FC = () => {
 
   const openDetail = async (task: ModelPreheatTask) => {
     setDetail(task);
-    setDetailLoading(true);
+    setDetailLoading(task.id !== detail?.id);
     setDetailError(false);
+    setDetailPollGeneration((generation) => generation + 1);
     return detailRequests.current.run(
       () => queryModelPreheatTask(task.id),
       setDetail,
       () => setDetailLoading(false)
     );
   };
+
+  useEffect(() => {
+    if (!detail || detailLoading || terminalStates.has(detail.execution_state)) return;
+    let disposed = false;
+    const timer = window.setTimeout(() => {
+      detailRequests.current
+        .run(
+          () => queryModelPreheatTask(detail.id),
+          (next) => {
+            if (!disposed) {
+              setDetail(next);
+              setDetailError(false);
+              if (!terminalStates.has(next.execution_state)) {
+                setDetailPollGeneration((generation) => generation + 1);
+              }
+            }
+          },
+          () => undefined
+        )
+        .catch(() => {
+          if (!disposed) {
+            setDetailError(true);
+            setDetailPollGeneration((generation) => generation + 1);
+          }
+        });
+    }, 3000);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    detail?.id,
+    detail?.execution_state,
+    detail?.updated_at,
+    detailLoading,
+    detailPollGeneration
+  ]);
 
   const handleAction = async () => {
     if (!confirm) return;
@@ -266,22 +305,23 @@ const ModelPreheatTasks: React.FC = () => {
 
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 70
-    },
-    {
       title: intl.formatMessage({ id: 'resources.preheat.model' }),
       dataIndex: 'model_id',
-      ellipsis: true
-    },
-    {
-      title: intl.formatMessage({ id: 'resources.preheat.revision' }),
-      dataIndex: 'resolved_revision',
-      width: 140,
-      render: (value: string) => {
-        const revision = getModelStorageRevisionPresentation(value);
-        return <Tooltip title={revision.full}>{revision.short}</Tooltip>;
+      width: 280,
+      fixed: 'left' as const,
+      render: (value: string, task: ModelPreheatTask) => {
+        const revision = getModelStorageRevisionPresentation(task.resolved_revision);
+        return (
+          <Space direction="vertical" size={0} style={{ maxWidth: 248 }}>
+            <Typography.Text ellipsis={{ tooltip: value }}>{value}</Typography.Text>
+            <Tooltip title={revision.full}>
+              <Typography.Text type="secondary">
+                {intl.formatMessage({ id: 'resources.preheat.revision' })}:{' '}
+                {revision.short}
+              </Typography.Text>
+            </Tooltip>
+          </Space>
+        );
       }
     },
     {
@@ -312,7 +352,7 @@ const ModelPreheatTasks: React.FC = () => {
       }
     },
     {
-      title: intl.formatMessage({ id: 'resources.preheat.targetCount' }),
+      title: intl.formatMessage({ id: 'resources.preheat.nodeCount' }),
       width: 100,
       render: (_: unknown, task: ModelPreheatTask) =>
         task.delivery_mode === 's3_only'
@@ -336,12 +376,6 @@ const ModelPreheatTasks: React.FC = () => {
       title: intl.formatMessage({ id: 'resources.preheat.attempt' }),
       dataIndex: 'attempt',
       width: 90
-    },
-    {
-      title: intl.formatMessage({ id: 'resources.preheat.targetCount' }),
-      dataIndex: 'target_worker_uuids',
-      width: 110,
-      render: (value: string[]) => value.length
     },
     {
       title: intl.formatMessage({ id: 'common.table.createTime' }),
@@ -434,6 +468,78 @@ const ModelPreheatTasks: React.FC = () => {
       )
     }
   ];
+
+  const workerTaskColumns = [
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.worker' }),
+      width: 180,
+      render: (_: unknown, item: ModelPreheatWorkerTask) => (
+        <Space direction="vertical" size={0}>
+          <Typography.Text>
+            {item.worker_name ||
+              item.worker_ip ||
+              (item.worker_id != null ? `Worker #${item.worker_id}` : '-')}
+          </Typography.Text>
+          <Tooltip title={item.worker_uuid}>
+            <Typography.Text type="secondary">
+              {item.worker_name && item.worker_ip
+                ? item.worker_ip
+                : item.worker_uuid}
+            </Typography.Text>
+          </Tooltip>
+        </Space>
+      )
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.preheat.workerRole' }),
+      dataIndex: 'role',
+      width: 110,
+      render: (role: string) =>
+        intl.formatMessage({ id: `resources.preheat.workerRole.${role}` })
+    },
+    {
+      title: intl.formatMessage({ id: 'common.table.status' }),
+      dataIndex: 'state',
+      width: 120,
+      render: (value: string) => {
+        const status = getModelStorageTaskStatusPresentation(value);
+        return (
+          <Tag color={statusColors[value || 'unknown']}>
+            {intl.formatMessage({ id: status.messageId })}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: intl.formatMessage({ id: 'resources.modelcache.progress' }),
+      dataIndex: 'progress',
+      width: 160,
+      render: (value: number, item: ModelPreheatWorkerTask) => (
+        <Space direction="vertical" size={0} style={{ width: 140 }}>
+          <Progress
+            percent={Math.round(value || 0)}
+            size="small"
+            status={item.state === 'error' ? 'exception' : undefined}
+          />
+          <Typography.Text type="secondary">
+            {item.total_size
+              ? `${numeral(item.downloaded_size).format('0.00 b')} / ${numeral(item.total_size).format('0.00 b')}`
+              : '-'}
+          </Typography.Text>
+        </Space>
+      )
+    },
+    {
+      title: intl.formatMessage({
+        id: 'resources.storage.syncTask.errorCode'
+      }),
+      width: 180,
+      render: (_: unknown, item: ModelPreheatWorkerTask) =>
+        item.state_message || item.error_code || '-'
+    }
+  ];
+
+  const workerTaskData = detail?.worker_tasks || [];
   const detailFailure = detail?.error_code
     ? getModelStorageErrorPresentation(detail.error_code)
     : null;
@@ -471,7 +577,7 @@ const ModelPreheatTasks: React.FC = () => {
         columns={columns}
         dataSource={tasks}
         loading={loading}
-        scroll={{ x: 1560 }}
+        scroll={{ x: 1450 }}
         pagination={{
           current: page,
           pageSize,
@@ -526,6 +632,7 @@ const ModelPreheatTasks: React.FC = () => {
           setDetail(null);
           setDetailError(false);
         }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Spin spinning={detailLoading}>
           {detailError && (
@@ -680,14 +787,27 @@ const ModelPreheatTasks: React.FC = () => {
             </Descriptions.Item>
           </Descriptions>
         </Spin>
-        <Table<ModelPreheatTargetSnapshot>
-          rowKey="worker_uuid"
-          size="small"
-          style={{ marginTop: 16 }}
-          columns={targetColumns}
-          dataSource={detail?.target_worker_snapshot || []}
-          pagination={false}
-        />
+        {workerTaskData.length ? (
+          <Table<ModelPreheatWorkerTask>
+            rowKey="id"
+            size="small"
+            style={{ marginTop: 16 }}
+            columns={workerTaskColumns}
+            dataSource={workerTaskData}
+            pagination={false}
+            scroll={{ x: 760 }}
+          />
+        ) : (
+          <Table<ModelPreheatTargetSnapshot>
+            rowKey="worker_uuid"
+            size="small"
+            style={{ marginTop: 16 }}
+            columns={targetColumns}
+            dataSource={detail?.target_worker_snapshot || []}
+            pagination={false}
+            scroll={{ x: 620 }}
+          />
+        )}
       </Modal>
       <ModelPreheatConfirmModal
         open={Boolean(confirm)}

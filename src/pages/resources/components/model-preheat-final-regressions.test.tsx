@@ -784,6 +784,185 @@ describe('任务发现与串行轮询', () => {
     expect(screen.getByText('2.05 KB')).toBeInTheDocument();
   });
 
+  it('活动任务详情持续刷新节点执行进度和具体失败原因', async () => {
+    const scheduler = installPollScheduler(3000);
+    const runningTask = {
+      ...task({ execution_state: 'distributing' }),
+      worker_tasks: [
+        {
+          id: 91,
+          task_id: 41,
+          parent_attempt: 1,
+          worker_uuid: 'worker-a',
+          worker_id: 12,
+          worker_name: 'a100-58',
+          worker_ip: '10.0.0.241',
+          role: 'seed',
+          state: 'running',
+          attempt: 1,
+          progress: 20,
+          downloaded_size: 20,
+          total_size: 100,
+          created_at: '2026-08-11T08:00:00Z',
+          updated_at: '2026-08-11T08:00:01Z'
+        }
+      ]
+    } as ModelPreheatTask;
+    const failedTask = {
+      ...runningTask,
+      execution_state: 'error',
+      worker_tasks: [
+        {
+          ...runningTask.worker_tasks![0],
+          state: 'error',
+          progress: 40,
+          state_message: 'disk space is below required threshold',
+          error_code: 'worker_execution_failed'
+        }
+      ]
+    } as ModelPreheatTask;
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([runningTask]));
+    api.queryModelPreheatTask
+      .mockResolvedValueOnce(runningTask)
+      .mockResolvedValueOnce(failedTask);
+
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    expect(await screen.findByText('a100-58')).toBeInTheDocument();
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    act(() => scheduler.runNext());
+    expect(
+      await screen.findByText('disk space is below required threshold')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('worker_execution_failed')).not.toBeInTheDocument();
+  });
+
+  it('活动任务详情刷新失败后继续轮询并恢复', async () => {
+    const scheduler = installPollScheduler(3000);
+    const runningTask = {
+      ...task({ execution_state: 'distributing' }),
+      worker_tasks: [
+        {
+          id: 91,
+          task_id: 41,
+          parent_attempt: 1,
+          worker_uuid: 'worker-a',
+          worker_id: 12,
+          worker_name: 'a100-58',
+          worker_ip: '10.0.0.241',
+          role: 'seed',
+          state: 'running',
+          attempt: 1,
+          progress: 20,
+          downloaded_size: 20,
+          total_size: 100,
+          created_at: '2026-08-11T08:00:00Z',
+          updated_at: '2026-08-11T08:00:01Z'
+        }
+      ]
+    } as ModelPreheatTask;
+    const failedTask = {
+      ...runningTask,
+      execution_state: 'error',
+      updated_at: '2026-08-11T08:00:10Z',
+      worker_tasks: [
+        {
+          ...runningTask.worker_tasks![0],
+          state: 'error',
+          state_message: 'disk space is below required threshold',
+          error_code: 'worker_execution_failed'
+        }
+      ]
+    } as ModelPreheatTask;
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([runningTask]));
+    api.queryModelPreheatTask
+      .mockResolvedValueOnce(runningTask)
+      .mockRejectedValueOnce(new Error('temporary network error'))
+      .mockResolvedValueOnce(failedTask);
+
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    expect(await screen.findByText('a100-58')).toBeInTheDocument();
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    act(() => scheduler.runNext());
+    expect(
+      await screen.findByText('resources.storage.state.error')
+    ).toBeInTheDocument();
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    act(() => scheduler.runNext());
+
+    expect(
+      await screen.findByText('disk space is below required threshold')
+    ).toBeInTheDocument();
+  });
+
+  it('活动任务详情首次慢请求不会被后台轮询抢占 loading 结束', async () => {
+    const scheduler = installPollScheduler(3000);
+    const slowDetail = deferred<ModelPreheatTask>();
+    const runningTask = {
+      ...task({ execution_state: 'distributing' }),
+      worker_tasks: [
+        {
+          id: 91,
+          task_id: 41,
+          parent_attempt: 1,
+          worker_uuid: 'worker-a',
+          worker_id: 12,
+          worker_name: 'a100-58',
+          worker_ip: '10.0.0.241',
+          role: 'seed',
+          state: 'running',
+          attempt: 1,
+          progress: 20,
+          downloaded_size: 20,
+          total_size: 100,
+          created_at: '2026-08-11T08:00:00Z',
+          updated_at: '2026-08-11T08:00:01Z'
+        }
+      ]
+    } as ModelPreheatTask;
+    const nextTask = {
+      ...runningTask,
+      updated_at: '2026-08-11T08:00:10Z',
+      worker_tasks: [
+        {
+          ...runningTask.worker_tasks![0],
+          progress: 60
+        }
+      ]
+    } as ModelPreheatTask;
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([runningTask]));
+    api.queryModelPreheatTask
+      .mockReturnValueOnce(slowDetail.promise)
+      .mockResolvedValueOnce(nextTask);
+
+    const { container } = render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    fireEvent.click(
+      container.querySelector('.anticon-eye')!.closest('button')!
+    );
+
+    await screen.findByRole('dialog');
+    expect(scheduler.pending()).toBe(0);
+    slowDetail.resolve(runningTask);
+    await act(async () => {
+      await slowDetail.promise;
+    });
+    expect(await screen.findByText('a100-58')).toBeInTheDocument();
+    await waitFor(() => expect(scheduler.pending()).toBe(1));
+    act(() => scheduler.runNext());
+
+    expect(await screen.findByText('60%')).toBeInTheDocument();
+  });
+
   it('终态预热任务通过居中确认弹窗删除', async () => {
     const user = userEvent.setup();
     const terminalTask = task({ execution_state: 'ready' });

@@ -181,20 +181,18 @@ const ModelStorageSyncPolicies: React.FC = () => {
   );
 
   useEffect(() => {
-    if (!hasActiveRuns) return;
     let stopped = false;
     let timer: number | undefined;
     const schedule = () => {
       if (stopped) return;
       timer = window.setTimeout(async () => {
-        let continuePolling = true;
         try {
-          continuePolling = await load();
+          await load();
         } catch {
-          continuePolling = true;
+          undefined;
         }
-        if (!stopped && continuePolling) schedule();
-      }, 2000);
+        if (!stopped) schedule();
+      }, hasActiveRuns ? 2000 : 15000);
     };
     schedule();
     return () => {

@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -92,6 +93,35 @@ beforeEach(() => {
 });
 
 describe('分发记录列表', () => {
+  it('空闲时仍低频刷新以发现定时分发 run', async () => {
+    let poll: (() => void) | undefined;
+    const nativeSetInterval = window.setInterval.bind(window);
+    vi.spyOn(window, 'setInterval').mockImplementation(((
+      handler: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (typeof handler === 'function' && timeout === 15000) {
+        poll = () => handler(...args);
+        return 8150;
+      }
+      return nativeSetInterval(handler, timeout, ...args);
+    }) as typeof window.setInterval);
+
+    render(<ModelDistributionPolicyRuns />);
+    await waitFor(() =>
+      expect(api.queryModelPreheatPolicyRuns).toHaveBeenCalledTimes(1)
+    );
+    expect(poll).toBeDefined();
+
+    await act(async () => {
+      poll?.();
+    });
+    await waitFor(() =>
+      expect(api.queryModelPreheatPolicyRuns).toHaveBeenCalledTimes(2)
+    );
+  });
+
   it('展示后端分发 run，并在详情中显示可读模型和节点信息', async () => {
     const user = userEvent.setup();
     render(<ModelDistributionPolicyRuns />);

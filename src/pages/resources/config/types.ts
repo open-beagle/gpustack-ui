@@ -476,6 +476,29 @@ export interface ModelPreheatTargetSnapshot {
   worker_name: string;
 }
 
+export interface ModelPreheatWorkerTask {
+  id: number;
+  task_id?: number | null;
+  parent_attempt: number;
+  worker_uuid: string;
+  worker_id?: number | null;
+  worker_name?: string | null;
+  worker_ip?: string | null;
+  role: 'seed' | 'distribute' | 'connectivity_check';
+  state: ModelPreheatWorkerTaskState;
+  attempt: number;
+  last_heartbeat_at?: string | null;
+  state_message?: string | null;
+  error_code?: string | null;
+  progress: number;
+  downloaded_size: number;
+  total_size: number;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ModelPreheatTask {
   id: number;
   attempt: number;
@@ -504,6 +527,8 @@ export interface ModelPreheatTask {
   transfer_source: ModelStorageTransferSource | null;
   transfer_profile_id: number | null;
   source_worker_id: number | null;
+  progress?: number;
+  worker_tasks?: ModelPreheatWorkerTask[];
   state_message?: string | null;
   error_code?: string | null;
   started_at?: string | null;

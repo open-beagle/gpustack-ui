@@ -160,8 +160,13 @@ const ModelDistributionPolicyRuns: React.FC = () => {
   }, [load]);
 
   useEffect(() => {
-    if (!runs.some((run) => ACTIVE_RUN_STATES.has(run.execution_state))) return;
-    const timer = window.setInterval(() => void load(false), 3000);
+    const hasActiveRuns = runs.some((run) =>
+      ACTIVE_RUN_STATES.has(run.execution_state)
+    );
+    const timer = window.setInterval(
+      () => void load(false),
+      hasActiveRuns ? 3000 : 15000
+    );
     return () => window.clearInterval(timer);
   }, [load, runs]);
 

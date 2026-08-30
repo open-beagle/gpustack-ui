@@ -326,6 +326,35 @@ describe('预热策略触发方式', () => {
     );
   });
 
+  it('同步策略空闲时仍低频刷新以发现定时运行', async () => {
+    let poll: (() => void) | undefined;
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    vi.spyOn(window, 'setTimeout').mockImplementation(((
+      handler: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (typeof handler === 'function' && timeout === 15000) {
+        poll = handler;
+        return 7150;
+      }
+      return nativeSetTimeout(handler, timeout, ...args);
+    }) as typeof window.setTimeout);
+
+    render(<ModelStorageSyncPolicies />);
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenCalledTimes(1)
+    );
+    expect(poll).toBeDefined();
+
+    await act(async () => {
+      poll?.();
+    });
+    await waitFor(() =>
+      expect(api.queryModelStorageSyncPolicies).toHaveBeenCalledTimes(2)
+    );
+  });
+
   it('服务能力字段关闭时仍允许新建和立即执行', async () => {
     api.queryModelStorageCapabilities.mockResolvedValue({
       credential_encryption_available: true,

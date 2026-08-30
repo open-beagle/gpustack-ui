@@ -252,20 +252,19 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   );
 
   useEffect(() => {
-    if (mode === 'preheat' || !hasActivePolicyRuns) return;
+    if (mode === 'preheat') return;
     let stopped = false;
     let timer: number | undefined;
     const schedule = () => {
       if (stopped) return;
       timer = window.setTimeout(async () => {
-        let continuePolling = true;
         try {
-          continuePolling = await loadPolicies();
+          await loadPolicies();
         } catch {
-          continuePolling = true;
+          undefined;
         }
-        if (!stopped && continuePolling) schedule();
-      }, 2000);
+        if (!stopped) schedule();
+      }, hasActivePolicyRuns ? 2000 : 15000);
     };
     schedule();
     return () => {
@@ -284,20 +283,19 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
   );
 
   useEffect(() => {
-    if (mode === 'distribution' || !hasActiveScheduleRuns) return;
+    if (mode === 'distribution') return;
     let stopped = false;
     let timer: number | undefined;
     const schedule = () => {
       if (stopped) return;
       timer = window.setTimeout(async () => {
-        let continuePolling = true;
         try {
-          continuePolling = await loadSchedules();
+          await loadSchedules();
         } catch {
-          continuePolling = true;
+          undefined;
         }
-        if (!stopped && continuePolling) schedule();
-      }, 2000);
+        if (!stopped) schedule();
+      }, hasActiveScheduleRuns ? 2000 : 15000);
     };
     schedule();
     return () => {
@@ -531,6 +529,8 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       {
         title: intl.formatMessage({ id: 'resources.preheat.policy.name' }),
         dataIndex: 'name',
+        width: 220,
+        fixed: 'left' as const,
         ellipsis: true
       },
       {
@@ -808,6 +808,14 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
       {
         title: intl.formatMessage({ id: 'resources.preheat.policy.name' }),
         dataIndex: 'name',
+        width: 220,
+        fixed: 'left' as const,
+        ellipsis: true
+      },
+      {
+        title: intl.formatMessage({ id: 'resources.storage.model' }),
+        dataIndex: 'model_id',
+        width: 260,
         ellipsis: true
       },
       {
@@ -1179,7 +1187,7 @@ const ModelPreheatPolicies: React.FC<{ mode?: PolicyMode }> = ({ mode }) => {
                       columns={scheduleColumns}
                       dataSource={schedules}
                       loading={scheduleLoading}
-                      scroll={{ x: 1250 }}
+                      scroll={{ x: 1530 }}
                       pagination={{
                         current: schedulePage,
                         pageSize: schedulePageSize,
