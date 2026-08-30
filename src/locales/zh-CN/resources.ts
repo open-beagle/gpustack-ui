@@ -283,12 +283,16 @@ export default {
   'resources.preheat.action.resume': '继续',
   'resources.preheat.action.cancel': '取消',
   'resources.preheat.action.retry': '重试',
+  'resources.preheat.action.delete': '删除',
   'resources.preheat.action.pauseConfirm': '暂停预热任务',
   'resources.preheat.action.resumeConfirm': '继续预热任务',
   'resources.preheat.action.cancelConfirm': '取消预热任务',
   'resources.preheat.action.retryConfirm': '重试预热任务',
+  'resources.preheat.action.deleteConfirm': '删除预热任务',
   'resources.preheat.action.content':
     '确定对任务 #{id}（{model}）执行此操作吗？',
+  'resources.preheat.action.deleteContent':
+    '确定删除预热任务 #{id}（{model}）的记录吗？不会删除 S3 模型或节点模型文件。',
   'resources.preheat.policy.name': '策略名称',
   'resources.preheat.policy.selector': '节点选择器',
   'resources.preheat.policy.lastReconciled': '最近同步时间',
@@ -559,6 +563,11 @@ export default {
   'resources.storage.taskRecords': '任务记录',
   'resources.storage.distributionTasks': '分发记录',
   'resources.storage.distributionTasks.policy': '分发策略',
+  'resources.storage.deleteRun': '删除记录',
+  'resources.storage.deleteRunConfirm': '删除运行记录',
+  'resources.storage.deleteRunContent':
+    '确认删除运行记录 #{id}？不会删除 S3 模型或节点模型文件。',
+  'resources.storage.runDeleteDisabled': '运行中的记录不能删除',
   'resources.storage.retry': '重试',
   'resources.storage.repository.exactInput': '手动输入精确模型名',
   'resources.storage.state.loading': '正在加载',

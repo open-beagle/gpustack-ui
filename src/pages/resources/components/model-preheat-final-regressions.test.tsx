@@ -29,6 +29,7 @@ const api = vi.hoisted(() => ({
   createModelPreheatConnectivityCheck: vi.fn(),
   createModelPreheatPolicy: vi.fn(),
   createModelPreheatSchedule: vi.fn(),
+  deleteModelPreheatTask: vi.fn(),
   queryModelPreheatConnectivityCheck: vi.fn(),
   queryModelPreheatPolicies: vi.fn(),
   queryModelPreheatSchedules: vi.fn(),
@@ -279,6 +280,7 @@ const installPollScheduler = (delay: number) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.deleteModelPreheatTask.mockResolvedValue({ ok: true });
   api.queryModelPreheatS3Profiles.mockResolvedValue(page([profile]));
   api.queryModelPreheatS3Profile.mockResolvedValue(profile);
   api.queryModelPreheatConnectivityCheck.mockResolvedValue(terminalCheck);
@@ -780,6 +782,34 @@ describe('任务发现与串行轮询', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('worker_execution_failed')).toHaveLength(1);
     expect(screen.getByText('2.05 KB')).toBeInTheDocument();
+  });
+
+  it('终态预热任务通过居中确认弹窗删除', async () => {
+    const user = userEvent.setup();
+    const terminalTask = task({ execution_state: 'ready' });
+    api.queryModelPreheatTasks.mockResolvedValueOnce(page([terminalTask]));
+
+    render(<ModelPreheatTasks />);
+    await screen.findByText('scheduled/model');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'resources.preheat.action.delete'
+      })
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.preheat.action.deleteConfirm')
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'resources.preheat.action.delete'
+      })
+    );
+
+    await waitFor(() =>
+      expect(api.deleteModelPreheatTask).toHaveBeenCalledWith(terminalTask.id)
+    );
   });
 
   it('旧后端未返回可选详情字段时仍可打开详情', async () => {

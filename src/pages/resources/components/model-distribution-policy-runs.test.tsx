@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ModelDistributionPolicyRuns from './model-distribution-policy-runs';
 
 const api = vi.hoisted(() => ({
+  deleteModelPreheatPolicyRun: vi.fn(),
   queryModelPreheatPolicyRun: vi.fn(),
   queryModelPreheatPolicyRuns: vi.fn()
 }));
@@ -87,6 +88,7 @@ beforeEach(() => {
       }
     ]
   });
+  api.deleteModelPreheatPolicyRun.mockResolvedValue({ ok: true });
 });
 
 describe('分发记录列表', () => {
@@ -115,5 +117,29 @@ describe('分发记录列表', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('beagle-241')).toBeInTheDocument();
     expect(within(dialog).getByText('10.4.2.241')).toBeInTheDocument();
+  });
+
+  it('终态分发 run 通过居中确认弹窗删除', async () => {
+    const user = userEvent.setup();
+    render(<ModelDistributionPolicyRuns />);
+
+    await screen.findAllByText('S3-work');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'resources.storage.deleteRun'
+      })
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('resources.storage.deleteRunConfirm')
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'common.button.delete' })
+    );
+
+    await waitFor(() =>
+      expect(api.deleteModelPreheatPolicyRun).toHaveBeenCalledWith(5)
+    );
   });
 });

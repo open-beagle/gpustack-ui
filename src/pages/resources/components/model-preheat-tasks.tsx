@@ -1,4 +1,5 @@
 import {
+  DeleteOutlined,
   EyeOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
@@ -25,6 +26,7 @@ import dayjs from 'dayjs';
 import numeral from 'numeral';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  deleteModelPreheatTask,
   queryModelPreheatS3Profiles,
   queryModelPreheatTask,
   queryModelPreheatTasks,
@@ -70,6 +72,10 @@ const actionIcons: Record<ModelPreheatTaskAction, React.ReactNode> = {
   retry: <RedoOutlined />
 };
 
+type PreheatTaskAction = ModelPreheatTaskAction | 'delete';
+
+const terminalStates = new Set(['ready', 'partial', 'error', 'canceled']);
+
 const ModelPreheatTasks: React.FC = () => {
   const intl = useIntl();
   const taskRequests = useRef(new LatestRequestGate());
@@ -91,7 +97,7 @@ const ModelPreheatTasks: React.FC = () => {
   const [detailError, setDetailError] = useState(false);
   const [confirm, setConfirm] = useState<{
     task: ModelPreheatTask;
-    action: ModelPreheatTaskAction;
+    action: PreheatTaskAction;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [profileNames, setProfileNames] = useState<Record<number, string>>({});
@@ -237,6 +243,14 @@ const ModelPreheatTasks: React.FC = () => {
     if (!confirm) return;
     setActionLoading(true);
     try {
+      if (confirm.action === 'delete') {
+        await deleteModelPreheatTask(confirm.task.id);
+        setConfirm(null);
+        if (detail?.id === confirm.task.id) setDetail(null);
+        message.success(intl.formatMessage({ id: 'common.message.success' }));
+        await startPolling(false);
+        return;
+      }
       const task = await runModelPreheatTaskAction(
         confirm.task.id,
         confirm.action
@@ -312,7 +326,7 @@ const ModelPreheatTasks: React.FC = () => {
       render: (value: string | null) => {
         const status = getModelStorageTaskStatusPresentation(value);
         return (
-          <Tag color={statusColors[value]}>
+          <Tag color={statusColors[value || 'unknown']}>
             {intl.formatMessage({ id: status.messageId })}
           </Tag>
         );
@@ -386,6 +400,23 @@ const ModelPreheatTasks: React.FC = () => {
               />
             </Tooltip>
           ))}
+          {terminalStates.has(task.execution_state) && (
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'resources.preheat.action.delete'
+              })}
+            >
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                aria-label={intl.formatMessage({
+                  id: 'resources.preheat.action.delete'
+                })}
+                onClick={() => setConfirm({ task, action: 'delete' })}
+              />
+            </Tooltip>
+          )}
         </Space>
       )
     }
@@ -664,13 +695,18 @@ const ModelPreheatTasks: React.FC = () => {
           id: `resources.preheat.action.${confirm?.action || 'cancel'}Confirm`
         })}
         content={intl.formatMessage(
-          { id: 'resources.preheat.action.content' },
+          {
+            id:
+              confirm?.action === 'delete'
+                ? 'resources.preheat.action.deleteContent'
+                : 'resources.preheat.action.content'
+          },
           { id: confirm?.task.id || '', model: confirm?.task.model_id || '' }
         )}
         okText={intl.formatMessage({
           id: `resources.preheat.action.${confirm?.action || 'cancel'}`
         })}
-        danger={confirm?.action === 'cancel'}
+        danger={confirm?.action === 'cancel' || confirm?.action === 'delete'}
         loading={actionLoading}
         onOk={handleAction}
         onCancel={() => setConfirm(null)}

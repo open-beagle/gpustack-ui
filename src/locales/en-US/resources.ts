@@ -288,12 +288,16 @@ export default {
   'resources.preheat.action.resume': 'Resume',
   'resources.preheat.action.cancel': 'Cancel',
   'resources.preheat.action.retry': 'Retry',
+  'resources.preheat.action.delete': 'Delete',
   'resources.preheat.action.pauseConfirm': 'Pause Preheat Task',
   'resources.preheat.action.resumeConfirm': 'Resume Preheat Task',
   'resources.preheat.action.cancelConfirm': 'Cancel Preheat Task',
   'resources.preheat.action.retryConfirm': 'Retry Preheat Task',
+  'resources.preheat.action.deleteConfirm': 'Delete Preheat Task',
   'resources.preheat.action.content':
     'Perform this action on task #{id} ({model})?',
+  'resources.preheat.action.deleteContent':
+    'Delete preheat task record #{id} ({model})? S3 models and worker model files are not deleted.',
   'resources.preheat.policy.name': 'Policy Name',
   'resources.preheat.policy.selector': 'Worker Selector',
   'resources.preheat.policy.lastReconciled': 'Last Synced',
@@ -595,6 +599,11 @@ export default {
   'resources.storage.taskRecords': 'Task Records',
   'resources.storage.distributionTasks': 'Distribution Records',
   'resources.storage.distributionTasks.policy': 'Distribution Policy',
+  'resources.storage.deleteRun': 'Delete Record',
+  'resources.storage.deleteRunConfirm': 'Delete Run Record',
+  'resources.storage.deleteRunContent':
+    'Delete run record #{id}? S3 models and worker model files are not deleted.',
+  'resources.storage.runDeleteDisabled': 'Running records cannot be deleted',
   'resources.storage.retry': 'Retry',
   'resources.storage.repository.exactInput': 'Enter exact model name',
   'resources.storage.state.loading': 'Loading',

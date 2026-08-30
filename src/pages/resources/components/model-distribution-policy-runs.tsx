@@ -1,4 +1,4 @@
-import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import {
   Alert,
@@ -15,6 +15,7 @@ import {
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  deleteModelPreheatPolicyRun,
   queryModelPreheatPolicyRun,
   queryModelPreheatPolicyRuns
 } from '../apis';
@@ -27,6 +28,7 @@ import type {
   ModelPreheatDistributionPolicyRun,
   PolicyRunTask
 } from '../config/types';
+import ModelPreheatConfirmModal from './model-preheat-confirm-modal';
 import { ModelStorageErrorAlert } from './model-storage-error-details';
 
 const ACTIVE_RUN_STATES = new Set(['waiting', 'running', 'paused']);
@@ -90,6 +92,9 @@ const ModelDistributionPolicyRuns: React.FC = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<ModelPreheatDistributionPolicyRun | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -135,6 +140,19 @@ const ModelDistributionPolicyRuns: React.FC = () => {
     setDetail(null);
     setDetailError(null);
     setDetailLoading(false);
+  };
+
+  const removeRun = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      await deleteModelPreheatPolicyRun(deleteTarget.id);
+      setDeleteTarget(null);
+      if (detail?.id === deleteTarget.id) closeDetail();
+      await load();
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -281,24 +299,47 @@ const ModelDistributionPolicyRuns: React.FC = () => {
           },
           {
             title: intl.formatMessage({ id: 'common.table.operation' }),
-            width: 90,
+            width: 120,
             fixed: 'right' as const,
-            render: (_: unknown, run) => (
-              <Tooltip
-                title={intl.formatMessage({
-                  id: 'resources.storage.distributionPolicy.runDetail'
-                })}
-              >
-                <Button
-                  type="text"
-                  icon={<EyeOutlined />}
-                  aria-label={intl.formatMessage({
-                    id: 'resources.storage.distributionPolicy.runDetail'
-                  })}
-                  onClick={() => void openDetail(run.id)}
-                />
-              </Tooltip>
-            )
+            render: (_: unknown, run) => {
+              const active = ACTIVE_RUN_STATES.has(run.execution_state);
+              return (
+                <Space size={4}>
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: 'resources.storage.distributionPolicy.runDetail'
+                    })}
+                  >
+                    <Button
+                      type="text"
+                      icon={<EyeOutlined />}
+                      aria-label={intl.formatMessage({
+                        id: 'resources.storage.distributionPolicy.runDetail'
+                      })}
+                      onClick={() => void openDetail(run.id)}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: active
+                        ? 'resources.storage.runDeleteDisabled'
+                        : 'resources.storage.deleteRun'
+                    })}
+                  >
+                    <Button
+                      danger
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      aria-label={intl.formatMessage({
+                        id: 'resources.storage.deleteRun'
+                      })}
+                      disabled={active}
+                      onClick={() => setDeleteTarget(run)}
+                    />
+                  </Tooltip>
+                </Space>
+              );
+            }
           }
         ]}
         pagination={{
@@ -509,6 +550,19 @@ const ModelDistributionPolicyRuns: React.FC = () => {
           </>
         )}
       </Modal>
+      <ModelPreheatConfirmModal
+        open={Boolean(deleteTarget)}
+        title={intl.formatMessage({ id: 'resources.storage.deleteRunConfirm' })}
+        content={intl.formatMessage(
+          { id: 'resources.storage.deleteRunContent' },
+          { id: deleteTarget?.id || '' }
+        )}
+        okText={intl.formatMessage({ id: 'common.button.delete' })}
+        danger
+        loading={deleteLoading}
+        onOk={removeRun}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 };

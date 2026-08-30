@@ -347,6 +347,12 @@ export async function queryModelPreheatTask(id: number) {
   });
 }
 
+export async function deleteModelPreheatTask(id: number) {
+  return request<{ ok: boolean }>(`${MODEL_PREHEATS_API}/${id}`, {
+    method: 'DELETE'
+  });
+}
+
 export async function createModelPreheatTask(
   data: ModelPreheatCreate,
   idempotencyKey: string
@@ -398,6 +404,12 @@ export async function queryModelPreheatPolicyRun(id: number) {
     `${MODEL_PREHEAT_POLICIES_API}/runs/${id}`,
     { method: 'GET' }
   );
+}
+
+export async function deleteModelPreheatPolicyRun(id: number) {
+  return request<{ ok: boolean }>(`${MODEL_PREHEAT_POLICIES_API}/runs/${id}`, {
+    method: 'DELETE'
+  });
 }
 
 export async function queryModelPreheatPolicyRuns(params: Global.SearchParams) {
@@ -473,5 +485,15 @@ export async function queryModelPreheatScheduleRun(
   return request<ModelPreheatScheduleRun>(
     `${MODEL_PREHEAT_SCHEDULES_API}/${scheduleId}/runs/${runId}`,
     { method: 'GET' }
+  );
+}
+
+export async function deleteModelPreheatScheduleRun(
+  scheduleId: number,
+  runId: number
+) {
+  return request<{ ok: boolean }>(
+    `${MODEL_PREHEAT_SCHEDULES_API}/${scheduleId}/runs/${runId}`,
+    { method: 'DELETE' }
   );
 }
