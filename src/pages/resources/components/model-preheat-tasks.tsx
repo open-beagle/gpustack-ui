@@ -77,6 +77,7 @@ const actionIcons: Record<ModelPreheatTaskAction, React.ReactNode> = {
 type PreheatTaskAction = ModelPreheatTaskAction | 'delete';
 
 const terminalStates = new Set(['ready', 'partial', 'error', 'canceled']);
+const workerTaskErrorStates = new Set(['error', 'canceled']);
 
 const ModelPreheatTasks: React.FC = () => {
   const intl = useIntl();
@@ -242,7 +243,8 @@ const ModelPreheatTasks: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!detail || detailLoading || terminalStates.has(detail.execution_state)) return;
+    if (!detail || detailLoading || terminalStates.has(detail.execution_state))
+      return;
     let disposed = false;
     const timer = window.setTimeout(() => {
       detailRequests.current
@@ -310,10 +312,14 @@ const ModelPreheatTasks: React.FC = () => {
       width: 280,
       fixed: 'left' as const,
       render: (value: string, task: ModelPreheatTask) => {
-        const revision = getModelStorageRevisionPresentation(task.resolved_revision);
+        const revision = getModelStorageRevisionPresentation(
+          task.resolved_revision
+        );
         return (
           <Space direction="vertical" size={0} style={{ maxWidth: 248 }}>
-            <Typography.Text ellipsis={{ tooltip: value }}>{value}</Typography.Text>
+            <Typography.Text ellipsis={{ tooltip: value }}>
+              {value}
+            </Typography.Text>
             <Tooltip title={revision.full}>
               <Typography.Text type="secondary">
                 {intl.formatMessage({ id: 'resources.preheat.revision' })}:{' '}
@@ -535,7 +541,9 @@ const ModelPreheatTasks: React.FC = () => {
       }),
       width: 180,
       render: (_: unknown, item: ModelPreheatWorkerTask) =>
-        item.state_message || item.error_code || '-'
+        workerTaskErrorStates.has(item.state)
+          ? item.state_message || item.error_code || '-'
+          : '-'
     }
   ];
 

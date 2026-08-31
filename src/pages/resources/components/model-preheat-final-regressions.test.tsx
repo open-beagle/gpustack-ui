@@ -798,11 +798,12 @@ describe('任务发现与串行轮询', () => {
           worker_name: 'a100-58',
           worker_ip: '10.0.0.241',
           role: 'seed',
-          state: 'running',
+          state: 'pending',
           attempt: 1,
-          progress: 20,
-          downloaded_size: 20,
+          progress: 0,
+          downloaded_size: 0,
           total_size: 100,
+          state_message: 'uploading',
           created_at: '2026-08-11T08:00:00Z',
           updated_at: '2026-08-11T08:00:01Z'
         }
@@ -833,12 +834,15 @@ describe('任务发现与串行轮询', () => {
     );
 
     expect(await screen.findByText('a100-58')).toBeInTheDocument();
+    expect(screen.queryByText('uploading')).not.toBeInTheDocument();
     await waitFor(() => expect(scheduler.pending()).toBe(1));
     act(() => scheduler.runNext());
     expect(
       await screen.findByText('disk space is below required threshold')
     ).toBeInTheDocument();
-    expect(screen.queryByText('worker_execution_failed')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('worker_execution_failed')
+    ).not.toBeInTheDocument();
   });
 
   it('活动任务详情刷新失败后继续轮询并恢复', async () => {

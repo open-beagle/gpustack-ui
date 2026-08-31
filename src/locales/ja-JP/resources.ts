@@ -415,6 +415,9 @@ export default {
   'resources.storage.scanSucceededAt': '最終成功',
   'resources.storage.scanResult': '結果',
   'resources.storage.scanResult.success': '{count} 件のモデルをスキャン',
+  'resources.storage.scanResult.artifactTotal': '一覧に {count} 件のレコード',
+  'resources.storage.scanResult.filteredArtifactTotal':
+    '条件に一致するレコード {count} 件',
   'resources.storage.artifactId': 'モデル ID',
   'resources.storage.manifestDigest': 'マニフェストダイジェスト',
   'resources.storage.manifestPath': 'マニフェストパス',

@@ -418,6 +418,9 @@ export default {
   'resources.storage.scanSucceededAt': 'Последний успех',
   'resources.storage.scanResult': 'Результат',
   'resources.storage.scanResult.success': 'Просканировано моделей: {count}',
+  'resources.storage.scanResult.artifactTotal': 'Записей в списке: {count}',
+  'resources.storage.scanResult.filteredArtifactTotal':
+    'Записей по фильтрам: {count}',
   'resources.storage.artifactId': 'Artifact ID',
   'resources.storage.manifestDigest': 'Хеш манифеста',
   'resources.storage.manifestPath': 'Путь манифеста',

@@ -117,6 +117,16 @@ const ModelStorage: React.FC = () => {
           {intl.formatMessage(
             { id: 'resources.storage.scanResult.success' },
             { count: selectedArtifact.inventory_last_scan_count || 0 }
+          )}{' '}
+          ·{' '}
+          {intl.formatMessage(
+            {
+              id:
+                artifactSearch || artifactSource || artifactState
+                  ? 'resources.storage.scanResult.filteredArtifactTotal'
+                  : 'resources.storage.scanResult.artifactTotal'
+            },
+            { count: artifactTotal }
           )}
         </>
       )}
@@ -256,6 +266,13 @@ const ModelStorage: React.FC = () => {
       )
         return;
       await loadArtifactsRef.current();
+      if (
+        controller.signal.aborted ||
+        generation !== refreshRequest.current.generation ||
+        artifactProfileIdRef.current !== profileId
+      )
+        return;
+      await loadProfiles();
       if (
         controller.signal.aborted ||
         generation !== refreshRequest.current.generation ||

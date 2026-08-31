@@ -219,7 +219,7 @@ describe('统一模型存储交互', () => {
       items: [maintenance, profile],
       pagination: { ...page.pagination, total: 2 }
     });
-    render(<ModelStorage />);
+    const { container } = render(<ModelStorage />);
     await user.click(
       await screen.findByRole('tab', { name: 'resources.storage.artifacts' })
     );
@@ -331,7 +331,7 @@ describe('统一模型存储交互', () => {
       started_at: '',
       finished_at: ''
     });
-    render(<ModelStorage />);
+    const { container } = render(<ModelStorage />);
     await user.click(await screen.findByText('resources.storage.connectivity'));
     await user.click(
       screen.getByRole('button', { name: 'resources.storage.checkWorkers' })
@@ -350,8 +350,24 @@ describe('统一模型存储交互', () => {
 
   it('库存扫描直接执行并在后端同步完成后立即回拉 Artifact 列表', async () => {
     const user = userEvent.setup();
+    const refreshedProfile = {
+      ...profile,
+      inventory_last_attempt_at: '2026-08-31T01:50:59Z',
+      inventory_last_success_at: '2026-08-31T01:50:59Z',
+      inventory_last_scan_count: 23
+    };
+    api.queryModelPreheatS3Profiles
+      .mockResolvedValueOnce(page)
+      .mockResolvedValue({
+        ...page,
+        items: [refreshedProfile]
+      });
+    api.queryModelStorageArtifacts.mockResolvedValueOnce([]).mockResolvedValue({
+      items: [],
+      pagination: { page: 1, perPage: 20, total: 25, totalPage: 2 }
+    });
     api.refreshModelStorageArtifacts.mockResolvedValue({ job_id: 71 });
-    render(<ModelStorage />);
+    const { container } = render(<ModelStorage />);
     await screen.findByRole('tab', { name: 'resources.storage.artifacts' });
     await user.click(
       screen.getByRole('tab', { name: 'resources.storage.artifacts' })
@@ -376,6 +392,19 @@ describe('统一模型存储交互', () => {
         { page: 1, perPage: 20 },
         { signal: expect.any(AbortSignal) }
       )
+    );
+    await waitFor(() =>
+      expect(api.queryModelPreheatS3Profiles.mock.calls.length).toBeGreaterThan(
+        1
+      )
+    );
+    await waitFor(() =>
+      expect(container.textContent).toContain(
+        'resources.storage.scanResult.success'
+      )
+    );
+    expect(container.textContent).toContain(
+      'resources.storage.scanResult.artifactTotal'
     );
   });
 

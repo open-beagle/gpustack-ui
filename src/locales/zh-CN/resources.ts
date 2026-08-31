@@ -136,7 +136,7 @@ export default {
   'resources.preheat.model': '模型 ID',
   'resources.preheat.revision': '版本',
   'resources.preheat.attempt': '尝试次数',
-  'resources.preheat.targetCount': '目标节点数',
+  'resources.preheat.targetCount': '节点数',
   'resources.preheat.nodeCount': '节点数',
   'resources.preheat.targetScope': '目标范围',
   'resources.preheat.gpuModel': 'GPU 型号',
@@ -651,6 +651,9 @@ export default {
   'resources.storage.scanSucceededAt': '最近成功',
   'resources.storage.scanResult': '结果',
   'resources.storage.scanResult.success': '扫描到 {count} 个模型',
+  'resources.storage.scanResult.artifactTotal': '列表共 {count} 条记录',
+  'resources.storage.scanResult.filteredArtifactTotal':
+    '当前条件共 {count} 条记录',
   'resources.storage.artifactId': 'Artifact ID',
   'resources.storage.manifestDigest': '清单摘要',
   'resources.storage.manifestPath': '清单路径',
@@ -672,7 +675,7 @@ export default {
     '{model} -> S3 配置 {profile} -> 目标节点',
   'resources.preheat.confirm.flow.artifact':
     '固定 S3 Artifact {model} -> 本集群目标节点',
-  'resources.preheat.confirm.targetCount': '目标节点数',
+  'resources.preheat.confirm.targetCount': '节点数',
   'resources.preheat.confirm.targetPending': '按 GPU 范围匹配，执行时确定',
   'resources.preheat.confirm.capacity': '可获得容量',
   'resources.preheat.confirm.capacityUnavailable': '节点未上报容量信息',

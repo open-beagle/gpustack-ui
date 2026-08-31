@@ -700,6 +700,9 @@ export default {
   'resources.storage.scanSucceededAt': 'Succeeded',
   'resources.storage.scanResult': 'Result',
   'resources.storage.scanResult.success': 'Scanned {count} artifacts',
+  'resources.storage.scanResult.artifactTotal': '{count} records in list',
+  'resources.storage.scanResult.filteredArtifactTotal':
+    '{count} records match filters',
   'resources.storage.artifactId': 'Artifact ID',
   'resources.storage.manifestDigest': 'Manifest digest',
   'resources.storage.manifestPath': 'Manifest path',
