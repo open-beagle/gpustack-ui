@@ -292,10 +292,17 @@ const childActionList = [
   }
 ];
 
-const renderGpuIndexs = (gpuIndexes: number[]) => {
+const normalizeGpuIndexes = (gpuIndexes?: Array<number | string>) =>
+  _.sortBy(gpuIndexes || [], (item) => Number(item));
+
+const renderGpuIndexs = (gpuIndexes?: Array<number | string>) => {
+  const list = normalizeGpuIndexes(gpuIndexes);
+  if (!list.length) {
+    return <GPUIndexWrapper>CPU</GPUIndexWrapper>;
+  }
   return (
     <GPUIndexWrapper>
-      {_.chunk(gpuIndexes, 8).map((item: number[], index: number) => {
+      {_.chunk(list, 8).map((item: Array<number | string>, index: number) => {
         return <span key={index}>{item.join(',')}</span>;
       })}
     </GPUIndexWrapper>
@@ -322,14 +329,13 @@ const distributeCols: ColumnProps[] = [
     locale: true,
     key: 'gpu_index',
     render: ({ row }) => {
-      const list = _.sortBy(row.gpu_index, (item: number) => item);
       return row.is_main ? (
         <>
-          {renderGpuIndexs(list)}
+          {renderGpuIndexs(row.gpu_index)}
           <span>(main)</span>
         </>
       ) : (
-        renderGpuIndexs(list)
+        renderGpuIndexs(row.gpu_index)
       );
     }
   },
@@ -426,8 +432,8 @@ const InstanceItem: React.FC<InstanceItemProps> = ({
         </div>
         <div className="flex-center">
           <IconFont type="icon-filled-gpu" className="m-r-5" />
-          {intl.formatMessage({ id: 'models.table.gpuindex' })}: [
-          {_.join(instanceData.gpu_indexes?.sort?.(), ',')}]
+          {intl.formatMessage({ id: 'models.table.gpuindex' })}:{' '}
+          {renderGpuIndexs(instanceData.gpu_indexes)}
         </div>
         <div className="flex-center">
           <ThunderboltFilled className="m-r-5" />
